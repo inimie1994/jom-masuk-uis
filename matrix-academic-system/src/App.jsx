@@ -17,35 +17,39 @@ import Reports from './pages/Reports';
 import AuditLogs from './pages/AuditLogs';
 import Settings from './pages/Settings';
 
+import { ThemeProvider } from './context/ThemeContext';
+
 function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+        <ThemeProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
 
-          <Route path="/" element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="students" element={<Students />} />
-            <Route path="lecturers" element={<Lecturers />} />
-            <Route path="subjects" element={<Subjects />} />
-            <Route path="classes" element={<Classes />} />
-            <Route path="enrollment" element={<Enrollment />} />
-            <Route path="timetable" element={<Timetable />} />
-            <Route path="attendance" element={<Attendance />} />
-            <Route path="assessments" element={<Assessments />} />
-            <Route path="reports" element={<Reports />} />
-            <Route path="audit-logs" element={<AuditLogs />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
+            <Route path="/" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="students" element={<Students />} />
+              <Route path="lecturers" element={<Lecturers />} />
+              <Route path="subjects" element={<Subjects />} />
+              <Route path="classes" element={<Classes />} />
+              <Route path="enrollment" element={<Enrollment />} />
+              <Route path="timetable" element={<Timetable />} />
+              <Route path="attendance" element={<Attendance />} />
+              <Route path="assessments" element={<Assessments />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="audit-logs" element={<AuditLogs />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
 
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </ThemeProvider>
       </AuthProvider>
     </Router>
   );

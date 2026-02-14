@@ -1,6 +1,6 @@
-
 import { useAuth } from '../../auth/AuthContext';
 import { LogOut, Bell, Search, Menu } from 'lucide-react';
+import ThemeToggle from '../ThemeToggle';
 
 const Topbar = ({ toggleMobileSidebar }) => {
     const { user, signOut } = useAuth();
@@ -9,7 +9,7 @@ const Topbar = ({ toggleMobileSidebar }) => {
     const userRole = 'Faculty Admin';
 
     return (
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-40">
+        <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-6 sticky top-0 z-40 transition-colors">
             <div className="flex items-center">
                 <button onClick={toggleMobileSidebar} className="mr-4 lg:hidden p-2 hover:bg-gray-100 rounded-md">
                     <Menu size={20} />
@@ -25,6 +25,7 @@ const Topbar = ({ toggleMobileSidebar }) => {
             </div>
 
             <div className="flex items-center space-x-4">
+                <ThemeToggle />
                 <button className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-50 rounded-full transition-colors relative">
                     <Bell size={20} />
                     <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
