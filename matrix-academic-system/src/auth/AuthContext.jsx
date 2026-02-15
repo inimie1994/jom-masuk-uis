@@ -31,7 +31,23 @@ export const AuthProvider = ({ children }) => {
 
         getSession();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session?.user) {
+                // Fetch profile first to get faculty_id
+                const { data: profile } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (profile) {
+                    // Log login action
+                    // Dynamically import to avoid circular dependency issues if any, though utils usually fine.
+                    import('../utils/auditLogger').then(({ logAuditAction }) => {
+                        logAuditAction({ ...session.user, ...profile }, 'LOGIN', { email: session.user.email });
+                    });
+                }
+            }
             fetchProfile(session);
         });
 

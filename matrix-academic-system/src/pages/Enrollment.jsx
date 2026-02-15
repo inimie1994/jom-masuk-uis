@@ -193,6 +193,16 @@ const Enrollment = () => {
 
             if (error) throw error;
 
+            // Audit Log
+            import('../utils/auditLogger').then(({ logAuditAction }) => {
+                logAuditAction(user, 'ENROLLMENT_BATCH', {
+                    class_code: selectedClass.subjects.code,
+                    section: selectedClass.section,
+                    student_count: newStudents.length,
+                    groups: selectedGroups
+                });
+            });
+
             resetModal();
             setSuccess(`Successfully enrolled ${newStudents.length} students from ${selectedGroups.length} groups.`);
             setTimeout(() => setSuccess(null), 3000);
@@ -372,8 +382,8 @@ const Enrollment = () => {
                             type="button"
                             onClick={() => setEnrollmentMode('single')}
                             className={`flex-1 py-2 text-sm font-medium border first:rounded-l-md last:rounded-r-md focus:z-10 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 ${enrollmentMode === 'single'
-                                    ? 'bg-indigo-50 border-indigo-500 text-indigo-700 z-10 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-500'
-                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-600'
+                                ? 'bg-indigo-50 border-indigo-500 text-indigo-700 z-10 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-500'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-600'
                                 }`}
                         >
                             <span className="flex items-center justify-center">
@@ -385,8 +395,8 @@ const Enrollment = () => {
                             type="button"
                             onClick={() => setEnrollmentMode('group')}
                             className={`flex-1 py-2 text-sm font-medium border first:rounded-l-md last:rounded-r-md focus:z-10 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 ${enrollmentMode === 'group'
-                                    ? 'bg-indigo-50 border-indigo-500 text-indigo-700 z-10 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-500'
-                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-600'
+                                ? 'bg-indigo-50 border-indigo-500 text-indigo-700 z-10 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-500'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-600'
                                 }`}
                         >
                             <span className="flex items-center justify-center">

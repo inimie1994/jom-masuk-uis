@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext';
 import {
     LayoutDashboard,
     Users,
@@ -19,9 +20,10 @@ import {
 } from 'lucide-react';
 
 const Sidebar = ({ isMobile }) => {
+    const { user } = useAuth();
     const [collapsed, setCollapsed] = useState(false);
 
-    const navItems = [
+    const adminNavItems = [
         { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/students', label: 'Students', icon: Users },
         { path: '/lecturers', label: 'Lecturers', icon: GraduationCap },
@@ -35,6 +37,18 @@ const Sidebar = ({ isMobile }) => {
         { path: '/audit-logs', label: 'Audit Logs', icon: Activity },
         { path: '/settings', label: 'Settings', icon: Settings },
     ];
+
+    const lecturerNavItems = [
+        { path: '/lecturer-dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { path: '/my-classes', label: 'My Classes', icon: CalendarDays },
+        { path: '/my-students', label: 'My Students', icon: Users },
+        { path: '/attendance', label: 'Mark Attendance', icon: CalendarCheck },
+        { path: '/assessments', label: 'Assessments', icon: FileText },
+        { path: '/settings', label: 'Settings', icon: Settings },
+    ];
+
+    const navItems = user?.role === 'lecturer' ? lecturerNavItems : adminNavItems;
+    const roleLabel = user?.role === 'lecturer' ? 'Lecturer' : 'Faculty Admin';
 
     const toggleSidebar = () => {
         setCollapsed(!collapsed);
@@ -82,12 +96,12 @@ const Sidebar = ({ isMobile }) => {
             <div className="p-4 border-t border-gray-200 dark:border-slate-800">
                 <div className={`flex items-center ${collapsed ? 'justify-center' : 'space-x-3'}`}>
                     <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
-                        FA
+                        {user?.email?.substring(0, 2).toUpperCase() || 'US'}
                     </div>
                     {!collapsed && (
-                        <div>
-                            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Faculty Admin</p>
-                            <p className="text-xs text-gray-500 dark:text-slate-500">View Profile</p>
+                        <div className="overflow-hidden">
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{user?.email}</p>
+                            <p className="text-xs text-gray-500 dark:text-slate-500">{roleLabel}</p>
                         </div>
                     )}
                 </div>

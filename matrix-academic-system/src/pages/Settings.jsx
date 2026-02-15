@@ -1,30 +1,168 @@
-
+import { useState, useEffect } from 'react';
+import { useAuth } from '../auth/AuthContext';
+import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
+import ThemeToggle from '../components/ThemeToggle';
+import { User, Building, Monitor, Save } from 'lucide-react';
 
 const Settings = () => {
+    const { user } = useAuth();
+    const [activeTab, setActiveTab] = useState('profile');
+    const [facultyName, setFacultyName] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState(null);
+
+    useEffect(() => {
+        if (user?.faculty_id && activeTab === 'faculty') {
+            fetchFacultyDetails();
+        }
+    }, [user?.faculty_id, activeTab]);
+
+    const fetchFacultyDetails = async () => {
+        const { data, error } = await supabase
+            .from('faculties')
+            .select('name')
+            .eq('id', user.faculty_id)
+            .single();
+
+        if (data) setFacultyName(data.name);
+    };
+
+    const handleUpdateFaculty = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setMessage(null);
+
+        try {
+            const { error } = await supabase
+                .from('faculties')
+                .update({ name: facultyName })
+                .eq('id', user.faculty_id);
+
+            if (error) throw error;
+            setMessage({ type: 'success', text: 'Faculty settings updated successfully.' });
+        } catch (error) {
+            console.error('Error updating faculty:', error);
+            setMessage({ type: 'error', text: 'Failed to update faculty settings.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const tabs = [
+        { id: 'profile', label: 'Profile', icon: User },
+        ...(user?.role === 'admin' ? [{ id: 'faculty', label: 'Faculty', icon: Building }] : []),
+        { id: 'application', label: 'Application', icon: Monitor },
+    ];
+
     return (
-        <div>
+        <div className="max-w-4xl mx-auto space-y-6">
             <PageHeader title="Settings" />
-            <div className="bg-white dark:bg-slate-800 shadow rounded-lg p-6 max-w-2xl border border-gray-200 dark:border-slate-700">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">General Settings</h3>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Faculty Name</label>
-                        <input type="text" className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 dark:bg-slate-700 dark:text-white" defaultValue="Faculty of Computer Science" />
+
+            <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 min-h-[400px]">
+                <div className="flex flex-col md:flex-row h-full">
+                    {/* Sidebar Tabs */}
+                    <div className="w-full md:w-64 bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-700">
+                        <nav className="p-4 space-y-1">
+                            {tabs.map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${activeTab === tab.id
+                                            ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                            : 'text-gray-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-gray-900 dark:hover:text-gray-200'
+                                        }`}
+                                >
+                                    <tab.icon size={18} className="mr-3" />
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </nav>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Academic Year</label>
-                        <select className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2 dark:bg-slate-700 dark:text-white">
-                            <option>2023/2024</option>
-                            <option>2024/2025</option>
-                        </select>
-                    </div>
-                    <div className="flex items-center">
-                        <input id="notifications" type="checkbox" className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded dark:bg-slate-700 dark:border-slate-600" defaultChecked />
-                        <label htmlFor="notifications" className="ml-2 block text-sm text-gray-900 dark:text-gray-200">Enable Email Notifications</label>
-                    </div>
-                    <div className="pt-4">
-                        <button className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Save Changes</button>
+
+                    {/* Content Area */}
+                    <div className="flex-1 p-8">
+                        {message && (
+                            <div className={`mb-6 p-4 rounded-md text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'}`}>
+                                {message.text}
+                            </div>
+                        )}
+
+                        {activeTab === 'profile' && (
+                            <div className="space-y-6">
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-white border-b pb-2 dark:border-slate-700">Your Profile</h3>
+                                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                                    <div className="sm:col-span-4">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email Address</label>
+                                        <div className="mt-1 flex rounded-md shadow-sm">
+                                            <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-gray-400 sm:text-sm">
+                                                @
+                                            </span>
+                                            <input
+                                                type="text"
+                                                disabled
+                                                value={user?.email || ''}
+                                                className="flex-1 pointer-events-none min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 sm:text-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="sm:col-span-3">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
+                                        <input
+                                            type="text"
+                                            disabled
+                                            value={user?.role?.toUpperCase() || 'USER'}
+                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 sm:text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'faculty' && user?.role === 'admin' && (
+                            <div className="space-y-6">
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-white border-b pb-2 dark:border-slate-700">Faculty Settings</h3>
+                                <form onSubmit={handleUpdateFaculty}>
+                                    <div className="space-y-6">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Faculty Name</label>
+                                            <input
+                                                type="text"
+                                                value={facultyName}
+                                                onChange={(e) => setFacultyName(e.target.value)}
+                                                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white"
+                                            />
+                                        </div>
+
+                                        <div className="flex justify-end">
+                                            <button
+                                                type="submit"
+                                                disabled={loading}
+                                                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                                            >
+                                                {loading ? 'Saving...' : 'Save Changes'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
+
+                        {activeTab === 'application' && (
+                            <div className="space-y-6">
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-white border-b pb-2 dark:border-slate-700">Application Settings</h3>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h4 className="text-base font-medium text-gray-900 dark:text-white">Theme Preference</h4>
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">Manage your light or dark mode preference.</p>
+                                        </div>
+                                        <ThemeToggle />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

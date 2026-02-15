@@ -16,6 +16,9 @@ import Assessments from './pages/Assessments';
 import Reports from './pages/Reports';
 import AuditLogs from './pages/AuditLogs';
 import Settings from './pages/Settings';
+import LecturerDashboard from './pages/LecturerDashboard';
+import MyClasses from './pages/MyClasses';
+import MyStudents from './pages/MyStudents';
 
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -34,6 +37,9 @@ function App() {
             }>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
+              <Route path="lecturer-dashboard" element={<LecturerDashboard />} />
+              <Route path="my-classes" element={<MyClasses />} />
+              <Route path="my-students" element={<MyStudents />} />
               <Route path="students" element={<Students />} />
               <Route path="lecturers" element={<Lecturers />} />
               <Route path="subjects" element={<Subjects />} />
