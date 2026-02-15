@@ -8,7 +8,7 @@ const PageHeader = ({ title, actionLabel, onAction }) => {
             {actionLabel && (
                 <button
                     onClick={onAction}
-                    className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-sm"
+                    className="flex items-center justify-center px-4 py-2 bg-primary text-white rounded-xl hover:opacity-90 transition-all shadow-sm shadow-indigo-200 dark:shadow-none"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     {actionLabel}

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './auth/AuthContext';
 import ProtectedRoute from './auth/ProtectedRoute';
 import Login from './pages/Login';
+import LecturerLogin from './pages/LecturerLogin';
 import DashboardLayout from './components/layout/DashboardLayout';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
@@ -29,6 +30,7 @@ function App() {
         <ThemeProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/lecturer-login" element={<LecturerLogin />} />
 
             <Route path="/" element={
               <ProtectedRoute>

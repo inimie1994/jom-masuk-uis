@@ -120,24 +120,24 @@ const Classes = () => {
 
             {loading ? (
                 <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
             ) : classes.length > 0 ? (
-                <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700">
+                <div className="bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-800">
                     <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                            <thead className="bg-gray-50 dark:bg-slate-900">
+                        <table className="min-w-full divide-y divide-gray-50 dark:divide-slate-800">
+                            <thead className="bg-slate-50 dark:bg-slate-950">
                                 <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Subject</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Section</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Semester</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Subject</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Section</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Semester</th>
                                     <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                            <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-50 dark:divide-slate-800">
                                 {classes.map((cls) => (
-                                    <tr key={cls.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    <tr key={cls.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">
                                             {cls.subjects?.code} - {cls.subjects?.name}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{cls.section}</td>
@@ -145,7 +145,7 @@ const Classes = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <button
                                                 onClick={() => handleDeleteClass(cls.id)}
-                                                className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                                                className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
                                                 title="Delete Class"
                                             >
                                                 <Trash2 size={18} />
@@ -173,13 +173,13 @@ const Classes = () => {
             >
                 <form onSubmit={handleCreateClass} className="space-y-4">
                     <div>
-                        <label htmlFor="subject" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label htmlFor="subject" className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                             Subject
                         </label>
                         <select
                             id="subject"
                             required
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                             value={formData.subject_id}
                             onChange={(e) => setFormData({ ...formData, subject_id: e.target.value })}
                         >
@@ -192,44 +192,44 @@ const Classes = () => {
                         </select>
                     </div>
                     <div>
-                        <label htmlFor="section" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label htmlFor="section" className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                             Section
                         </label>
                         <input
                             type="text"
                             id="section"
                             required
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                             placeholder="e.g. 01"
                             value={formData.section}
                             onChange={(e) => setFormData({ ...formData, section: e.target.value })}
                         />
                     </div>
                     <div>
-                        <label htmlFor="semester" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label htmlFor="semester" className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                             Semester
                         </label>
                         <input
                             type="text"
                             id="semester"
                             required
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                             placeholder="e.g. 2023/2024-1"
                             value={formData.semester}
                             onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
                         />
                     </div>
-                    <div className="flex justify-end space-x-3 pt-2">
+                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-50 dark:border-slate-800 mt-6">
                         <button
                             type="button"
                             onClick={() => setIsModalOpen(false)}
-                            className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            className="px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-xl text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            className="px-4 py-2 border border-transparent rounded-xl shadow-sm text-sm font-bold uppercase tracking-wider text-white bg-primary hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all"
                         >
                             Create Class
                         </button>

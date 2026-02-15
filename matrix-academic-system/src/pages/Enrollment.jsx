@@ -262,57 +262,57 @@ const Enrollment = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-[calc(100vh-12rem)]">
                 {/* Left Column: Class Selection */}
-                <div className="md:col-span-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col overflow-hidden">
-                    <div className="p-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-                        <h3 className="font-semibold text-gray-700 dark:text-gray-200">Select Class</h3>
+                <div className="md:col-span-4 bg-white dark:bg-slate-900 rounded-2xl shadow-pastel border border-gray-100 dark:border-slate-800 flex flex-col overflow-hidden">
+                    <div className="p-4 border-b border-gray-50 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                        <h3 className="font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider text-xs">Select Class</h3>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-2">
+                    <div className="flex-1 overflow-y-auto p-3">
                         {loadingClasses ? (
                             <div className="flex justify-center p-4">
-                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                             </div>
                         ) : classes.length > 0 ? (
-                            <ul className="space-y-1">
+                            <ul className="space-y-2">
                                 {classes.map((cls) => (
                                     <li key={cls.id}>
                                         <button
                                             onClick={() => setSelectedClass(cls)}
-                                            className={`w-full text-left px-4 py-3 rounded-md transition-colors flex items-center justify-between group ${selectedClass?.id === cls.id
-                                                ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-500'
-                                                : 'hover:bg-gray-50 dark:hover:bg-slate-700/50 text-gray-700 dark:text-gray-300'
+                                            className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between group ${selectedClass?.id === cls.id
+                                                ? 'bg-pastel-indigo dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 shadow-sm border border-indigo-100 dark:border-indigo-800/30'
+                                                : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-gray-700 dark:text-gray-300 border border-transparent'
                                                 }`}
                                         >
                                             <div>
-                                                <div className="font-medium">{cls.subjects?.code}</div>
-                                                <div className="text-sm opacity-75">{cls.subjects?.name}</div>
-                                                <div className="text-xs text-gray-400 mt-1">
+                                                <div className="font-bold">{cls.subjects?.code}</div>
+                                                <div className="text-sm opacity-80">{cls.subjects?.name}</div>
+                                                <div className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
                                                     Section {cls.section} • {cls.semester}
                                                 </div>
                                             </div>
-                                            <ChevronRight size={16} className={`opacity-0 group-hover:opacity-100 transition-opacity ${selectedClass?.id === cls.id ? 'opacity-100 text-indigo-600' : 'text-gray-400'}`} />
+                                            <ChevronRight size={16} className={`opacity-0 group-hover:opacity-100 transition-all ${selectedClass?.id === cls.id ? 'opacity-100 text-indigo-600' : 'text-gray-400'}`} />
                                         </button>
                                     </li>
                                 ))}
                             </ul>
                         ) : (
-                            <div className="p-4 text-center text-gray-500 text-sm">No classes found.</div>
+                            <div className="p-4 text-center text-gray-500 text-sm italic">No classes found.</div>
                         )}
                     </div>
                 </div>
 
                 {/* Right Column: Enrolled Students */}
-                <div className="md:col-span-8 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col overflow-hidden">
-                    <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900">
-                        <h3 className="font-semibold text-gray-700 dark:text-gray-200">
+                <div className="md:col-span-8 bg-white dark:bg-slate-900 rounded-2xl shadow-pastel border border-gray-100 dark:border-slate-800 flex flex-col overflow-hidden">
+                    <div className="p-4 border-b border-gray-50 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
+                        <h3 className="font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider text-xs">
                             {selectedClass
-                                ? `Enrolled Students: ${selectedClass.subjects?.code} (Section ${selectedClass.section})`
+                                ? `Enrollments: ${selectedClass.subjects?.code} (Section ${selectedClass.section})`
                                 : 'Select a class to view enrollments'}
                         </h3>
                         {selectedClass && (
                             <button
                                 onClick={() => setIsModalOpen(true)}
-                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                className="inline-flex items-center px-4 py-1.5 border border-transparent text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm text-white bg-primary hover:opacity-90 transition-all"
                             >
                                 <UserPlus size={16} className="mr-1.5" />
                                 Enroll Student
@@ -323,26 +323,26 @@ const Enrollment = () => {
                     <div className="flex-1 overflow-y-auto">
                         {!selectedClass ? (
                             <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8">
-                                <Users size={48} className="mb-4 opacity-20" />
-                                <p>Select a class from the left to manage enrollments.</p>
+                                <Users size={48} className="mb-4 opacity-10" />
+                                <p className="italic">Select a class from the left to manage enrollments.</p>
                             </div>
                         ) : loadingEnrollments ? (
                             <div className="flex justify-center p-12">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                             </div>
                         ) : enrolledStudents.length > 0 ? (
-                            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                                <thead className="bg-gray-50 dark:bg-slate-900">
+                            <table className="min-w-full divide-y divide-gray-50 dark:divide-slate-800">
+                                <thead className="bg-slate-50 dark:bg-slate-950">
                                     <tr>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Matric No</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Matric No</th>
                                         <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                                <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-50 dark:divide-slate-800">
                                     {enrolledStudents.map((enrollment) => (
-                                        <tr key={enrollment.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        <tr key={enrollment.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">
                                                 {enrollment.students?.name}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
@@ -351,7 +351,7 @@ const Enrollment = () => {
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <button
                                                     onClick={() => handleUnenrollStudent(enrollment.id)}
-                                                    className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                                                    className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
                                                     title="Remove Student"
                                                 >
                                                     <Trash2 size={16} />
@@ -363,7 +363,7 @@ const Enrollment = () => {
                             </table>
                         ) : (
                             <div className="h-full flex flex-col items-center justify-center text-gray-500 p-8">
-                                <p>No students enrolled in this class yet.</p>
+                                <p className="italic">No students enrolled in this class yet.</p>
                             </div>
                         )}
                     </div>
@@ -377,13 +377,13 @@ const Enrollment = () => {
             >
                 <div>
                     {/* Mode Switcher */}
-                    <div className="flex rounded-md shadow-sm mb-6 w-full">
+                    <div className="flex rounded-xl shadow-sm mb-6 w-full overflow-hidden border border-gray-100 dark:border-slate-800">
                         <button
                             type="button"
                             onClick={() => setEnrollmentMode('single')}
-                            className={`flex-1 py-2 text-sm font-medium border first:rounded-l-md last:rounded-r-md focus:z-10 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 ${enrollmentMode === 'single'
-                                ? 'bg-indigo-50 border-indigo-500 text-indigo-700 z-10 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-500'
-                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-600'
+                            className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${enrollmentMode === 'single'
+                                ? 'bg-primary text-white'
+                                : 'bg-white text-gray-500 hover:bg-slate-50 dark:bg-slate-800 dark:text-gray-400 dark:hover:bg-slate-700'
                                 }`}
                         >
                             <span className="flex items-center justify-center">
@@ -394,9 +394,9 @@ const Enrollment = () => {
                         <button
                             type="button"
                             onClick={() => setEnrollmentMode('group')}
-                            className={`flex-1 py-2 text-sm font-medium border first:rounded-l-md last:rounded-r-md focus:z-10 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 ${enrollmentMode === 'group'
-                                ? 'bg-indigo-50 border-indigo-500 text-indigo-700 z-10 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-500'
-                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-600'
+                            className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider transition-all ${enrollmentMode === 'group'
+                                ? 'bg-primary text-white'
+                                : 'bg-white text-gray-500 hover:bg-slate-50 dark:bg-slate-800 dark:text-gray-400 dark:hover:bg-slate-700'
                                 }`}
                         >
                             <span className="flex items-center justify-center">
@@ -409,13 +409,13 @@ const Enrollment = () => {
                     <form onSubmit={handleEnroll} className="space-y-4">
                         {enrollmentMode === 'single' ? (
                             <div>
-                                <label htmlFor="student" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <label htmlFor="student" className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
                                     Select Student
                                 </label>
                                 <select
                                     id="student"
                                     required
-                                    className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                                    className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                                     value={selectedStudentToAdd}
                                     onChange={(e) => setSelectedStudentToAdd(e.target.value)}
                                 >
@@ -429,11 +429,11 @@ const Enrollment = () => {
                             </div>
                         ) : (
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">
                                     Select Groups to Enroll
                                 </label>
                                 {availableGroups.length > 0 ? (
-                                    <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-slate-700 rounded-md p-2 space-y-2 bg-gray-50 dark:bg-slate-800">
+                                    <div className="max-h-48 overflow-y-auto border border-gray-100 dark:border-slate-800 rounded-xl p-3 space-y-2 bg-slate-50 dark:bg-slate-900">
                                         {availableGroups.map((group) => (
                                             <div key={group} className="flex items-center">
                                                 <input
@@ -442,38 +442,38 @@ const Enrollment = () => {
                                                     type="checkbox"
                                                     checked={selectedGroups.includes(group)}
                                                     onChange={() => toggleGroupSelection(group)}
-                                                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded dark:bg-slate-700 dark:border-slate-600"
+                                                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded-lg dark:bg-slate-700 dark:border-slate-600 transition-all"
                                                 />
-                                                <label htmlFor={`group-${group}`} className="ml-2 block text-sm text-gray-900 dark:text-gray-100 cursor-pointer select-none">
+                                                <label htmlFor={`group-${group}`} className="ml-2 block text-sm text-gray-900 dark:text-gray-100 cursor-pointer select-none font-medium">
                                                     {group}
                                                 </label>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="text-sm text-gray-500 italic p-2 border border-gray-200 rounded-md bg-gray-50">
+                                    <div className="text-sm text-gray-500 italic p-3 border border-gray-100 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-900">
                                         No student groups found. Add groups to students first.
                                     </div>
                                 )}
-                                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                <p className="mt-2 text-xs text-gray-400 dark:text-gray-500 font-semibold uppercase tracking-widest">
                                     Selected groups: {selectedGroups.join(', ') || 'None'}
                                 </p>
                             </div>
                         )}
 
-                        <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100 dark:border-slate-700 mt-6">
+                        <div className="flex justify-end space-x-3 pt-4 border-t border-gray-50 dark:border-slate-800 mt-6">
                             <button
                                 type="button"
                                 onClick={resetModal}
-                                className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                className="px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-xl text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
-                                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                className="px-4 py-2 border border-transparent rounded-xl shadow-sm text-sm font-bold uppercase tracking-wider text-white bg-primary hover:opacity-90 transition-all"
                             >
-                                {enrollmentMode === 'single' ? 'Enroll Student' : 'Enroll Selected Groups'}
+                                {enrollmentMode === 'single' ? 'Enroll Student' : 'Enroll Groups'}
                             </button>
                         </div>
                     </form>

@@ -62,8 +62,8 @@ const Sidebar = ({ isMobile }) => {
                 ${isMobile && collapsed ? '-translate-x-full' : ''}
             `}
         >
-            <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-slate-800">
-                {!collapsed && <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">Matrix</span>}
+            <div className="h-16 flex items-center justify-between px-4 border-b border-gray-100 dark:border-slate-800">
+                {!collapsed && <span className="text-xl font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">Matrix</span>}
                 {!isMobile && (
                     <button onClick={toggleSidebar} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 dark:text-slate-400 dark:hover:text-white transition-colors">
                         {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
@@ -78,10 +78,10 @@ const Sidebar = ({ isMobile }) => {
                             <NavLink
                                 to={item.path}
                                 className={({ isActive }) => `
-                                    flex items-center px-4 py-3 rounded-md transition-colors
+                                    flex items-center px-4 py-3 rounded-xl transition-all duration-200
                                     ${isActive
-                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
-                                        : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 dark:hover:text-white'
+                                        ? 'bg-pastel-indigo text-indigo-600 shadow-sm border border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800/50'
+                                        : 'text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800/50 dark:hover:text-white'
                                     }
                                 `}
                             >

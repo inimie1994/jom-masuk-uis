@@ -274,14 +274,14 @@ const Attendance = () => {
             />
 
             {/* Filters */}
-            <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-wrap gap-4 items-center">
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-pastel border border-gray-100 dark:border-slate-800 flex flex-wrap gap-4 items-center">
                 <div className="flex items-center space-x-2">
                     <Calendar size={20} className="text-gray-400" />
                     <input
                         type="date"
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
-                        className="rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                        className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                     />
                 </div>
                 <div className="flex items-center space-x-2">
@@ -289,7 +289,7 @@ const Attendance = () => {
                     <select
                         value={selectedGroup}
                         onChange={(e) => setSelectedGroup(e.target.value)}
-                        className="rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border w-48"
+                        className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border w-48 transition-all"
                     >
                         <option value="">All Groups</option>
                         {groups.map(g => (
@@ -301,55 +301,55 @@ const Attendance = () => {
 
             {/* Alerts */}
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-md mb-4 text-sm flex justify-between items-center">
-                    <span>{error}</span>
-                    <button onClick={() => setError(null)} className="text-sm underline">Dismiss</button>
+                <div className="bg-red-50 dark:bg-red-900/10 text-red-500 dark:text-red-400 p-4 rounded-xl mb-4 text-sm flex justify-between items-center border border-red-100 dark:border-red-900/30">
+                    <span className="font-semibold">{error}</span>
+                    <button onClick={() => setError(null)} className="text-xs font-bold uppercase tracking-widest hover:underline">Dismiss</button>
                 </div>
             )}
             {successMessage && (
-                <div className="bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 p-4 rounded-md mb-4 text-sm flex justify-between items-center">
-                    <span>{successMessage}</span>
-                    <button onClick={() => setSuccessMessage(null)} className="text-sm underline">Dismiss</button>
+                <div className="bg-green-50 dark:bg-green-900/10 text-green-500 dark:text-green-400 p-4 rounded-xl mb-4 text-sm flex justify-between items-center border border-green-100 dark:border-green-900/30">
+                    <span className="font-semibold">{successMessage}</span>
+                    <button onClick={() => setSuccessMessage(null)} className="text-xs font-bold uppercase tracking-widest hover:underline">Dismiss</button>
                 </div>
             )}
 
             {/* Sessions List */}
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 font-medium text-gray-700 dark:text-gray-200">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-pastel border border-gray-100 dark:border-slate-800 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-50 dark:border-slate-800 font-bold text-gray-700 dark:text-gray-200 uppercase tracking-widest text-xs bg-slate-50/50 dark:bg-slate-950/50">
                     Sessions for {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </div>
 
                 {loading ? (
-                    <div className="p-8 text-center text-gray-400">Loading sessions...</div>
+                    <div className="p-8 text-center text-gray-400 italic">Loading sessions...</div>
                 ) : sessions.length === 0 ? (
-                    <div className="p-8 text-center text-gray-400 flex flex-col items-center">
-                        <Calendar size={48} className="mb-4 opacity-20" />
-                        <p>No sessions found for this date.</p>
-                        <p className="text-sm mt-2">Try changing the date or generating a schedule.</p>
+                    <div className="p-12 text-center text-gray-400 flex flex-col items-center">
+                        <Calendar size={48} className="mb-4 opacity-10" />
+                        <p className="italic">No sessions found for this date.</p>
+                        <p className="text-xs mt-2 uppercase tracking-widest font-bold">Try changing the date or generating a schedule.</p>
                     </div>
                 ) : (
-                    <div className="divide-y divide-gray-200 dark:divide-slate-700">
+                    <div className="divide-y divide-gray-50 dark:divide-slate-800">
                         {sessions.map(session => (
-                            <div key={session.id} className="p-6 hover:bg-gray-50 dark:hover:bg-slate-750 transition-colors flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                            <div key={session.id} className="p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center group">
                                 <div className="space-y-1 mb-4 sm:mb-0">
                                     <div className="flex items-center space-x-2">
-                                        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                                        <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">
                                             {session.subjects?.code} - {session.subjects?.name}
                                         </h3>
-                                        <span className={`px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300`}>
+                                        <span className={`px-2 py-0.5 rounded-lg text-[10px] uppercase tracking-widest font-bold bg-pastel-indigo text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300`}>
                                             {session.class_type || 'Class'}
                                         </span>
                                     </div>
-                                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 space-x-4">
-                                        <span className="flex items-center"><Clock size={14} className="mr-1" /> {session.start_time.slice(0, 5)} - {session.end_time.slice(0, 5)}</span>
-                                        <span className="flex items-center"><MapPin size={14} className="mr-1" /> {session.room || 'No Room'}</span>
-                                        <span className="flex items-center"><User size={14} className="mr-1" /> {session.lecturers?.name || 'No Lecturer'}</span>
-                                        <span className="flex items-center font-semibold text-gray-700 dark:text-gray-300">Group: {session.group_name}</span>
+                                    <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 space-x-4">
+                                        <span className="flex items-center"><Clock size={14} className="mr-1 opacity-70" /> {session.start_time.slice(0, 5)} - {session.end_time.slice(0, 5)}</span>
+                                        <span className="flex items-center"><MapPin size={14} className="mr-1 opacity-70" /> {session.room || 'No Room'}</span>
+                                        <span className="flex items-center"><User size={14} className="mr-1 opacity-70" /> {session.lecturers?.name || 'No Lecturer'}</span>
+                                        <span className="flex items-center font-bold text-primary dark:text-indigo-300 uppercase tracking-wider">Group: {session.group_name}</span>
                                     </div>
                                 </div>
                                 <button
                                     onClick={() => openMarkModal(session)}
-                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium transition-colors shadow-sm"
+                                    className="px-6 py-2 bg-primary hover:opacity-90 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-sm"
                                 >
                                     Mark Attendance
                                 </button>
@@ -366,44 +366,44 @@ const Attendance = () => {
                 title="Generate Semester Schedule"
             >
                 <form onSubmit={handleGenerateSessions} className="space-y-4">
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md text-sm text-yellow-800 dark:text-yellow-200 mb-4 flex items-start">
-                        <AlertCircle size={16} className="mt-0.5 mr-2 flex-shrink-0" />
-                        <p>This will generate attendance sessions for all classes in the timetable within the selected date range. Existing sessions will not be duplicated.</p>
+                    <div className="bg-amber-50 dark:bg-amber-900/10 p-4 rounded-xl text-sm text-amber-700 dark:text-amber-300 mb-4 flex items-start border border-amber-100 dark:border-amber-900/30 shadow-sm">
+                        <AlertCircle size={18} className="mt-0.5 mr-3 flex-shrink-0 opacity-80" />
+                        <p className="font-medium leading-relaxed">This will generate attendance sessions for all classes in the timetable within the selected date range. Existing sessions will not be duplicated.</p>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Semester Start Date</label>
+                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Semester Start Date</label>
                         <input
                             type="date"
                             required
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                             value={semesterStart}
                             onChange={(e) => setSemesterStart(e.target.value)}
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Semester End Date</label>
+                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Semester End Date</label>
                         <input
                             type="date"
                             required
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                             value={semesterEnd}
                             onChange={(e) => setSemesterEnd(e.target.value)}
                         />
                     </div>
 
-                    <div className="flex justify-end pt-4">
+                    <div className="flex justify-end pt-6 border-t border-gray-50 dark:border-slate-800 mt-6">
                         <button
                             type="button"
                             onClick={() => setIsGenerateModalOpen(false)}
-                            className="mr-3 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
+                            className="mr-3 px-6 py-2 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={generateLoading}
-                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                            className="px-6 py-2 border border-transparent rounded-xl shadow-sm text-xs font-bold uppercase tracking-widest text-white bg-primary hover:opacity-90 disabled:opacity-50 transition-all"
                         >
                             {generateLoading ? 'Generating...' : 'Generate Schedule'}
                         </button>
@@ -419,44 +419,43 @@ const Attendance = () => {
             >
                 <div>
                     {markingLoading && !students.length ? (
-                        <div className="p-4 text-center">Loading student list...</div>
+                        <div className="p-8 text-center text-gray-400 italic">Loading student list...</div>
                     ) : (
                         <>
-                            <div className="mb-4 flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
-                                <span>{students.length} Students</span>
-                                <div className="space-x-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const newStatus = {};
-                                            students.forEach(s => newStatus[s.id] = 'Present');
-                                            setAttendanceStatus(newStatus);
-                                        }}
-                                        className="text-xs text-indigo-600 hover:underline"
-                                    >
-                                        Mark All Present
-                                    </button>
-                                </div>
+                            <div className="mb-6 flex justify-between items-center">
+                                <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">{students.length} Students</span>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newStatus = {};
+                                        students.forEach(s => newStatus[s.id] = 'Present');
+                                        setAttendanceStatus(newStatus);
+                                    }}
+                                    className="text-[10px] font-bold uppercase tracking-widest text-primary hover:opacity-80 transition-all flex items-center"
+                                >
+                                    <CheckCircle size={14} className="mr-1" />
+                                    Mark All Present
+                                </button>
                             </div>
 
-                            <div className="max-h-[60vh] overflow-y-auto space-y-2 pr-2">
+                            <div className="max-h-[50vh] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                                 {students.map(student => (
-                                    <div key={student.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-750 rounded-md border border-gray-100 dark:border-slate-700">
-                                        <div>
-                                            <p className="font-medium text-gray-900 dark:text-white text-sm">{student.name}</p>
-                                            <p className="text-xs text-gray-500">{student.matric_no}</p>
+                                    <div key={student.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-50/50 dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 transition-all hover:shadow-sm">
+                                        <div className="mb-3 sm:mb-0">
+                                            <p className="font-bold text-gray-900 dark:text-white text-sm">{student.name}</p>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{student.matric_no}</p>
                                         </div>
-                                        <div className="flex space-x-1">
+                                        <div className="flex flex-wrap gap-1.5">
                                             {['Present', 'Absent', 'Late', 'Excused'].map(status => (
                                                 <button
                                                     key={status}
                                                     type="button"
                                                     onClick={() => handleStatusChange(student.id, status)}
                                                     className={`
-                                                        px-2 py-1 text-xs rounded-md transition-colors border
+                                                        px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all border
                                                         ${attendanceStatus[student.id] === status
-                                                            ? `${getStatusColor(status)} border-transparent font-bold ring-1 ring-offset-1 ring-indigo-500`
-                                                            : 'bg-white dark:bg-slate-800 text-gray-500 border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700'
+                                                            ? `${getStatusColor(status)} border-transparent shadow-sm scale-105`
+                                                            : 'bg-white dark:bg-slate-800 text-gray-400 border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
                                                         }
                                                     `}
                                                 >
@@ -468,11 +467,11 @@ const Attendance = () => {
                                 ))}
                             </div>
 
-                            <div className="flex justify-end pt-4 mt-4 border-t border-gray-200 dark:border-slate-700">
+                            <div className="flex justify-end pt-6 mt-6 border-t border-gray-50 dark:border-slate-800">
                                 <button
                                     type="button"
                                     onClick={() => setIsMarkModalOpen(false)}
-                                    className="mr-3 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
+                                    className="mr-3 px-6 py-2 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all font-bold"
                                 >
                                     Cancel
                                 </button>
@@ -480,7 +479,7 @@ const Attendance = () => {
                                     type="button"
                                     onClick={saveAttendance}
                                     disabled={markingLoading}
-                                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                                    className="px-6 py-2 border border-transparent rounded-xl shadow-pastel text-xs font-bold uppercase tracking-widest text-white bg-primary hover:opacity-90 disabled:opacity-50 transition-all"
                                 >
                                     {markingLoading ? 'Saving...' : 'Save Attendance'}
                                 </button>

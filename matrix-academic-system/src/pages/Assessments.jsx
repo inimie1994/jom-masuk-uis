@@ -315,37 +315,41 @@ const Assessments = () => {
                     <div className="space-x-3">
                         <button
                             onClick={() => setGradingAssessment(null)}
-                            className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
+                            className="px-6 py-2 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
                         >
                             Cancel
                         </button>
                         <button
                             onClick={saveGrades}
-                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium flex items-center"
+                            className="px-6 py-2 bg-primary hover:opacity-90 text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all shadow-pastel flex items-center"
                         >
                             <Save size={16} className="mr-2" /> Save Grades
                         </button>
                     </div>
                 </div>
 
-                {error && <div className="text-red-500 bg-red-50 p-3 rounded">{error}</div>}
+                {error && (
+                    <div className="bg-red-50 dark:bg-red-900/10 text-red-500 dark:text-red-400 p-4 rounded-xl mb-4 text-sm border border-red-100 dark:border-red-900/30 font-bold">
+                        {error}
+                    </div>
+                )}
 
-                <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                        <thead className="bg-gray-50 dark:bg-slate-900">
+                <div className="bg-white dark:bg-slate-900 shadow-pastel rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-800">
+                    <table className="min-w-full divide-y divide-gray-50 dark:divide-slate-800">
+                        <thead className="bg-slate-50 dark:bg-slate-950">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Student</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Matric No</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Group</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Marks (/{gradingAssessment.total_marks})</th>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Student</th>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Matric No</th>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Group</th>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Marks (/{gradingAssessment.total_marks})</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                        <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-50 dark:divide-slate-800">
                             {students.map(student => (
-                                <tr key={student.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{student.name}</td>
+                                <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">{student.name}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.matric_no}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.student_group}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-medium">{student.student_group}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                         <input
                                             type="number"
@@ -354,14 +358,14 @@ const Assessments = () => {
                                             step="0.01"
                                             value={grades[student.id] || ''}
                                             onChange={(e) => handleGradeChange(student.id, e.target.value)}
-                                            className="w-24 rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-2 py-1 border"
+                                            className="w-24 rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                                         />
                                     </td>
                                 </tr>
                             ))}
                             {students.length === 0 && !gradingLoading && (
                                 <tr>
-                                    <td colSpan="4" className="px-6 py-4 text-center text-gray-500">No students found enrolled in this subject.</td>
+                                    <td colSpan="4" className="px-6 py-4 text-center text-gray-500 italic">No students found enrolled in this subject.</td>
                                 </tr>
                             )}
                         </tbody>
@@ -379,12 +383,12 @@ const Assessments = () => {
                 onAction={() => handleOpenModal()}
             />
 
-            <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex items-center space-x-4">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Select Subject:</span>
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-pastel border border-gray-100 dark:border-slate-800 flex items-center space-x-4">
+                <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Select Subject:</span>
                 <select
                     value={selectedSubject}
                     onChange={(e) => setSelectedSubject(e.target.value)}
-                    className="block w-64 rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                    className="block w-64 rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                 >
                     <option value="">Select a subject...</option>
                     {subjects.map(s => (
@@ -394,62 +398,73 @@ const Assessments = () => {
             </div>
 
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-md mb-4 text-sm flex justify-between items-center">
-                    <span>{error}</span>
-                    <button onClick={() => setError(null)} className="text-sm underline">Dismiss</button>
+                <div className="bg-red-50 dark:bg-red-900/10 text-red-500 dark:text-red-400 p-4 rounded-xl mb-4 text-sm border border-red-100 dark:border-red-900/30 flex justify-between items-center transition-all">
+                    <span className="font-bold">{error}</span>
+                    <button onClick={() => setError(null)} className="text-[10px] font-bold uppercase tracking-widest hover:underline">Dismiss</button>
                 </div>
             )}
             {successMessage && (
-                <div className="bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 p-4 rounded-md mb-4 text-sm flex justify-between items-center">
-                    <span>{successMessage}</span>
-                    <button onClick={() => setSuccessMessage(null)} className="text-sm underline">Dismiss</button>
+                <div className="bg-green-50 dark:bg-green-900/10 text-green-500 dark:text-green-400 p-4 rounded-xl mb-4 text-sm border border-green-100 dark:border-green-900/30 flex justify-between items-center transition-all">
+                    <span className="font-bold">{successMessage}</span>
+                    <button onClick={() => setSuccessMessage(null)} className="text-[10px] font-bold uppercase tracking-widest hover:underline">Dismiss</button>
                 </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {!selectedSubject ? (
-                    <div className="col-span-full py-12 text-center text-gray-400">
-                        <FileText size={48} className="mx-auto mb-4 opacity-20" />
-                        <p>Select a subject to view assessments.</p>
+                    <div className="col-span-full py-24 text-center text-gray-400 flex flex-col items-center">
+                        <FileText size={48} className="mb-4 opacity-10" />
+                        <p className="italic uppercase tracking-widest text-xs font-bold">Select a subject to view assessments.</p>
                     </div>
                 ) : assessments.length === 0 ? (
-                    <div className="col-span-full py-12 text-center text-gray-400">
-                        <p>No assessments created for this subject yet.</p>
-                        <button onClick={() => handleOpenModal()} className="mt-2 text-indigo-600 hover:underline">Create one now</button>
+                    <div className="col-span-full py-24 text-center text-gray-400 flex flex-col items-center">
+                        <p className="italic mb-4">No assessments created for this subject yet.</p>
+                        <button
+                            onClick={() => handleOpenModal()}
+                            className="text-primary font-bold uppercase tracking-widest text-xs border-b border-primary/30 hover:border-primary transition-all pb-1"
+                        >
+                            Create one now
+                        </button>
                     </div>
                 ) : (
                     assessments.map(assessment => (
-                        <div key={assessment.id} className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+                        <div key={assessment.id} className="bg-white dark:bg-slate-900 rounded-2xl shadow-pastel border border-gray-100 dark:border-slate-800 p-6 flex flex-col justify-between hover:shadow-pastel-lg transition-all group">
                             <div>
-                                <div className="flex justify-between items-start mb-2">
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{assessment.name}</h3>
-                                    <span className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 text-xs px-2 py-1 rounded-full font-medium">
+                                <div className="flex justify-between items-start mb-4">
+                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">{assessment.name}</h3>
+                                    <span className="bg-pastel-indigo text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-widest">
                                         {assessment.weightage}%
                                     </span>
                                 </div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 line-clamp-2">{assessment.description || 'No description'}</p>
-                                <div className="space-y-1 text-sm text-gray-500 dark:text-gray-400">
-                                    <p>Total Marks: <span className="font-medium text-gray-700 dark:text-gray-300">{assessment.total_marks}</span></p>
-                                    <p>Date: <span className="font-medium text-gray-700 dark:text-gray-300">{assessment.date || 'N/A'}</span></p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 line-clamp-2 italic leading-relaxed">{assessment.description || 'No description provided.'}</p>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-widest text-gray-400">
+                                        <span>Total Marks</span>
+                                        <span className="text-gray-700 dark:text-gray-200">{assessment.total_marks}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-[10px] uppercase font-bold tracking-widest text-gray-400">
+                                        <span>Assessment Date</span>
+                                        <span className="text-gray-700 dark:text-gray-200">{assessment.date || 'To be announced'}</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="mt-6 pt-4 border-t border-gray-100 dark:border-slate-700 flex justify-between items-center">
+                            <div className="mt-8 pt-4 border-t border-gray-50 dark:border-slate-800 flex justify-between items-center">
                                 <button
                                     onClick={() => startGrading(assessment)}
-                                    className="text-indigo-600 hover:text-indigo-700 text-sm font-medium flex items-center"
+                                    className="text-primary hover:opacity-80 text-[10px] font-bold uppercase tracking-widest flex items-center transition-all"
                                 >
-                                    <CheckCircle size={16} className="mr-1" /> Enter Grades
+                                    <CheckCircle size={14} className="mr-1.5" /> Enter Grades
                                 </button>
-                                <div className="flex space-x-2">
+                                <div className="flex space-x-1">
                                     <button
                                         onClick={() => handleOpenModal(assessment)}
-                                        className="text-gray-400 hover:text-blue-500 transition-colors"
+                                        className="p-2 text-gray-300 hover:text-blue-400 transition-all rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800"
                                     >
                                         <Edit2 size={16} />
                                     </button>
                                     <button
                                         onClick={() => handleDelete(assessment.id)}
-                                        className="text-gray-400 hover:text-red-500 transition-colors"
+                                        className="p-2 text-gray-300 hover:text-red-400 transition-all rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800"
                                     >
                                         <Trash2 size={16} />
                                     </button>
@@ -467,70 +482,71 @@ const Assessments = () => {
             >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Assessment Name</label>
+                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Assessment Name</label>
                         <input
                             type="text"
                             required
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             placeholder="e.g. Midterm Exam"
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Description</label>
                         <textarea
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            rows="2"
+                            rows="3"
+                            placeholder="Briefly describe the assessment..."
                         ></textarea>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Marks</label>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Total Marks</label>
                             <input
                                 type="number"
                                 required
                                 min="0"
-                                className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                                className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                                 value={formData.total_marks}
                                 onChange={(e) => setFormData({ ...formData, total_marks: e.target.value })}
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Weightage (%)</label>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Weightage (%)</label>
                             <input
                                 type="number"
                                 required
                                 min="0"
                                 max="100"
-                                className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                                className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                                 value={formData.weightage}
                                 onChange={(e) => setFormData({ ...formData, weightage: e.target.value })}
                             />
                         </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Date (Optional)</label>
+                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Date (Optional)</label>
                         <input
                             type="date"
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                             value={formData.date}
                             onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                         />
                     </div>
-                    <div className="flex justify-end pt-4">
+                    <div className="flex justify-end pt-6 border-t border-gray-50 dark:border-slate-800 mt-6">
                         <button
                             type="button"
                             onClick={() => setIsModalOpen(false)}
-                            className="mr-3 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700"
+                            className="mr-3 px-6 py-2 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all font-bold"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                            className="px-6 py-2 border border-transparent rounded-xl shadow-pastel text-xs font-bold uppercase tracking-widest text-white bg-primary hover:opacity-90 transition-all"
                         >
                             {editingAssessment ? 'Update' : 'Create'}
                         </button>

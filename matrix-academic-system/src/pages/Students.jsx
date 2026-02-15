@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
 import EmptyState from '../components/common/EmptyState';
 import Modal from '../components/common/Modal';
-import { Plus, Trash2, Users, Download, Upload, LayoutList, Layers } from 'lucide-react';
+import { Plus, Trash2, Users, Download, Upload, LayoutList, Layers, Eye } from 'lucide-react';
+import StudentDetailsModal from '../components/student/StudentDetailsModal';
 import * as XLSX from 'xlsx';
 
 const Students = () => {
@@ -19,6 +20,10 @@ const Students = () => {
 
     // New state for view mode: 'all' or 'group'
     const [viewMode, setViewMode] = useState('all');
+
+    // Student Details Modal State
+    const [selectedStudent, setSelectedStudent] = useState(null);
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
     useEffect(() => {
         if (user?.faculty_id) {
@@ -194,26 +199,36 @@ const Students = () => {
     };
 
     const TableView = ({ data }) => (
-        <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 mb-6">
+        <div className="bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-800 mb-6">
             <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                    <thead className="bg-gray-50 dark:bg-slate-900">
+                <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-800">
+                    <thead className="bg-slate-50 dark:bg-slate-950">
                         <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Matric No</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Group</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider">Name</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider">Matric No</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider">Group</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider">Email</th>
                             <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                    <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-50 dark:divide-slate-800">
                         {data.map((student) => (
-                            <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                            <tr key={student.id} className="hover:bg-pastel-indigo dark:hover:bg-indigo-900/10 transition-colors group">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{student.name}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{student.matric_no}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{student.student_group || '-'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{student.email || '-'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedStudent(student);
+                                            setIsDetailsOpen(true);
+                                        }}
+                                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors mr-2"
+                                        title="View Profile"
+                                    >
+                                        <Eye size={18} />
+                                    </button>
                                     <button
                                         onClick={() => handleDeleteStudent(student.id)}
                                         className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
@@ -238,12 +253,12 @@ const Students = () => {
                 />
                 <div className="flex flex-wrap gap-2 items-center">
                     {/* View Toggle */}
-                    <div className="bg-gray-100 dark:bg-slate-700 p-1 rounded-lg flex mr-2">
+                    <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex mr-2">
                         <button
                             onClick={() => setViewMode('all')}
-                            className={`flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === 'all'
-                                    ? 'bg-white dark:bg-slate-600 shadow text-gray-900 dark:text-white'
-                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                            className={`flex items-center px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${viewMode === 'all'
+                                ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-white'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                                 }`}
                         >
                             <LayoutList size={16} className="mr-2" />
@@ -251,9 +266,9 @@ const Students = () => {
                         </button>
                         <button
                             onClick={() => setViewMode('group')}
-                            className={`flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === 'group'
-                                    ? 'bg-white dark:bg-slate-600 shadow text-gray-900 dark:text-white'
-                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                            className={`flex items-center px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${viewMode === 'group'
+                                ? 'bg-white dark:bg-slate-600 shadow text-gray-900 dark:text-white'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                                 }`}
                         >
                             <Layers size={16} className="mr-2" />
@@ -263,14 +278,14 @@ const Students = () => {
 
                     <button
                         onClick={downloadTemplate}
-                        className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-slate-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        className="inline-flex items-center px-3 py-2 border border-gray-200 dark:border-slate-700 shadow-sm text-xs font-bold uppercase tracking-wider rounded-xl text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
                     >
                         <Download size={16} className="mr-2" />
                         Template
                     </button>
                     <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-slate-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        className="inline-flex items-center px-3 py-2 border border-gray-200 dark:border-slate-700 shadow-sm text-xs font-bold uppercase tracking-wider rounded-xl text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
                     >
                         <Upload size={16} className="mr-2" />
                         Upload
@@ -284,7 +299,7 @@ const Students = () => {
                     />
                     <button
                         onClick={() => setIsModalOpen(true)}
-                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-pastel text-xs font-bold uppercase tracking-widest text-white bg-primary hover:opacity-90 transition-all"
                     >
                         <Plus size={20} className="mr-2" />
                         Add Student
@@ -308,7 +323,7 @@ const Students = () => {
 
             {loading ? (
                 <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
             ) : students.length > 0 ? (
                 <>
@@ -354,7 +369,7 @@ const Students = () => {
                             type="text"
                             id="name"
                             required
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                             placeholder="John Doe"
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -368,7 +383,7 @@ const Students = () => {
                             type="text"
                             id="matric_no"
                             required
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                             placeholder="e.g. A23CS001"
                             value={formData.matric_no}
                             onChange={(e) => setFormData({ ...formData, matric_no: e.target.value })}
@@ -381,7 +396,7 @@ const Students = () => {
                         <input
                             type="text"
                             id="student_group"
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                             placeholder="e.g. 1SEC-1"
                             value={formData.student_group}
                             onChange={(e) => setFormData({ ...formData, student_group: e.target.value })}
@@ -394,7 +409,7 @@ const Students = () => {
                         <input
                             type="email"
                             id="email"
-                            className="mt-1 block w-full rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
                             placeholder="john@example.com"
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -404,19 +419,25 @@ const Students = () => {
                         <button
                             type="button"
                             onClick={() => setIsModalOpen(false)}
-                            className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            className="px-6 py-2 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all font-bold"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            className="px-4 py-2 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-primary hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all"
                         >
                             Create Student
                         </button>
                     </div>
                 </form>
             </Modal>
+
+            <StudentDetailsModal
+                isOpen={isDetailsOpen}
+                onClose={() => setIsDetailsOpen(false)}
+                student={selectedStudent}
+            />
         </div>
     );
 };

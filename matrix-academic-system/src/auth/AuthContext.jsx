@@ -9,31 +9,69 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchProfile = async (session) => {
-            if (session?.user) {
-                const { data: profile } = await supabase
-                    .from('users')
-                    .select('*')
-                    .eq('id', session.user.id)
-                    .single();
+        console.log('AuthContext: Initializing...');
 
-                setUser({ ...session.user, ...profile });
-            } else {
-                setUser(null);
+        // Safety timeout to prevent permanent hang
+        const safetyTimeout = setTimeout(() => {
+            if (loading) {
+                console.warn('AuthContext: Loading timed out after 5s. Forcing loading=false.');
+                setLoading(false);
             }
-            setLoading(false);
+        }, 5000);
+
+        const fetchProfile = async (session) => {
+            console.log('AuthContext: fetchProfile called for user:', session?.user?.id);
+            try {
+                if (session?.user) {
+                    const { data: profile, error } = await supabase
+                        .from('users')
+                        .select('*')
+                        .eq('id', session.user.id)
+                        .single();
+
+                    if (error) {
+                        console.error('AuthContext: Error fetching profile:', error);
+                    } else {
+                        console.log('AuthContext: Profile fetched successfully');
+                    }
+
+                    setUser({ ...session.user, ...profile });
+                } else {
+                    console.log('AuthContext: No session user found');
+                    setUser(null);
+                }
+            } catch (error) {
+                console.error('AuthContext: Unexpected error in fetchProfile:', error);
+                setUser(null);
+            } finally {
+                setLoading(false);
+                clearTimeout(safetyTimeout);
+                console.log('AuthContext: loading set to false');
+            }
         };
 
         const getSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            await fetchProfile(session);
+            console.log('AuthContext: getSession started');
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.error('AuthContext: Error getting session:', error);
+                    throw error;
+                }
+                console.log('AuthContext: Session retrieved:', session ? 'Active' : 'None');
+                await fetchProfile(session);
+            } catch (error) {
+                console.error('AuthContext: Failed to obtain session:', error);
+                setLoading(false);
+                clearTimeout(safetyTimeout);
+            }
         };
 
         getSession();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('AuthContext: onAuthStateChange event:', event);
             if (event === 'SIGNED_IN' && session?.user) {
-                // Fetch profile first to get faculty_id
                 const { data: profile } = await supabase
                     .from('users')
                     .select('*')
@@ -41,17 +79,18 @@ export const AuthProvider = ({ children }) => {
                     .single();
 
                 if (profile) {
-                    // Log login action
-                    // Dynamically import to avoid circular dependency issues if any, though utils usually fine.
                     import('../utils/auditLogger').then(({ logAuditAction }) => {
                         logAuditAction({ ...session.user, ...profile }, 'LOGIN', { email: session.user.email });
-                    });
+                    }).catch(err => console.error("AuthContext: Failed to load audit logger", err));
                 }
             }
             fetchProfile(session);
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            subscription.unsubscribe();
+            clearTimeout(safetyTimeout);
+        };
     }, []);
 
     const value = {
@@ -71,9 +110,17 @@ export const AuthProvider = ({ children }) => {
         user,
     };
 
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+            </div>
+        );
+    }
+
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 };
