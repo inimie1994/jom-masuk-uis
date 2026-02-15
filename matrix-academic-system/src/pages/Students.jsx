@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
 import EmptyState from '../components/common/EmptyState';
 import Modal from '../components/common/Modal';
-import { Plus, Trash2, Users, Download, Upload, FileSpreadsheet } from 'lucide-react';
+import { Plus, Trash2, Users, Download, Upload, LayoutList, Layers } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const Students = () => {
@@ -16,6 +16,9 @@ const Students = () => {
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState(null);
     const fileInputRef = useRef(null);
+
+    // New state for view mode: 'all' or 'group'
+    const [viewMode, setViewMode] = useState('all');
 
     useEffect(() => {
         if (user?.faculty_id) {
@@ -166,13 +169,98 @@ const Students = () => {
         }
     };
 
+    // Helper to group students
+    const getGroupedStudents = () => {
+        const grouped = {};
+        students.forEach(student => {
+            const group = student.student_group || 'Ungrouped';
+            if (!grouped[group]) {
+                grouped[group] = [];
+            }
+            grouped[group].push(student);
+        });
+
+        // Sort groups alphabetically, but put 'Ungrouped' last
+        const sortedKeys = Object.keys(grouped).sort((a, b) => {
+            if (a === 'Ungrouped') return 1;
+            if (b === 'Ungrouped') return -1;
+            return a.localeCompare(b);
+        });
+
+        return sortedKeys.map(key => ({
+            groupName: key,
+            students: grouped[key]
+        }));
+    };
+
+    const TableView = ({ data }) => (
+        <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 mb-6">
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                    <thead className="bg-gray-50 dark:bg-slate-900">
+                        <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Matric No</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Group</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
+                            <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                        {data.map((student) => (
+                            <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{student.name}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{student.matric_no}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{student.student_group || '-'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{student.email || '-'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <button
+                                        onClick={() => handleDeleteStudent(student.id)}
+                                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                                        title="Delete Student"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+
     return (
         <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
                 <PageHeader
                     title="Students"
                 />
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
+                    {/* View Toggle */}
+                    <div className="bg-gray-100 dark:bg-slate-700 p-1 rounded-lg flex mr-2">
+                        <button
+                            onClick={() => setViewMode('all')}
+                            className={`flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === 'all'
+                                    ? 'bg-white dark:bg-slate-600 shadow text-gray-900 dark:text-white'
+                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                }`}
+                        >
+                            <LayoutList size={16} className="mr-2" />
+                            All
+                        </button>
+                        <button
+                            onClick={() => setViewMode('group')}
+                            className={`flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-all ${viewMode === 'group'
+                                    ? 'bg-white dark:bg-slate-600 shadow text-gray-900 dark:text-white'
+                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                }`}
+                        >
+                            <Layers size={16} className="mr-2" />
+                            Groups
+                        </button>
+                    </div>
+
                     <button
                         onClick={downloadTemplate}
                         className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-slate-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -223,40 +311,26 @@ const Students = () => {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
                 </div>
             ) : students.length > 0 ? (
-                <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                            <thead className="bg-gray-50 dark:bg-slate-900">
-                                <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Matric No</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Group</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Email</th>
-                                    <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-                                {students.map((student) => (
-                                    <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{student.name}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{student.matric_no}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{student.student_group || '-'}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{student.email || '-'}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button
-                                                onClick={() => handleDeleteStudent(student.id)}
-                                                className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
-                                                title="Delete Student"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <>
+                    {viewMode === 'all' ? (
+                        <TableView data={students} />
+                    ) : (
+                        <div className="space-y-6">
+                            {getGroupedStudents().map((group) => (
+                                <div key={group.groupName}>
+                                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2 ml-1 flex items-center">
+                                        <Layers size={18} className="mr-2 text-indigo-500" />
+                                        {group.groupName}
+                                        <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded-full">
+                                            {group.students.length}
+                                        </span>
+                                    </h3>
+                                    <TableView data={group.students} />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </>
             ) : (
                 <EmptyState
                     icon={Users}
