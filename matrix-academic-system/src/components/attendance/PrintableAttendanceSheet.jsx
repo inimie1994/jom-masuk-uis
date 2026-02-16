@@ -33,10 +33,15 @@ const PrintableAttendanceSheet = ({
             <style type="text/css" media="print">
                 {`
                     @page { size: landscape; margin: 10mm; }
-                    body { -webkit-print-color-adjust: exact; margin: 0; }
+                    body { -webkit-print-color-adjust: exact; margin: 0; background-color: white !important; }
                     .print-table th, .print-table td { border: 1px solid black !important; }
                 `}
             </style>
+
+            {/* Header Text - Top Right */}
+            <div className="flex justify-end text-[8px] font-bold mb-1">
+                BKP/FAKULTI/2025/Pin.8
+            </div>
 
             {/* Header / Logo Section */}
             <div className="border border-black flex mb-2">
@@ -46,9 +51,6 @@ const PrintableAttendanceSheet = ({
                 <div className="flex-1 flex flex-col justify-center text-center font-bold">
                     <div className="border-b border-black py-2 text-lg">UNIVERSITI ISLAM SELANGOR</div>
                     <div className="py-2 text-lg">BORANG KEHADIRAN PELAJAR</div>
-                </div>
-                <div className="w-24 border-l border-black p-1 text-[8px] flex items-end justify-end">
-                    BKP/FAKULTI/2025/Pin.8
                 </div>
             </div>
 

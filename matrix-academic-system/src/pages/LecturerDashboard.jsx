@@ -8,7 +8,9 @@ import {
     Calendar,
     Clock,
     MapPin,
-    ArrowRight
+    ArrowRight,
+    ClipboardList,
+    GraduationCap
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -20,6 +22,8 @@ const LecturerDashboard = () => {
         subjects: 0
     });
     const [upcomingClasses, setUpcomingClasses] = useState([]);
+    const [myClasses, setMyClasses] = useState([]);
+    const [recentAssessments, setRecentAssessments] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -73,6 +77,8 @@ const LecturerDashboard = () => {
                 .eq('lecturer_id', lecturerId);
 
             if (myClasses && myClasses.length > 0) {
+                setMyClasses(myClasses);
+
                 // Construct a filter for attendance_sessions
                 // (subject_id, student_group) IN ...
                 // Supabase doesn't support tuple IN directly easily.
@@ -91,6 +97,17 @@ const LecturerDashboard = () => {
                 }).slice(0, 5) || [];
 
                 setUpcomingClasses(mySessions);
+
+                // 4. Get recent assessments
+                const subjectIds = myClasses.map(c => c.subject_id);
+                const { data: assessments } = await supabase
+                    .from('assessments')
+                    .select('*, subjects(code, name)')
+                    .in('subject_id', subjectIds)
+                    .gte('due_date', today)
+                    .order('due_date', { ascending: true })
+                    .limit(5);
+                setRecentAssessments(assessments || []);
             }
 
             setStats({
@@ -196,6 +213,85 @@ const LecturerDashboard = () => {
                             </div>
                         ))
                     )}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* My Classes Widget */}
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+                    <div className="p-6 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">My Classes</h2>
+                        <Link to="/lecturer-timetable" className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center">
+                            View Timetable <ArrowRight size={16} className="ml-1" />
+                        </Link>
+                    </div>
+                    <div className="p-6">
+                        {myClasses.length === 0 ? (
+                            <div className="text-center text-gray-500 dark:text-gray-400">
+                                No classes assigned yet.
+                            </div>
+                        ) : (
+                            <ul className="space-y-3">
+                                {myClasses.map((cls, idx) => (
+                                    <li key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-750 rounded-lg border border-gray-100 dark:border-slate-700">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-full text-indigo-600 dark:text-indigo-400">
+                                                <GraduationCap size={18} />
+                                            </div>
+                                            <div>
+                                                <div className="font-medium text-gray-900 dark:text-white">{cls.subjects?.code}</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">{cls.subjects?.name}</div>
+                                            </div>
+                                        </div>
+                                        {cls.student_group && (
+                                            <span className="px-2 py-1 text-xs font-semibold bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded text-gray-600 dark:text-gray-300">
+                                                {cls.student_group}
+                                            </span>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+
+                {/* Recent Assessments Widget */}
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+                    <div className="p-6 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Upcoming Assessments</h2>
+                        <Link to="/assessments" className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center">
+                            Manage <ArrowRight size={16} className="ml-1" />
+                        </Link>
+                    </div>
+                    <div className="p-6">
+                        {recentAssessments.length === 0 ? (
+                            <div className="text-center text-gray-500 dark:text-gray-400">
+                                No upcoming assessments.
+                            </div>
+                        ) : (
+                            <ul className="space-y-3">
+                                {recentAssessments.map((assessment) => (
+                                    <li key={assessment.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-750 rounded-lg border border-gray-100 dark:border-slate-700">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-full text-orange-600 dark:text-orange-400">
+                                                <ClipboardList size={18} />
+                                            </div>
+                                            <div>
+                                                <div className="font-medium text-gray-900 dark:text-white">{assessment.title}</div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">{assessment.subjects?.code}</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-xs font-bold text-gray-900 dark:text-white">
+                                                {new Date(assessment.due_date).toLocaleDateString()}
+                                            </div>
+                                            <div className="text-[10px] text-gray-500 dark:text-gray-400">Due Date</div>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

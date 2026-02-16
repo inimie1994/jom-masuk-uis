@@ -29,7 +29,8 @@ const Lecturers = () => {
     const [workloadForm, setWorkloadForm] = useState({
         subject_id: '',
         type: 'Lecture',
-        hours: 1
+        hours: 1,
+        student_group: ''
     });
 
     const [error, setError] = useState(null);
@@ -93,6 +94,7 @@ const Lecturers = () => {
                     id,
                     type,
                     hours,
+                    student_group,
                     created_at,
                     subjects (id, code, name)
                 `)
@@ -159,13 +161,24 @@ const Lecturers = () => {
                     lecturer_id: selectedLecturer.id,
                     subject_id: workloadForm.subject_id,
                     type: workloadForm.type,
-                    hours: parseInt(workloadForm.hours)
+                    hours: parseInt(workloadForm.hours),
+                    student_group: workloadForm.student_group
                 }]);
 
             if (error) throw error;
 
+            // Update classes table to link lecturer if class exists for this subject + section
+            if (workloadForm.student_group) {
+                await supabase
+                    .from('classes')
+                    .update({ lecturer_id: selectedLecturer.id })
+                    .eq('subject_id', workloadForm.subject_id)
+                    .eq('section', workloadForm.student_group)
+                    .eq('faculty_id', user.faculty_id);
+            }
+
             setIsWorkloadModalOpen(false);
-            setWorkloadForm({ subject_id: '', type: 'Lecture', hours: 1 });
+            setWorkloadForm({ subject_id: '', type: 'Lecture', hours: 1, student_group: '' });
             fetchWorkload(selectedLecturer.id);
         } catch (err) {
             console.error('Error adding workload:', err);
@@ -339,6 +352,12 @@ const Lecturers = () => {
                                                             }`}></span>
                                                         {work.type}
                                                     </span>
+                                                    {work.student_group && (
+                                                        <span className="flex items-center text-xs font-semibold bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded text-gray-600 dark:text-gray-300">
+                                                            <User size={12} className="mr-1" />
+                                                            {work.student_group}
+                                                        </span>
+                                                    )}
                                                     <span className="flex items-center">
                                                         <Clock size={14} className="mr-1" />
                                                         {work.hours} Hour{work.hours > 1 ? 's' : ''}
@@ -433,6 +452,17 @@ const Lecturers = () => {
                                 <option key={sub.id} value={sub.id}>{sub.code} - {sub.name}</option>
                             ))}
                         </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Student Group / Section</label>
+                        <input
+                            type="text"
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                            value={workloadForm.student_group}
+                            onChange={(e) => setWorkloadForm({ ...workloadForm, student_group: e.target.value })}
+                            placeholder="e.g. Section 01, Group A"
+                        />
+                        <p className="mt-1 text-[10px] text-gray-500">Optional: Links to Classes for Dashboard</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>

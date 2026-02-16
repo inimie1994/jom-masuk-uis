@@ -201,7 +201,7 @@ const Attendance = () => {
             // 1. Fetch Timetable for this Group + Subject
             const { data: timetableData, error: timetableError } = await supabase
                 .from('timetable')
-                .select('*')
+                .select('*, lecturers(name)')
                 .eq('group_name', selectedGroup)
                 .eq('subject_id', selectedSubject);
 
@@ -581,8 +581,8 @@ const Attendance = () => {
                     lecturerName={
                         user.role === 'lecturer'
                             ? user.name
-                            : (timetable.length > 0 && timetable[0].lecturer_id
-                                ? "__________________________" // Placeholder for now
+                            : (timetable.length > 0 && timetable[0].lecturers
+                                ? timetable[0].lecturers.name
                                 : "__________________________")
                     }
                     logoUrl={user?.faculty_logo}
