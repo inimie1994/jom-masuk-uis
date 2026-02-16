@@ -1,13 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
+import PrintableAttendanceSheet from '../components/attendance/PrintableAttendanceSheet';
+import * as XLSX from 'xlsx';
 import {
     Calendar,
     Users,
     BookOpen,
     Save,
-    Check
+    Check,
+    Printer,
+    FileSpreadsheet
 } from 'lucide-react';
 
 const Attendance = () => {
@@ -375,141 +379,216 @@ const Attendance = () => {
         return Object.values(attendanceData[studentId]).filter(s => s === 'Present').length;
     };
 
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const handleExportExcel = () => {
+        if (students.length === 0 || dateColumns.length === 0) return;
+
+        // Build Rows
+        const rows = students.map((student, idx) => {
+            const row = {
+                'No': idx + 1,
+                'Matric No': student.matric_no,
+                'Name': student.name,
+            };
+
+            dateColumns.forEach(col => {
+                const key = `${col.date}_${col.startTime}`;
+                const isPresent = attendanceData[student.id]?.[key] === 'Present';
+                row[col.displayDate] = isPresent ? '1' : '0';
+            });
+
+            row['Total'] = calculateTotal(student.id);
+            return row;
+        });
+
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.json_to_sheet(rows);
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
+        XLSX.writeFile(workbook, `Attendance_${selectedGroup}_${selectedMonth}.xlsx`);
+    };
+
     return (
-        <div className="space-y-6">
-            <PageHeader
-                title="Attendance Management"
-            />
+        <>
+            <div className="space-y-6 print:hidden">
+                <PageHeader
+                    title="Attendance Management"
+                />
 
-            {/* Controls */}
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-pastel border border-gray-100 dark:border-slate-800 flex flex-wrap gap-6 items-end">
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Month</label>
-                    <input
-                        type="month"
-                        value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(e.target.value)}
-                        className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border w-48 transition-all"
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Group</label>
-                    <select
-                        value={selectedGroup}
-                        onChange={(e) => setSelectedGroup(e.target.value)}
-                        className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border w-64 transition-all"
-                    >
-                        <option value="">Select Group...</option>
-                        {groups.map(g => (
-                            <option key={g} value={g}>{g}</option>
-                        ))}
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Subject</label>
-                    <select
-                        value={selectedSubject}
-                        onChange={(e) => setSelectedSubject(e.target.value)}
-                        disabled={!selectedGroup}
-                        className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border w-64 transition-all disabled:opacity-50"
-                    >
-                        <option value="">Select Subject...</option>
-                        {subjects.map(s => (
-                            <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
-                        ))}
-                    </select>
-                </div>
-            </div>
+                {/* Controls */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-pastel border border-gray-100 dark:border-slate-800 flex flex-wrap gap-6 items-end justify-between">
+                    <div className="flex flex-wrap gap-6 items-end">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Month</label>
+                            <input
+                                type="month"
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border w-48 transition-all"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Group</label>
+                            <select
+                                value={selectedGroup}
+                                onChange={(e) => setSelectedGroup(e.target.value)}
+                                className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border w-64 transition-all"
+                            >
+                                <option value="">Select Group...</option>
+                                {groups.map(g => (
+                                    <option key={g} value={g}>{g}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Subject</label>
+                            <select
+                                value={selectedSubject}
+                                onChange={(e) => setSelectedSubject(e.target.value)}
+                                disabled={!selectedGroup}
+                                className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border w-64 transition-all disabled:opacity-50"
+                            >
+                                <option value="">Select Subject...</option>
+                                {subjects.map(s => (
+                                    <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
 
-            {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl border border-red-100 dark:border-red-800/30 text-sm">
-                    {error}
-                </div>
-            )}
-
-            {/* Grid */}
-            {selectedGroup && selectedSubject ? (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-pastel border border-gray-100 dark:border-slate-800 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        {loading ? (
-                            <div className="p-12 text-center text-gray-400">Loading attendance data...</div>
-                        ) : dateColumns.length === 0 ? (
-                            <div className="p-12 text-center text-gray-400">
-                                <Calendar className="mx-auto h-12 w-12 opacity-20 mb-3" />
-                                <p>No classes found in the timetable for this month.</p>
-                            </div>
-                        ) : (
-                            <table className="min-w-full text-sm">
-                                <thead>
-                                    <tr className="bg-slate-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800">
-                                        <th className="px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider w-16 sticky left-0 bg-slate-50 dark:bg-slate-950 z-10 border-r border-gray-200 dark:border-slate-800">#</th>
-                                        <th className="px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider w-48 sticky left-16 bg-slate-50 dark:bg-slate-950 z-10 border-r border-gray-200 dark:border-slate-800">Student Name</th>
-                                        {dateColumns.map((col, idx) => (
-                                            <th key={idx} className="px-2 py-3 text-center min-w-[50px] border-r border-gray-100 dark:border-slate-800/50">
-                                                <div className="flex flex-col items-center">
-                                                    <span className="text-xs font-bold text-gray-900 dark:text-white">{col.displayDate}</span>
-                                                    <span className="text-[9px] text-gray-400 uppercase tracking-wider">{col.dayName.slice(0, 3)}</span>
-                                                    <span className={`text-[8px] px-1 rounded mt-0.5 ${col.type === 'Lecture' ? 'bg-blue-100 text-blue-700' :
-                                                        col.type === 'Tutorial' ? 'bg-green-100 text-green-700' :
-                                                            'bg-orange-100 text-orange-700'
-                                                        }`}>{col.type?.slice(0, 1)}</span>
-                                                </div>
-                                            </th>
-                                        ))}
-                                        {/* Total Column sticky right */}
-                                        <th className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider w-24 sticky right-0 bg-slate-50 dark:bg-slate-950 z-10 border-l border-gray-200 dark:border-slate-800 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
-                                            Total
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-                                    {students.map((student, idx) => (
-                                        <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                            <td className="px-4 py-3 font-mono text-xs text-gray-400 sticky left-0 bg-white dark:bg-slate-900 z-10 border-r border-gray-100 dark:border-slate-800">
-                                                {idx + 1}
-                                            </td>
-                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white sticky left-16 bg-white dark:bg-slate-900 z-10 border-r border-gray-100 dark:border-slate-800">
-                                                <div>{student.name}</div>
-                                                <div className="text-[10px] text-gray-400">{student.matric_no}</div>
-                                            </td>
-                                            {dateColumns.map((col, cIdx) => {
-                                                const key = `${col.date}_${col.startTime}`;
-                                                const isPresent = attendanceData[student.id]?.[key] === 'Present';
-
-                                                return (
-                                                    <td key={cIdx} className="px-2 py-3 text-center border-r border-gray-50 dark:border-slate-800/50">
-                                                        <button
-                                                            onClick={() => toggleAttendance(student.id, col)}
-                                                            className={`
-                                                                w-6 h-6 rounded-md flex items-center justify-center transition-all mx-auto
-                                                                ${isPresent
-                                                                    ? 'bg-primary text-white shadow-sm'
-                                                                    : 'bg-gray-100 dark:bg-slate-800 text-transparent hover:bg-gray-200 dark:hover:bg-slate-700'
-                                                                }
-                                                            `}
-                                                        >
-                                                            <Check size={14} className={isPresent ? 'opacity-100' : 'opacity-0'} />
-                                                        </button>
-                                                    </td>
-                                                );
-                                            })}
-                                            <td className="px-4 py-3 font-bold text-center text-primary dark:text-indigo-400 sticky right-0 bg-white dark:bg-slate-900 z-10 border-l border-gray-100 dark:border-slate-800 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
-                                                {calculateTotal(student.id)}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
+                    {/* Export Buttons */}
+                    <div className="flex gap-3">
+                        <button
+                            onClick={handleExportExcel}
+                            disabled={!selectedGroup || !selectedSubject}
+                            className="px-4 py-2 border border-green-200 dark:border-green-800 rounded-xl text-xs font-bold uppercase tracking-widest text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all flex items-center disabled:opacity-50"
+                        >
+                            <FileSpreadsheet size={16} className="mr-2" />
+                            Excel
+                        </button>
+                        <button
+                            onClick={handlePrint}
+                            disabled={!selectedGroup || !selectedSubject}
+                            className="px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center disabled:opacity-50"
+                        >
+                            <Printer size={16} className="mr-2" />
+                            Print
+                        </button>
                     </div>
                 </div>
-            ) : (
-                <div className="flex flex-col items-center justify-center h-64 bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-gray-200 dark:border-slate-800 text-gray-400">
-                    <Users size={48} className="mb-4 opacity-10" />
-                    <p>Select a Group and Subject to view attendance.</p>
-                </div>
+
+                {error && (
+                    <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl border border-red-100 dark:border-red-800/30 text-sm">
+                        {error}
+                    </div>
+                )}
+
+                {/* Grid */}
+                {selectedGroup && selectedSubject ? (
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-pastel border border-gray-100 dark:border-slate-800 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            {loading ? (
+                                <div className="p-12 text-center text-gray-400">Loading attendance data...</div>
+                            ) : dateColumns.length === 0 ? (
+                                <div className="p-12 text-center text-gray-400">
+                                    <Calendar className="mx-auto h-12 w-12 opacity-20 mb-3" />
+                                    <p>No classes found in the timetable for this month.</p>
+                                </div>
+                            ) : (
+                                <table className="min-w-full text-sm">
+                                    <thead>
+                                        <tr className="bg-slate-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800">
+                                            <th className="px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider w-16 sticky left-0 bg-slate-50 dark:bg-slate-950 z-10 border-r border-gray-200 dark:border-slate-800">#</th>
+                                            <th className="px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider w-48 sticky left-16 bg-slate-50 dark:bg-slate-950 z-10 border-r border-gray-200 dark:border-slate-800">Student Name</th>
+                                            {dateColumns.map((col, idx) => (
+                                                <th key={idx} className="px-2 py-3 text-center min-w-[50px] border-r border-gray-100 dark:border-slate-800/50">
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="text-xs font-bold text-gray-900 dark:text-white">{col.displayDate}</span>
+                                                        <span className="text-[9px] text-gray-400 uppercase tracking-wider">{col.dayName.slice(0, 3)}</span>
+                                                        <span className={`text-[8px] px-1 rounded mt-0.5 ${col.type === 'Lecture' ? 'bg-blue-100 text-blue-700' :
+                                                            col.type === 'Tutorial' ? 'bg-green-100 text-green-700' :
+                                                                'bg-orange-100 text-orange-700'
+                                                            }`}>{col.type?.slice(0, 1)}</span>
+                                                    </div>
+                                                </th>
+                                            ))}
+                                            {/* Total Column sticky right */}
+                                            <th className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider w-24 sticky right-0 bg-slate-50 dark:bg-slate-950 z-10 border-l border-gray-200 dark:border-slate-800 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
+                                                Total
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                                        {students.map((student, idx) => (
+                                            <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                <td className="px-4 py-3 font-mono text-xs text-gray-400 sticky left-0 bg-white dark:bg-slate-900 z-10 border-r border-gray-100 dark:border-slate-800">
+                                                    {idx + 1}
+                                                </td>
+                                                <td className="px-4 py-3 font-medium text-gray-900 dark:text-white sticky left-16 bg-white dark:bg-slate-900 z-10 border-r border-gray-100 dark:border-slate-800">
+                                                    <div>{student.name}</div>
+                                                    <div className="text-[10px] text-gray-400">{student.matric_no}</div>
+                                                </td>
+                                                {dateColumns.map((col, cIdx) => {
+                                                    const key = `${col.date}_${col.startTime}`;
+                                                    const isPresent = attendanceData[student.id]?.[key] === 'Present';
+
+                                                    return (
+                                                        <td key={cIdx} className="px-2 py-3 text-center border-r border-gray-50 dark:border-slate-800/50">
+                                                            <button
+                                                                onClick={() => toggleAttendance(student.id, col)}
+                                                                className={`
+                                                                w-6 h-6 rounded-md flex items-center justify-center transition-all mx-auto
+                                                                ${isPresent
+                                                                        ? 'bg-primary text-white shadow-sm'
+                                                                        : 'bg-gray-100 dark:bg-slate-800 text-transparent hover:bg-gray-200 dark:hover:bg-slate-700'
+                                                                    }
+                                                            `}
+                                                            >
+                                                                <Check size={14} className={isPresent ? 'opacity-100' : 'opacity-0'} />
+                                                            </button>
+                                                        </td>
+                                                    );
+                                                })}
+                                                <td className="px-4 py-3 font-bold text-center text-primary dark:text-indigo-400 sticky right-0 bg-white dark:bg-slate-900 z-10 border-l border-gray-100 dark:border-slate-800 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
+                                                    {calculateTotal(student.id)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-64 bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-gray-200 dark:border-slate-800 text-gray-400">
+                        <Users size={48} className="mb-4 opacity-10" />
+                        <p>Select a Group and Subject to view attendance.</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Printable Component (Hidden unless printing) */}
+            {selectedGroup && selectedSubject && (
+                <PrintableAttendanceSheet
+                    month={selectedMonth}
+                    group={selectedGroup}
+                    subject={subjects.find(s => s.id === selectedSubject)}
+                    students={students}
+                    dates={dateColumns}
+                    attendanceData={attendanceData}
+                    lecturerName={
+                        user.role === 'lecturer'
+                            ? user.name
+                            : (timetable.length > 0 && timetable[0].lecturer_id
+                                ? "__________________________" // Placeholder for now
+                                : "__________________________")
+                    }
+                    logoUrl={user?.faculty_logo}
+                />
             )}
-        </div>
+        </>
     );
 };
 

@@ -25,8 +25,11 @@ const LecturerDashboard = () => {
     useEffect(() => {
         if (user?.lecturer_id) {
             fetchDashboardData();
+        } else if (user) {
+            // If user is loaded but no lecturer_id, stop loading to show access restricted
+            setLoading(false);
         }
-    }, [user?.lecturer_id]);
+    }, [user?.lecturer_id, user]);
 
     const fetchDashboardData = async () => {
         try {

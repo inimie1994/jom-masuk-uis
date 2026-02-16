@@ -1,40 +1,56 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { GraduationCap, Mail, Lock, CheckCircle, AlertCircle, User } from 'lucide-react';
 
 const LecturerLogin = () => {
-    const { signIn } = useAuth();
+    const { user, signIn } = useAuth();
     const navigate = useNavigate();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [authSuccess, setAuthSuccess] = useState(false);
+
+    // Keep loading true if auth succeeded but user profile still loading in AuthContext
+    const isActuallyLoading = loading || (authSuccess && !user);
+
+    useEffect(() => {
+        if (user) {
+            console.log('LecturerLogin: User detected, navigating...', user.role);
+            if (user.role === 'lecturer' || user.user_metadata?.role === 'lecturer') {
+                navigate('/lecturer-dashboard');
+            } else if (user.role === 'admin') {
+                navigate('/dashboard');
+            } else {
+                // If it's a student or unknown role, we still want to move them away from login
+                navigate('/dashboard');
+            }
+        }
+    }, [user, navigate]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
+        setAuthSuccess(false);
 
         try {
             const internalEmail = `${username.trim()}@matrix-system.com`;
+            console.log('LecturerLogin: Attempting sign in for', internalEmail);
             const { data, error } = await signIn({ email: internalEmail, password });
-            if (error) throw error;
 
-            // Redirect happens in AuthContext or explictly here if needed
-            // But since Login.jsx redirects based on role, we might rely on that logic if it was centralized.
-            // Check if user is actually a lecturer
-            if (data.user?.user_metadata?.role === 'lecturer' || data.user?.role === 'lecturer') { // Check metadata or profile if available immediately
-                navigate('/lecturer-dashboard');
-            } else {
-                // Fetch profile to be sure
-                navigate('/lecturer-dashboard');
+            if (error) {
+                console.error('LecturerLogin: Sign in error', error);
+                throw error;
             }
 
+            console.log('LecturerLogin: Sign in successful, waiting for profile...');
+            setAuthSuccess(true);
+            // We don't set loading(false) here, we wait for useEffect
         } catch (err) {
             console.error('Login error:', err);
-            setError('Invalid email or password.');
-        } finally {
+            setError(err.message || 'Invalid email or password.');
             setLoading(false);
         }
     };
@@ -112,10 +128,10 @@ const LecturerLogin = () => {
                         <div>
                             <button
                                 type="submit"
-                                disabled={loading}
+                                disabled={isActuallyLoading}
                                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors"
                             >
-                                {loading ? 'Signing in...' : 'Sign in'}
+                                {isActuallyLoading ? 'Signing in...' : 'Sign in'}
                             </button>
                         </div>
                     </form>

@@ -20,28 +20,67 @@ export const AuthProvider = ({ children }) => {
         }, 5000);
 
         const fetchProfile = async (session) => {
-            console.log('AuthContext: fetchProfile called for user:', session?.user?.id);
+            console.log('AuthContext: fetchProfile called', {
+                uid: session?.user?.id,
+                email: session?.user?.email,
+                metadata_role: session?.user?.user_metadata?.role
+            });
+
             if (!session?.user) {
-                console.log('AuthContext: No session user found');
+                console.log('AuthContext: No session user found, setting user to null');
                 setUser(null);
                 setLoading(false);
                 return;
             }
 
             try {
-                const { data: profile, error } = await supabase
+                console.log('AuthContext: Querying users table for profile...');
+                const queryPromise = supabase
                     .from('users')
                     .select('*')
                     .eq('id', session.user.id)
                     .single();
 
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('DB query timeout')), 4000));
+
+                const { data: profile, error } = await Promise.race([queryPromise, timeoutPromise]);
+
                 if (error) {
-                    console.error('AuthContext: Error fetching profile:', error);
-                    // Still set user with basic auth info if profile fetch fails
-                    setUser({ ...session.user, role: session.user.user_metadata?.role || null });
+                    console.error('AuthContext: Error fetching profile from DB:', error);
+                    // Fallback to metadata if available
+                    const fallbackUser = {
+                        ...session.user,
+                        role: session.user.user_metadata?.role || null
+                    };
+                    console.log('AuthContext: Setting fallback user:', fallbackUser.role);
+                    setUser(fallbackUser);
                 } else {
-                    console.log('AuthContext: Profile fetched successfully', profile.role);
-                    setUser({ ...session.user, ...profile });
+                    console.log('AuthContext: Profile found in DB!', profile.role);
+
+                    // Fetch Faculty Logo if available
+                    let facultyLogo = null;
+                    if (profile.faculty_id) {
+                        const { data: faculty } = await supabase
+                            .from('faculties')
+                            .select('logo_url')
+                            .eq('id', profile.faculty_id)
+                            .single();
+                        if (faculty) facultyLogo = faculty.logo_url;
+                    }
+
+                    const finalUser = {
+                        ...session.user,
+                        ...profile,
+                        faculty_logo: facultyLogo
+                    };
+                    console.log('AuthContext: User state updated with profile', finalUser.role);
+
+                    // Audit Logging
+                    import('../utils/auditLogger').then(({ logAuditAction }) => {
+                        logAuditAction(finalUser, 'LOGIN', { email: session.user.email });
+                    }).catch(err => console.error("AuthContext: Failed to load audit logger", err));
+
+                    setUser(finalUser);
                 }
             } catch (error) {
                 console.error('AuthContext: Unexpected error in fetchProfile:', error);
@@ -55,7 +94,12 @@ export const AuthProvider = ({ children }) => {
         const getSession = async () => {
             console.log('AuthContext: getSession started');
             try {
-                const { data: { session }, error } = await supabase.auth.getSession();
+                // Add a local timeout for getSession call itself
+                const sessionPromise = supabase.auth.getSession();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('getSession timeout')), 3000));
+
+                const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
+
                 if (error) {
                     console.error('AuthContext: Error getting session:', error);
                     throw error;
@@ -63,7 +107,7 @@ export const AuthProvider = ({ children }) => {
                 console.log('AuthContext: Session retrieved:', session ? 'Active' : 'None');
                 await fetchProfile(session);
             } catch (error) {
-                console.error('AuthContext: Failed to obtain session:', error);
+                console.error('AuthContext: Failed to obtain session (or timed out):', error.message);
                 setLoading(false);
                 clearTimeout(safetyTimeout);
             }
@@ -71,22 +115,15 @@ export const AuthProvider = ({ children }) => {
 
         getSession();
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             console.log('AuthContext: onAuthStateChange event:', event);
-            if (event === 'SIGNED_IN' && session?.user) {
-                const { data: profile } = await supabase
-                    .from('users')
-                    .select('*')
-                    .eq('id', session.user.id)
-                    .single();
-
-                if (profile) {
-                    import('../utils/auditLogger').then(({ logAuditAction }) => {
-                        logAuditAction({ ...session.user, ...profile }, 'LOGIN', { email: session.user.email });
-                    }).catch(err => console.error("AuthContext: Failed to load audit logger", err));
-                }
-            }
             fetchProfile(session);
+
+            // Handle audit logging for SIGNED_IN event
+            if (event === 'SIGNED_IN' && session?.user) {
+                // We'll delay the audit log until we're sure the profile is loaded via fetchProfile
+                // or just log with what we have if it's simpler.
+            }
         });
 
         return () => {
@@ -97,7 +134,11 @@ export const AuthProvider = ({ children }) => {
 
     const value = {
         signUp: (data) => supabase.auth.signUp(data),
-        signIn: (data) => supabase.auth.signInWithPassword(data),
+        signIn: async (data) => {
+            const authPromise = supabase.auth.signInWithPassword(data);
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Login timeout')), 10000));
+            return Promise.race([authPromise, timeoutPromise]);
+        },
         signInWithGoogle: async () => {
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',

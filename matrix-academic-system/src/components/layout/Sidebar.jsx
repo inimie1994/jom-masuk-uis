@@ -19,7 +19,7 @@ import {
     School
 } from 'lucide-react';
 
-const Sidebar = ({ isMobile }) => {
+const Sidebar = ({ isMobile, className = '' }) => {
     const { user } = useAuth();
     const [collapsed, setCollapsed] = useState(false);
 
@@ -40,7 +40,7 @@ const Sidebar = ({ isMobile }) => {
 
     const lecturerNavItems = [
         { path: '/lecturer-dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { path: '/my-classes', label: 'My Classes', icon: CalendarDays },
+        { path: '/lecturer-timetable', label: 'Timetable', icon: CalendarDays },
         { path: '/my-students', label: 'My Students', icon: Users },
         { path: '/attendance', label: 'Mark Attendance', icon: CalendarCheck },
         { path: '/assessments', label: 'Assessments', icon: FileText },
@@ -60,10 +60,17 @@ const Sidebar = ({ isMobile }) => {
                 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 transition-all duration-300 flex flex-col z-50
                 ${isMobile ? 'fixed inset-y-0 left-0 w-64' : (collapsed ? 'w-20' : 'w-64')}
                 ${isMobile && collapsed ? '-translate-x-full' : ''}
+                ${className}
             `}
         >
             <div className="h-16 flex items-center justify-between px-4 border-b border-gray-100 dark:border-slate-800">
-                {!collapsed && <span className="text-xl font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">Matrix</span>}
+                {!collapsed && (
+                    user?.faculty_logo ? (
+                        <img src={user.faculty_logo} alt="Faculty Logo" className="h-8 w-auto object-contain" />
+                    ) : (
+                        <span className="text-xl font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">Matrix</span>
+                    )
+                )}
                 {!isMobile && (
                     <button onClick={toggleSidebar} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 dark:text-slate-400 dark:hover:text-white transition-colors">
                         {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}

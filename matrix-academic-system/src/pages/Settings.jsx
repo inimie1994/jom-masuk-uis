@@ -3,12 +3,14 @@ import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
 import ThemeToggle from '../components/ThemeToggle';
-import { User, Building, Monitor, Save } from 'lucide-react';
+import { User, Building, Monitor, Save, Upload, Image as ImageIcon } from 'lucide-react';
 
 const Settings = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('profile');
     const [facultyName, setFacultyName] = useState('');
+    const [logoPreview, setLogoPreview] = useState(null);
+    const [uploadingLogo, setUploadingLogo] = useState(false);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null);
 
@@ -25,7 +27,10 @@ const Settings = () => {
             .eq('id', user.faculty_id)
             .single();
 
-        if (data) setFacultyName(data.name);
+        if (data) {
+            setFacultyName(data.name);
+            setLogoPreview(data.logo_url);
+        }
     };
 
     const handleUpdateFaculty = async (e) => {
@@ -49,6 +54,50 @@ const Settings = () => {
         }
     };
 
+    const handleLogoUpload = async (e) => {
+        try {
+            setUploadingLogo(true);
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${user.faculty_id}/${Date.now()}_logo.${fileExt}`;
+            const filePath = `faculty_logos/${fileName}`;
+
+            // 1. Upload to Supabase Storage
+            const { error: uploadError } = await supabase.storage
+                .from('assets')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            // 2. Get Public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('assets')
+                .getPublicUrl(filePath);
+
+            // 3. Update Database
+            const { error: dbError } = await supabase
+                .from('faculties')
+                .update({ logo_url: publicUrl })
+                .eq('id', user.faculty_id);
+
+            if (dbError) throw dbError;
+
+            setLogoPreview(publicUrl);
+            setMessage({ type: 'success', text: 'Faculty logo updated successfully.' });
+
+            // Reload page to reflect changes globally (simple way to update AuthContext)
+            window.location.reload();
+
+        } catch (error) {
+            console.error('Error uploading logo:', error);
+            setMessage({ type: 'error', text: 'Failed to upload logo.' });
+        } finally {
+            setUploadingLogo(false);
+        }
+    };
+
     const tabs = [
         { id: 'profile', label: 'Profile', icon: User },
         ...(user?.role === 'admin' ? [{ id: 'faculty', label: 'Faculty', icon: Building }] : []),
@@ -69,8 +118,8 @@ const Settings = () => {
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
                                     className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${activeTab === tab.id
-                                            ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                                            : 'text-gray-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-gray-900 dark:hover:text-gray-200'
+                                        ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                        : 'text-gray-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-slate-800/50 hover:text-gray-900 dark:hover:text-gray-200'
                                         }`}
                                 >
                                     <tab.icon size={18} className="mr-3" />
@@ -133,6 +182,48 @@ const Settings = () => {
                                                 onChange={(e) => setFacultyName(e.target.value)}
                                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white"
                                             />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Institution Logo</label>
+                                            <div className="mt-2 flex items-center space-x-6">
+                                                <div className="shrink-0">
+                                                    {logoPreview ? (
+                                                        <img
+                                                            className="h-24 w-24 object-contain rounded-md border border-gray-200 dark:border-slate-600 bg-white"
+                                                            src={logoPreview}
+                                                            alt="Current faculty logo"
+                                                        />
+                                                    ) : (
+                                                        <div className="h-24 w-24 rounded-md border border-gray-200 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 flex items-center justify-center">
+                                                            <ImageIcon className="h-10 w-10 text-gray-400" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <label className="block">
+                                                    <span className="sr-only">Choose profile photo</span>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            onChange={handleLogoUpload}
+                                                            disabled={uploadingLogo}
+                                                            className="block w-full text-sm text-slate-500
+                                                            file:mr-4 file:py-2 file:px-4
+                                                            file:rounded-full file:border-0
+                                                            file:text-sm file:font-semibold
+                                                            file:bg-indigo-50 file:text-indigo-700
+                                                            hover:file:bg-indigo-100 disabled:opacity-50 cursor-pointer"
+                                                        />
+                                                        {uploadingLogo && (
+                                                            <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-slate-800/50">
+                                                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">PNG, JPG, GIF up to 2MB</p>
+                                                </label>
+                                            </div>
                                         </div>
 
                                         <div className="flex justify-end">

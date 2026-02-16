@@ -21,12 +21,14 @@ const DashboardLayout = () => {
                 ></div>
             )}
 
-            <Sidebar isMobile={mobileSidebarOpen} />
+            <Sidebar isMobile={mobileSidebarOpen} className="print:hidden" />
 
             <div className="flex flex-col flex-1 overflow-hidden">
-                <Topbar toggleMobileSidebar={toggleMobileSidebar} />
-                <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 scroll-smooth">
-                    <div className="max-w-7xl mx-auto">
+                <div className="print:hidden">
+                    <Topbar toggleMobileSidebar={toggleMobileSidebar} />
+                </div>
+                <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 scroll-smooth print:p-0 print:overflow-visible">
+                    <div className="max-w-7xl mx-auto print:max-w-none print:w-full">
                         <Outlet />
                     </div>
                 </main>
