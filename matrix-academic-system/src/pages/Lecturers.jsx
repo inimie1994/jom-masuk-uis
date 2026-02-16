@@ -189,20 +189,29 @@ const Lecturers = () => {
         }
     };
 
+    const [success, setSuccess] = useState(null);
+
     const handleDeleteLecturer = async (lecturerId) => {
         if (!window.confirm('Delete this lecturer? (This will NOT delete the Auth User account currently)')) return;
         try {
-            const { error } = await supabase
+            setLoading(true);
+            const { error: deleteError } = await supabase
                 .from('lecturers')
                 .delete()
                 .eq('id', lecturerId);
 
-            if (error) throw error;
+            if (deleteError) throw deleteError;
+
+            setSuccess('Lecturer deleted successfully.');
+            setTimeout(() => setSuccess(null), 3000);
+
             if (selectedLecturer?.id === lecturerId) setSelectedLecturer(null);
             fetchLecturers();
         } catch (err) {
             console.error('Error deleting lecturer:', err);
-            setError('Failed to delete lecturer.');
+            setError(err.message || 'Failed to delete lecturer.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -220,9 +229,16 @@ const Lecturers = () => {
             />
 
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-md mb-4 text-sm flex justify-between items-center">
+                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-md mb-4 text-sm flex justify-between items-center animate-in">
                     <span>{error}</span>
                     <button onClick={() => setError(null)} className="text-sm underline">Dismiss</button>
+                </div>
+            )}
+
+            {success && (
+                <div className="bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 p-4 rounded-md mb-4 text-sm flex justify-between items-center animate-in">
+                    <span>{success}</span>
+                    <button onClick={() => setSuccess(null)} className="text-sm underline">Dismiss</button>
                 </div>
             )}
 
