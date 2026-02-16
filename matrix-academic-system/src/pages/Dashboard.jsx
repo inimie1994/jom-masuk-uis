@@ -1,4 +1,6 @@
 
+import CalendarWidget from '../components/dashboard/CalendarWidget';
+
 const Dashboard = () => {
     return (
         <div className="p-6">
@@ -20,6 +22,8 @@ const Dashboard = () => {
                     </div>
                 </div>
             </div>
+
+            <CalendarWidget />
         </div>
     );
 };

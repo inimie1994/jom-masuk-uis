@@ -21,32 +21,34 @@ export const AuthProvider = ({ children }) => {
 
         const fetchProfile = async (session) => {
             console.log('AuthContext: fetchProfile called for user:', session?.user?.id);
+            if (!session?.user) {
+                console.log('AuthContext: No session user found');
+                setUser(null);
+                setLoading(false);
+                return;
+            }
+
             try {
-                if (session?.user) {
-                    const { data: profile, error } = await supabase
-                        .from('users')
-                        .select('*')
-                        .eq('id', session.user.id)
-                        .single();
+                const { data: profile, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .single();
 
-                    if (error) {
-                        console.error('AuthContext: Error fetching profile:', error);
-                    } else {
-                        console.log('AuthContext: Profile fetched successfully');
-                    }
-
-                    setUser({ ...session.user, ...profile });
+                if (error) {
+                    console.error('AuthContext: Error fetching profile:', error);
+                    // Still set user with basic auth info if profile fetch fails
+                    setUser({ ...session.user, role: session.user.user_metadata?.role || null });
                 } else {
-                    console.log('AuthContext: No session user found');
-                    setUser(null);
+                    console.log('AuthContext: Profile fetched successfully', profile.role);
+                    setUser({ ...session.user, ...profile });
                 }
             } catch (error) {
                 console.error('AuthContext: Unexpected error in fetchProfile:', error);
-                setUser(null);
+                setUser(session?.user || null);
             } finally {
                 setLoading(false);
                 clearTimeout(safetyTimeout);
-                console.log('AuthContext: loading set to false');
             }
         };
 
@@ -106,7 +108,17 @@ export const AuthProvider = ({ children }) => {
             if (error) throw error;
             return data;
         },
-        signOut: () => supabase.auth.signOut(),
+        signOut: async () => {
+            try {
+                const { error } = await supabase.auth.signOut();
+                if (error) throw error;
+                setUser(null);
+            } catch (error) {
+                console.error('AuthContext: Error during signOut:', error);
+                // Even if Supabase fails, we should clear the local state
+                setUser(null);
+            }
+        },
         user,
     };
 

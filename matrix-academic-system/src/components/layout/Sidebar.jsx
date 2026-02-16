@@ -48,7 +48,7 @@ const Sidebar = ({ isMobile }) => {
     ];
 
     const navItems = user?.role === 'lecturer' ? lecturerNavItems : adminNavItems;
-    const roleLabel = user?.role === 'lecturer' ? 'Lecturer' : 'Faculty Admin';
+    const roleLabel = user?.role === 'lecturer' ? 'Lecturer' : (user?.role === 'admin' ? 'Faculty Admin' : (user ? 'Loading Role...' : 'Guest'));
 
     const toggleSidebar = () => {
         setCollapsed(!collapsed);

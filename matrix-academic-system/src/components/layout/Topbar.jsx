@@ -1,12 +1,24 @@
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { LogOut, Bell, Search, Menu } from 'lucide-react';
 import ThemeToggle from '../ThemeToggle';
 
 const Topbar = ({ toggleMobileSidebar }) => {
     const { user, signOut } = useAuth();
+    const navigate = useNavigate();
 
-    // Simple placeholder for user email/name
-    const userRole = 'Faculty Admin';
+    const handleLogout = async () => {
+        const isLecturer = user?.role === 'lecturer';
+        await signOut();
+        if (isLecturer) {
+            navigate('/lecturer-login');
+        } else {
+            navigate('/login');
+        }
+    };
+
+    const roleLabel = user?.role === 'lecturer' ? 'Lecturer' :
+        (user?.role === 'admin' ? 'Faculty Admin' : 'System User');
 
     return (
         <header className="h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-100 dark:border-slate-800 flex items-center justify-between px-6 sticky top-0 z-40 transition-colors">
@@ -36,10 +48,10 @@ const Topbar = ({ toggleMobileSidebar }) => {
                 <div className="flex items-center space-x-3">
                     <div className="text-right hidden sm:block">
                         <p className="text-sm font-medium text-gray-800 dark:text-white">{user?.email || 'User'}</p>
-                        <p className="text-xs text-gray-500 dark:text-slate-400">{userRole}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">{roleLabel}</p>
                     </div>
                     <button
-                        onClick={() => signOut()}
+                        onClick={handleLogout}
                         className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
                         title="Sign Out"
                     >

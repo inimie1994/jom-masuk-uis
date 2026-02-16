@@ -255,31 +255,54 @@ const Timetable = () => {
                     .update(payload)
                     .eq('id', editingClass.id);
                 if (error) throw error;
+                setSuccess('Class updated successfully.');
             } else {
                 const { error } = await supabase
                     .from('timetable')
                     .insert([payload]);
                 if (error) throw error;
+                setSuccess('Class scheduled successfully.');
             }
 
+            setTimeout(() => setSuccess(null), 3000);
             setIsModalOpen(false);
-            fetchTimetable();
+            setEditingClass(null);
+            await fetchTimetable();
         } catch (err) {
             console.error('Error saving class:', err);
-            setError('Failed to save class schedule.');
+            setError(err.message || 'Failed to save class schedule.');
+        } finally {
+            setLoading(false);
         }
     };
 
+    const [success, setSuccess] = useState(null);
+
     const handleDelete = async () => {
-        if (!editingClass || !window.confirm('Are you sure?')) return;
+        if (!editingClass || !window.confirm('Are you sure you want to delete this class?')) return;
+
         try {
-            const { error } = await supabase.from('timetable').delete().eq('id', editingClass.id);
-            if (error) throw error;
+            setLoading(true);
+            const { error: deleteError } = await supabase
+                .from('timetable')
+                .delete()
+                .eq('id', editingClass.id);
+
+            if (deleteError) throw deleteError;
+
+            setSuccess('Class deleted successfully.');
+            setTimeout(() => setSuccess(null), 3000);
+
             setIsModalOpen(false);
-            fetchTimetable();
+            setEditingClass(null);
+
+            // Re-fetch timetable to update the grid
+            await fetchTimetable();
         } catch (err) {
-            console.error('Error deleting:', err);
-            setError('Failed to delete class.');
+            console.error('Error deleting class:', err);
+            setError(err.message || 'Failed to delete class.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -374,25 +397,44 @@ const Timetable = () => {
                 }}
             />
 
-            <div className="mb-6 flex items-center bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-                <Users className="text-gray-400 mr-2" size={20} />
-                <span className="mr-4 text-sm font-medium text-gray-700 dark:text-gray-300">Student Group:</span>
-                <select
-                    value={selectedGroup}
-                    onChange={(e) => setSelectedGroup(e.target.value)}
-                    className="block w-64 rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
-                >
-                    <option value="">Select a group...</option>
-                    {groups.map(g => (
-                        <option key={g} value={g}>{g}</option>
-                    ))}
-                </select>
+            <div className="mb-8 flex flex-wrap items-center gap-3 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700/50">
+                <div className="flex items-center text-gray-400 mr-2 border-r border-gray-100 dark:border-slate-700/50 pr-4">
+                    <Users className="mr-2" size={20} />
+                    <span className="text-sm font-bold uppercase tracking-wider">Group</span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    {groups.length > 0 ? (
+                        groups.map(g => (
+                            <button
+                                key={g}
+                                onClick={() => setSelectedGroup(g)}
+                                className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-200 uppercase tracking-wide
+                                    ${selectedGroup === g
+                                        ? 'bg-primary text-white shadow-pastel transform scale-105 z-10'
+                                        : 'bg-slate-50 dark:bg-slate-900 text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-850 hover:text-gray-700 dark:hover:text-gray-200'
+                                    }`}
+                            >
+                                {g}
+                            </button>
+                        ))
+                    ) : (
+                        <span className="text-sm text-gray-400 italic">No groups found</span>
+                    )}
+                </div>
             </div>
 
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-md mb-4 text-sm flex justify-between items-center">
+                <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-md mb-4 text-sm flex justify-between items-center animate-in mb-4">
                     <span>{error}</span>
                     <button onClick={() => setError(null)} className="text-sm underline">Dismiss</button>
+                </div>
+            )}
+
+            {success && (
+                <div className="bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 p-4 rounded-md mb-4 text-sm flex justify-between items-center animate-in mb-4">
+                    <span>{success}</span>
+                    <button onClick={() => setSuccess(null)} className="text-sm underline">Dismiss</button>
                 </div>
             )}
 
@@ -540,15 +582,18 @@ const Timetable = () => {
                         <div className="flex space-x-3">
                             <button
                                 type="button"
+                                disabled={loading}
                                 onClick={() => setIsModalOpen(false)}
-                                className="px-6 py-2 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all font-bold"
+                                className="px-6 py-2 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all font-bold disabled:opacity-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
-                                className="px-6 py-2 border border-transparent rounded-xl shadow-pastel text-xs font-bold uppercase tracking-widest text-white bg-primary hover:opacity-90 transition-all"
+                                disabled={loading}
+                                className="px-6 py-2 border border-transparent rounded-xl shadow-pastel text-xs font-bold uppercase tracking-widest text-white bg-primary hover:opacity-90 transition-all disabled:opacity-50 flex items-center"
                             >
+                                {loading && <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>}
                                 {editingClass ? 'Update Class' : 'Schedule Class'}
                             </button>
                         </div>

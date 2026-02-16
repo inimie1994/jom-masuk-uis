@@ -103,8 +103,17 @@ const LecturerDashboard = () => {
         }
     };
 
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <span className="ml-3 text-gray-500 font-medium">Loading your dashboard...</span>
+            </div>
+        );
+    }
+
     if (!user?.lecturer_id) {
-        return <div className="p-8 text-center text-gray-500">Access Restricted. Not a registered lecturer.</div>;
+        return <div className="p-8 text-center text-gray-500 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-100 dark:border-slate-700">Access Restricted. Not a registered lecturer.</div>;
     }
 
     return (

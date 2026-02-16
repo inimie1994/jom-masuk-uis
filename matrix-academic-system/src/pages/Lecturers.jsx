@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabaseClient';
-import { createClient } from '@supabase/supabase-js';
 import PageHeader from '../components/common/PageHeader';
 import Modal from '../components/common/Modal';
-import { Plus, Trash2, Clock, BookOpen, ChevronRight, Briefcase, Eye, Key, Mail, Lock } from 'lucide-react';
+import { Plus, Trash2, Clock, BookOpen, ChevronRight, Briefcase, Eye, Key, Mail, Lock, User } from 'lucide-react';
 
 const Lecturers = () => {
     const { user } = useAuth();
@@ -23,7 +22,7 @@ const Lecturers = () => {
     // Form States
     const [lecturerForm, setLecturerForm] = useState({
         name: '',
-        email: '',
+        username: '',
         password: '',
     });
 
@@ -113,7 +112,7 @@ const Lecturers = () => {
     const handleAddLecturer = async (e) => {
         e.preventDefault();
         setError(null);
-        if (!lecturerForm.name.trim() || !lecturerForm.email.trim() || !lecturerForm.password.trim()) {
+        if (!lecturerForm.name.trim() || !lecturerForm.username.trim() || !lecturerForm.password.trim()) {
             setError('All fields are required.');
             return;
         }
@@ -121,107 +120,29 @@ const Lecturers = () => {
         try {
             setLoading(true);
 
-            // 1. Create Auth User using a secondary client to avoid logging out the admin
-            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-            const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-            const secondaryClient = createClient(supabaseUrl, supabaseAnonKey, {
-                auth: { persistSession: false } // Crucial: Do not persist this session
-            });
-
-            const { data: authData, error: authError } = await secondaryClient.auth.signUp({
-                email: lecturerForm.email,
-                password: lecturerForm.password,
-                options: {
-                    data: {
-                        role: 'lecturer', // Metadata role
-                        name: lecturerForm.name
-                        // We can't set faculty_id here securely usually, but trigger handles it if we insert row
-                        // Actually, trigger relies on auth.uid() which is the *new* user.
-                        // But users table trigger 'handle_new_user' just inserts basic info.
-                        // We need to update the users table *after* creation with role='lecturer' and faculty_id.
-                    }
+            // Invoke the Edge Function to handle Auth creation and Database inserts securely
+            // This bypasses email verification and rate limits
+            const { data, error: functionError } = await supabase.functions.invoke('create-lecturer', {
+                body: {
+                    name: lecturerForm.name,
+                    username: lecturerForm.username,
+                    password: lecturerForm.password,
+                    faculty_id: user.faculty_id
                 }
             });
 
-            if (authError) throw authError;
-            if (!authData.user) throw new Error("Failed to create user.");
-
-            // 2. Insert into Lecturers table
-            // We store temp_password for admin view (insecure but requested)
-            const { data: lecturerData, error: lecturerError } = await supabase
-                .from('lecturers')
-                .insert([{
-                    name: lecturerForm.name,
-                    email: lecturerForm.email,
-                    temp_password: lecturerForm.password,
-                    faculty_id: user.faculty_id
-                }])
-                .select()
-                .single();
-
-            if (lecturerError) throw lecturerError;
-
-            // 3. Update public.users table to link them
-            // The trigger 'on_auth_user_created' shoud have created the row in 'users' table.
-            // We need to update it to set role='lecturer', faculty_id, and lecturer_id
-
-            // Note: RLS might prevent update of *other* users. 
-            // Admin policy we created earlier: "Admins can update students in their faculty".
-            // We need "Admins can update users in their faculty".
-            // existing policy: "Admins can view all users in their faculty".
-            // We probably need to ensure Admins can UPDATE users where they are adding them.
-            // The new user might not have faculty_id set yet in users table (it's null by default trigger).
-            // So "Admins can update users in their faculty" might fail if the target user doesn't have faculty_id yet.
-            // But wait, the trigger `handle_new_user` inserts `role='student'` and `faculty_id=NULL`.
-
-            // We can try to update using service role if available or strict RLS.
-            // Since we don't have service role in client, we might hit RLS issues if we try to update a user that isn't "in our faculty" yet.
-            // Workaround: We rely on the fact that we can't easily update auth.users metadata from client for *other* users without function.
-            // AND we can't update public.users if RLS says "only if faculty_id matches".
-
-            // However, for this MVP, let's assume we use a Edge Function or we relax RLS for "Admins can update ANY user to set faculty_id"? No that's bad.
-            // 
-            // Alternative: The Admin creates the lecturer. The Admin sees the `lecturer_id`.
-            // The Admin needs to link `auth.users.id` to `lecturers.id`.
-            // But we can't easily query `public.users` for the new user if we don't know their ID? 
-            // secondaryClient.auth.signUp returns the user object with ID! -> `authData.user.id`.
-
-            // So we have `authData.user.id`.
-            // We want to update `public.users` SET role='lecturer', lecturer_id=..., faculty_id=... WHERE id=...
-            // RLS Check: Can I update a row in `public.users` where `id` is the new user?
-            // Existing Policy: "Users can read own profile".
-            // Missing Policy: "Admins can update users...".
-            // We might need to add a policy or function.
-            // Let's try to update it. If it fails, we might need to add a policy dynamically or user sql tool.
-
-            const { error: userUpdateError } = await supabase
-                .from('users')
-                .update({
-                    role: 'lecturer',
-                    lecturer_id: lecturerData.id,
-                    faculty_id: user.faculty_id
-                })
-                .eq('id', authData.user.id);
-
-            if (userUpdateError) {
-                console.warn("Could not update public.users table directly. RLS might be blocking.", userUpdateError);
-                // If this fails, the user exists but isn't linked.
-                // We might need a database function "assign_lecturer_role(user_id, lecturer_id, faculty_id)"
-                // But let's hope we can fix it with a policy if needed or use previous "Admins can update students" pattern for users.
-                // Let's create a policy on the fly? No.
-                // Let's rely on `20240215_audit_logs.sql` ... no.
-                // Let's invoke a SQL query? I can do that via MCP!
-
-                // I will add a policy or use SQL via MCP in the next step if this is blocking.
-                // For now, let's assume it works or I'll fix the RLS in next step.
-            }
+            if (functionError) throw functionError;
+            if (data?.error) throw new Error(data.error);
 
             setIsAddLecturerModalOpen(false);
-            setLecturerForm({ name: '', email: '', password: '' });
+            setLecturerForm({ name: '', username: '', password: '' });
             fetchLecturers();
+
+            // Log success to console for verification
+            console.log('Lecturer added successfully:', data);
         } catch (err) {
             console.error('Error adding lecturer:', err);
-            setError(err.message || 'Failed to add lecturer.');
+            setError(err.message || 'Failed to add lecturer. Please check if the username already exists.');
         } finally {
             setLoading(false);
         }
@@ -445,15 +366,16 @@ const Lecturers = () => {
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Username</label>
                         <input
-                            type="email"
+                            type="text"
                             required
                             className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
-                            value={lecturerForm.email}
-                            onChange={(e) => setLecturerForm({ ...lecturerForm, email: e.target.value })}
-                            placeholder="e.g. aris@matrix.edu"
+                            value={lecturerForm.username}
+                            onChange={(e) => setLecturerForm({ ...lecturerForm, username: e.target.value.toLowerCase().replace(/\s/g, '') })}
+                            placeholder="e.g. aris123"
                         />
+                        <p className="mt-1 text-[10px] text-gray-500 italic">No spaces allowed. This will be used for login.</p>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Initial Password</label>
@@ -551,10 +473,10 @@ const Lecturers = () => {
 
                     <div className="space-y-3">
                         <div>
-                            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Email</label>
+                            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Username</label>
                             <div className="mt-1 flex items-center bg-gray-50 dark:bg-slate-900 px-3 py-2 rounded border border-gray-200 dark:border-slate-700">
-                                <Mail size={16} className="text-gray-400 mr-2" />
-                                <span className="text-gray-900 dark:text-white select-all">{credentialsView?.email || 'N/A'}</span>
+                                <User size={16} className="text-gray-400 mr-2" />
+                                <span className="text-gray-900 dark:text-white select-all">{credentialsView?.username || 'N/A'}</span>
                             </div>
                         </div>
                         <div>

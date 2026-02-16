@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { GraduationCap, Mail, Lock, CheckCircle, AlertCircle } from 'lucide-react';
+import { GraduationCap, Mail, Lock, CheckCircle, AlertCircle, User } from 'lucide-react';
 
 const LecturerLogin = () => {
     const { signIn } = useAuth();
     const navigate = useNavigate();
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -17,7 +17,8 @@ const LecturerLogin = () => {
         setError(null);
 
         try {
-            const { data, error } = await signIn({ email, password });
+            const internalEmail = `${username.trim()}@matrix-system.com`;
+            const { data, error } = await signIn({ email: internalEmail, password });
             if (error) throw error;
 
             // Redirect happens in AuthContext or explictly here if needed
@@ -65,23 +66,23 @@ const LecturerLogin = () => {
                         )}
 
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Email address
+                            <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Username
                             </label>
                             <div className="mt-1 relative rounded-md shadow-sm">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Mail className="h-5 w-5 text-gray-400" />
+                                    <User className="h-5 w-5 text-gray-400" />
                                 </div>
                                 <input
-                                    id="email"
-                                    name="email"
-                                    type="email"
-                                    autoComplete="email"
+                                    id="username"
+                                    name="username"
+                                    type="text"
+                                    autoComplete="username"
                                     required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
                                     className="block w-full pl-10 sm:text-sm border-gray-300 dark:border-slate-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500 dark:bg-slate-700 dark:text-white py-2 border"
-                                    placeholder="lecturer@example.com"
+                                    placeholder="e.g. aris123"
                                 />
                             </div>
                         </div>
