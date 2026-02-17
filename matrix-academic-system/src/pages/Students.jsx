@@ -19,7 +19,7 @@ const Students = () => {
     const fileInputRef = useRef(null);
 
     // New state for view mode: 'all' or 'group'
-    const [viewMode, setViewMode] = useState('all');
+    const [viewMode, setViewMode] = useState('group');
 
     // Student Details Modal State
     const [selectedStudent, setSelectedStudent] = useState(null);
@@ -391,41 +391,41 @@ const Students = () => {
                 />
                 <div className="flex flex-wrap gap-2 items-center">
                     {/* View Toggle */}
-                    <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex mr-2">
+                    <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex mr-1 sm:mr-2">
                         <button
                             onClick={() => setViewMode('all')}
-                            className={`flex items-center px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${viewMode === 'all'
+                            className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-sm font-medium rounded-lg transition-all ${viewMode === 'all'
                                 ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-white'
                                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                                 }`}
                         >
-                            <LayoutList size={16} className="mr-2" />
+                            <LayoutList size={14} className="mr-1 sm:mr-2" />
                             All
                         </button>
                         <button
                             onClick={() => setViewMode('group')}
-                            className={`flex items-center px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${viewMode === 'group'
+                            className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-sm font-medium rounded-lg transition-all ${viewMode === 'group'
                                 ? 'bg-white dark:bg-slate-600 shadow text-gray-900 dark:text-white'
                                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                                 }`}
                         >
-                            <Layers size={16} className="mr-2" />
+                            <Layers size={14} className="mr-1 sm:mr-2" />
                             Groups
                         </button>
                     </div>
 
                     <button
                         onClick={downloadTemplate}
-                        className="inline-flex items-center px-3 py-2 border border-gray-200 dark:border-slate-700 shadow-sm text-xs font-bold uppercase tracking-wider rounded-xl text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+                        className="inline-flex items-center px-2 sm:px-3 py-1 sm:py-2 border border-gray-200 dark:border-slate-700 shadow-sm text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-xl text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
                     >
-                        <Download size={16} className="mr-2" />
+                        <Download size={14} className="mr-1 sm:mr-2" />
                         Template
                     </button>
                     <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="inline-flex items-center px-3 py-2 border border-gray-200 dark:border-slate-700 shadow-sm text-xs font-bold uppercase tracking-wider rounded-xl text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+                        className="inline-flex items-center px-2 sm:px-3 py-1 sm:py-2 border border-gray-200 dark:border-slate-700 shadow-sm text-[10px] sm:text-xs font-bold uppercase tracking-wider rounded-xl text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
                     >
-                        <Upload size={16} className="mr-2" />
+                        <Upload size={14} className="mr-1 sm:mr-2" />
                         Upload
                     </button>
                     <input
@@ -437,9 +437,9 @@ const Students = () => {
                     />
                     <button
                         onClick={() => setIsModalOpen(true)}
-                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-xl shadow-pastel text-xs font-bold uppercase tracking-widest text-white bg-primary hover:opacity-90 transition-all"
+                        className="inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 border border-transparent rounded-xl shadow-pastel text-[10px] sm:text-xs font-bold uppercase tracking-widest text-white bg-primary hover:opacity-90 transition-all"
                     >
-                        <Plus size={20} className="mr-2" />
+                        <Plus size={16} className="mr-1 sm:mr-2" />
                         Add Student
                     </button>
                 </div>
@@ -484,9 +484,9 @@ const Students = () => {
                                                     <Layers size={18} />
                                                 </div>
                                                 <div>
-                                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center">
+                                                    <h3 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white flex items-center">
                                                         {group.groupName}
-                                                        <span className="ml-3 text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-slate-700 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                                        <span className="ml-2 sm:ml-3 text-[9px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-slate-700 px-1.5 sm:px-2.5 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap">
                                                             {group.students.length} Students
                                                         </span>
                                                     </h3>

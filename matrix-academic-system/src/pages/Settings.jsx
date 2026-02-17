@@ -310,7 +310,6 @@ const Settings = () => {
 
     const tabs = [
         { id: 'profile', label: 'Profile', icon: User },
-        { id: 'profile', label: 'Profile', icon: User },
         ...(user?.role === 'admin' ? [
             { id: 'faculty', label: 'Faculty', icon: Building },
             { id: 'attendance', label: 'Attendance', icon: CalendarDays }

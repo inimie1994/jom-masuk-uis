@@ -75,12 +75,14 @@ const Attendance = () => {
 
             // Lecturer filter logic
             if (user.role === 'lecturer' && user.lecturer_id) {
-                const { data: myClasses } = await supabase
-                    .from('classes')
-                    .select('student_group')
+                // Fetch groups from timetable
+                const { data: timetableData } = await supabase
+                    .from('timetable')
+                    .select('group_name')
                     .eq('lecturer_id', user.lecturer_id);
 
-                const myGroups = [...new Set(myClasses?.map(c => c.student_group))];
+                const myGroups = [...new Set(timetableData?.map(t => t.group_name).filter(Boolean))];
+
                 if (myGroups.length > 0) {
                     query = query.in('student_group', myGroups);
                 } else {

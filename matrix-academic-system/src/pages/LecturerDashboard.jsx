@@ -22,6 +22,7 @@ const LecturerDashboard = () => {
         marketingStudents: 0, // placeholder name
         subjects: 0
     });
+    const [workloads, setWorkloads] = useState([]);
     const [upcomingClasses, setUpcomingClasses] = useState([]);
     const [myClasses, setMyClasses] = useState([]);
     const [mySubjects, setMySubjects] = useState([]);
@@ -45,53 +46,60 @@ const LecturerDashboard = () => {
             const now = new Date();
             const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-            // 1. Get my classes (to derive subjects and class IDs)
-            const { data: myClassesData } = await supabase
-                .from('classes')
-                .select('id, subject_id, section, semester, subjects(name, code)')
-                .eq('lecturer_id', lecturerId);
+            // 1. Get ALL assignment sources
+            const [classesRes, timetableRes, workloadRes] = await Promise.all([
+                supabase.from('classes').select('id, subject_id, section, subjects(name, code)').eq('lecturer_id', lecturerId),
+                supabase.from('timetable').select('id, subject_id, group_name, subjects(name, code)').eq('lecturer_id', lecturerId),
+                supabase.from('workload').select('id, subject_id, student_group, subjects(name, code)').eq('lecturer_id', lecturerId)
+            ]);
 
-            const myClasses = myClassesData || [];
-            if (myClasses.length > 0) {
-                setMyClasses(myClasses);
+            const assignmentItems = [];
+            const subjectMap = new Map();
+            const classIds = new Set();
 
-                // Derive unique subjects
-                const uniqueSubjects = [];
-                const seenSubjectIds = new Set();
-                myClasses.forEach(cls => {
-                    if (!seenSubjectIds.has(cls.subject_id) && cls.subjects) {
-                        seenSubjectIds.add(cls.subject_id);
-                        uniqueSubjects.push({
-                            id: cls.subject_id,
-                            code: cls.subjects.code,
-                            name: cls.subjects.name
-                        });
-                    }
+            if (classesRes.data) {
+                classesRes.data.forEach(c => {
+                    assignmentItems.push({ ...c, type: 'class', group: c.section });
+                    classIds.add(c.id);
+                    if (c.subjects) subjectMap.set(c.subject_id, c.subjects);
                 });
-                setMySubjects(uniqueSubjects);
+            }
+            if (timetableRes.data) {
+                timetableRes.data.forEach(t => {
+                    assignmentItems.push({ ...t, type: 'timetable', group: t.group_name });
+                    classIds.add(t.id);
+                    if (t.subjects) subjectMap.set(t.subject_id, t.subjects);
+                });
+            }
+            if (workloadRes.data) {
+                workloadRes.data.forEach(w => {
+                    assignmentItems.push({ ...w, type: 'workload', group: w.student_group });
+                    if (w.subjects) subjectMap.set(w.subject_id, w.subjects);
+                });
             }
 
-            const myClassIds = myClasses.map(c => c.id);
-            const mySubjectIds = [...new Set(myClasses.map(c => c.subject_id))];
+            setMyClasses(assignmentItems);
+            setMySubjects(Array.from(subjectMap.values()));
 
-            // 2. Total Students (Count enrollments in my classes)
+            // 2. Total Students
             let totalStudentsCount = 0;
-            if (myClassIds.length > 0) {
+            const validClassIds = Array.from(classIds).filter(id => id && typeof id === 'string');
+            if (validClassIds.length > 0) {
                 const { count } = await supabase
                     .from('enrollments')
                     .select('*', { count: 'exact', head: true })
-                    .in('class_id', myClassIds);
+                    .in('class_id', validClassIds);
                 totalStudentsCount = count || 0;
             }
 
             // 3. Active/Upcoming Assessments
-            // Fetch assessments for my subjects due on or after today
             let assessmentsData = [];
-            if (mySubjectIds.length > 0) {
+            const validSubjectIds = Array.from(subjectMap.keys()).filter(id => id && typeof id === 'string');
+            if (validSubjectIds.length > 0) {
                 const { data } = await supabase
                     .from('assessments')
                     .select('*, subjects(code, name)')
-                    .in('subject_id', mySubjectIds)
+                    .in('subject_id', validSubjectIds)
                     .gte('date', today)
                     .order('date', { ascending: true })
                     .limit(5);
@@ -101,13 +109,12 @@ const LecturerDashboard = () => {
 
             // 4. Update Stats
             setStats({
-                classes: myClasses.length,
+                classes: assignmentItems.length,
                 students: totalStudentsCount,
-                subjects: mySubjectIds.length
+                subjects: subjectMap.size
             });
 
-            // 5. Upcoming Sessions (Today onwards)
-            // Fetch sessions for me
+            // 5. Upcoming Sessions
             const { data: upcoming } = await supabase
                 .from('attendance_sessions')
                 .select('*, subjects(code, name)')
@@ -119,10 +126,7 @@ const LecturerDashboard = () => {
 
             setUpcomingClasses(upcoming || []);
 
-            // 6. Pending Attendance (Past sessions with no records)
-            // Fetch past 10 sessions and check if they have records
-            // Note: This is an approximation. Ideally, backend should flag 'status'.
-            // for now, we verify if attendance_records exist.
+            // 6. Pending Attendance
             const { data: pastSessions } = await supabase
                 .from('attendance_sessions')
                 .select('id, date, start_time, group_name, subjects(code, name), attendance_records(id)')
@@ -131,10 +135,15 @@ const LecturerDashboard = () => {
                 .order('date', { ascending: false })
                 .limit(10);
 
-            // Filter those with 0 records
             const pending = pastSessions?.filter(s => !s.attendance_records || s.attendance_records.length === 0) || [];
-            // We can store this in a new state variable
             setPendingAttendance(pending);
+
+            // 7. Fetch Workload (Specifically for the widget)
+            const { data: wData } = await supabase
+                .from('workload')
+                .select('*, subjects(code, name)')
+                .eq('lecturer_id', lecturerId);
+            setWorkloads(wData || []);
 
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
@@ -179,7 +188,7 @@ const LecturerDashboard = () => {
                                         to={`/attendance?session=${session.id}`}
                                         className="block text-xs font-medium text-orange-900 dark:text-orange-200 hover:underline"
                                     >
-                                        • {new Date(session.date).toLocaleDateString()} - {session.subjects?.code} ({session.group_name})
+                                        • {new Date(session.date).toLocaleDateString()} - {session.subjects?.code || 'Unknown'} ({session.group_name})
                                     </Link>
                                 ))}
                             </div>
@@ -194,7 +203,7 @@ const LecturerDashboard = () => {
                         <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full text-blue-600 dark:text-blue-400">
                             <BookOpen size={24} />
                         </div>
-                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Subjects</span>
+                        <span className="text-sm font-medium text-gray-500 dark:text-slate-400">Subjects</span>
                     </div>
                     <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{stats.subjects}</h3>
                 </div>
@@ -204,7 +213,7 @@ const LecturerDashboard = () => {
                         <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-full text-indigo-600 dark:text-indigo-400">
                             <Calendar size={24} />
                         </div>
-                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Classes</span>
+                        <span className="text-sm font-medium text-gray-500 dark:text-slate-400">Active Classes</span>
                     </div>
                     <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{stats.classes}</h3>
                 </div>
@@ -214,10 +223,10 @@ const LecturerDashboard = () => {
                         <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full text-green-600 dark:text-green-400">
                             <Users size={24} />
                         </div>
-                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Students</span>
+                        <span className="text-sm font-medium text-gray-500 dark:text-slate-400">Total Students</span>
                     </div>
                     <h3 className="text-3xl font-bold text-gray-900 dark:text-white">{stats.students}</h3>
-                    <p className="text-xs text-gray-500 mt-1">across all sections</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">across all sections</p>
                 </div>
             </div>
 
@@ -229,35 +238,41 @@ const LecturerDashboard = () => {
                     </Link>
                 </div>
                 <div className="divide-y divide-gray-200 dark:divide-slate-700">
-                    {upcomingClasses.length === 0 ? (
-                        <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                            No upcoming classes scheduled soon.
-                        </div>
-                    ) : (
-                        upcomingClasses.map((session) => (
-                            <div key={session.id} className="p-6 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-750 transition-colors">
-                                <div className="flex items-center space-x-4">
-                                    <div className="p-3 bg-gray-100 dark:bg-slate-700 rounded-lg text-center min-w-[60px]">
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold">{new Date(session.date).toLocaleDateString('en-US', { month: 'short' })}</div>
-                                        <div className="text-xl font-bold text-gray-900 dark:text-white">{new Date(session.date).getDate()}</div>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{session.subjects?.code} - {session.subjects?.name}</h4>
-                                        <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-1 space-x-4">
-                                            <span className="flex items-center"><Clock size={14} className="mr-1" /> {session.start_time.slice(0, 5)} - {session.end_time.slice(0, 5)}</span>
-                                            <span className="flex items-center"><MapPin size={14} className="mr-1" /> {session.group_name}</span>
+                    <div className="space-y-4">
+                        {upcomingClasses.length === 0 ? (
+                            <div className="text-center py-4 text-gray-500 italic">No upcoming sessions.</div>
+                        ) : (
+                            upcomingClasses.map(session => (
+                                <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900/40 rounded-xl border border-gray-100 dark:border-slate-700">
+                                    <div className="flex items-center">
+                                        <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-xl flex flex-col items-center justify-center border border-gray-100 dark:border-slate-600 mr-4 shadow-sm">
+                                            <span className="text-[10px] font-bold uppercase text-gray-400">{new Date(session.date).toLocaleString('default', { month: 'short' })}</span>
+                                            <span className="text-lg font-bold text-gray-900 dark:text-white leading-none">{new Date(session.date).getDate()}</span>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-gray-900 dark:text-white">
+                                                {session.subjects?.name || `Subject (ID: ${session.subject_id?.substring(0, 5)})`}
+                                            </h4>
+                                            <div className="flex items-center mt-1 space-x-3">
+                                                <span className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                                                    <Clock size={12} className="mr-1" /> {session.start_time.substring(0, 5)} - {session.end_time.substring(0, 5)}
+                                                </span>
+                                                <span className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                                                    <MapPin size={12} className="mr-1" /> {session.location || 'Classroom'}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
+                                    <Link
+                                        to={`/attendance?session=${session.id}`}
+                                        className="px-4 py-2 bg-slate-800 dark:bg-slate-700 text-white rounded-lg text-xs font-bold hover:bg-slate-900 transition-colors"
+                                    >
+                                        Mark Attendance
+                                    </Link>
                                 </div>
-                                <Link
-                                    to={`/attendance?session=${session.id}`}
-                                    className="px-4 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-600"
-                                >
-                                    Mark Attendance
-                                </Link>
-                            </div>
-                        ))
-                    )}
+                            ))
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -265,7 +280,7 @@ const LecturerDashboard = () => {
                 {/* My Subjects Widget */}
                 <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
                     <div className="p-6 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center">
-                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">My Subjects</h2>
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">My Classes</h2>
                         <Link to="/subjects" className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center">
                             View All <ArrowRight size={16} className="ml-1" />
                         </Link>
@@ -278,7 +293,7 @@ const LecturerDashboard = () => {
                         ) : (
                             <ul className="space-y-3">
                                 {mySubjects.map((subject, idx) => (
-                                    <li key={idx} className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-slate-750 rounded-lg border border-gray-100 dark:border-slate-700">
+                                    <li key={idx} className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-slate-900/40 rounded-lg border border-gray-100 dark:border-slate-700">
                                         <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full text-blue-600 dark:text-blue-400">
                                             <BookOpen size={18} />
                                         </div>
@@ -309,7 +324,7 @@ const LecturerDashboard = () => {
                         ) : (
                             <ul className="space-y-3">
                                 {myClasses.map((cls, idx) => (
-                                    <li key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-750 rounded-lg border border-gray-100 dark:border-slate-700">
+                                    <li key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-900/40 rounded-lg border border-gray-100 dark:border-slate-700">
                                         <div className="flex items-center space-x-3">
                                             <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-full text-indigo-600 dark:text-indigo-400">
                                                 <GraduationCap size={18} />
@@ -331,6 +346,57 @@ const LecturerDashboard = () => {
                     </div>
                 </div>
 
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* My Workload Widget */}
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+                    <div className="p-6 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center">
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">My Workload</h2>
+                        <span className="text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 px-2 py-1 rounded-full">
+                            {workloads.reduce((acc, curr) => acc + curr.hours, 0)} Hours/Week
+                        </span>
+                    </div>
+                    <div className="p-6">
+                        {workloads.length === 0 ? (
+                            <div className="text-center text-gray-500 dark:text-gray-400">
+                                No workload assigned.
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {workloads.map((work) => (
+                                    <div key={work.id} className="flex items-start p-3 bg-gray-50 dark:bg-slate-900/40 rounded-lg border border-gray-100 dark:border-slate-700">
+                                        <div className={`p-2 rounded-lg mr-3 ${work.type === 'Lecture' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' :
+                                            work.type === 'Tutorial' ? 'bg-green-100 text-green-600 dark:bg-green-900/30' :
+                                                'bg-orange-100 text-orange-600 dark:bg-orange-900/30'
+                                            }`}>
+                                            <Clock size={18} />
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between">
+                                                <h4 className="font-semibold text-sm text-gray-900 dark:text-white">{work.subjects?.code}</h4>
+                                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{work.hours}h</span>
+                                            </div>
+                                            <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">{work.subjects?.name}</p>
+                                            <div className="flex items-center mt-2 text-xs text-gray-500 dark:text-gray-400 space-x-3">
+                                                <span className="flex items-center font-medium">
+                                                    {work.type}
+                                                </span>
+                                                {work.student_group && (
+                                                    <span className="flex items-center px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border border-gray-200 dark:border-slate-600">
+                                                        <Users size={10} className="mr-1" />
+                                                        {work.student_group}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
                 {/* Active Assessments Widget */}
                 <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
                     <div className="p-6 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center">
@@ -347,7 +413,7 @@ const LecturerDashboard = () => {
                         ) : (
                             <ul className="space-y-3">
                                 {recentAssessments.map((assessment) => (
-                                    <li key={assessment.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-750 rounded-lg border border-gray-100 dark:border-slate-700">
+                                    <li key={assessment.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-900/40 rounded-lg border border-gray-100 dark:border-slate-700">
                                         <div className="flex items-center space-x-3">
                                             <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-full text-orange-600 dark:text-orange-400">
                                                 <ClipboardList size={18} />
@@ -370,7 +436,7 @@ const LecturerDashboard = () => {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 

@@ -490,8 +490,9 @@ const Lecturers = () => {
                             value={workloadForm.student_group}
                             onChange={(e) => setWorkloadForm({ ...workloadForm, student_group: e.target.value })}
                             placeholder="e.g. Section 01, Group A"
+                            required
                         />
-                        <p className="mt-1 text-[10px] text-gray-500">Optional: Links to Classes for Dashboard</p>
+                        <p className="mt-1 text-[10px] text-gray-500">Required: Links to Classes for Dashboard</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>

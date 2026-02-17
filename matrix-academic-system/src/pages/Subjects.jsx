@@ -47,33 +47,59 @@ const Subjects = () => {
                 if (error) throw error;
                 setSubjects(data || []);
             } else if (user?.lecturer_id) {
-                // Fetch subjects assigned to this lecturer
-                const { data: myClasses, error: classesError } = await supabase
-                    .from('classes')
-                    .select('subject_id')
+                // Fetch timetable entries assigned to this lecturer
+                const { data, error } = await supabase
+                    .from('timetable')
+                    .select('group_name, class_type, subjects(id, code, name, credits)')
                     .eq('lecturer_id', user.lecturer_id);
 
-                if (classesError) throw classesError;
+                if (error) throw error;
 
-                const subjectIds = [...new Set(myClasses.map(c => c.subject_id))];
+                // Group by subject and then by class_type
+                const subjectGroups = (data || []).reduce((acc, item) => {
+                    const sub = item.subjects;
+                    if (!sub) return acc;
 
-                if (subjectIds.length === 0) {
-                    setSubjects([]);
-                    return;
-                }
+                    if (!acc[sub.id]) {
+                        acc[sub.id] = {
+                            id: sub.id,
+                            code: sub.code,
+                            name: sub.name,
+                            credits: sub.credits,
+                            classTypes: {}
+                        };
+                    }
 
-                const { data: subjectsData, error: subjectsError } = await supabase
-                    .from('subjects')
-                    .select('*')
-                    .in('id', subjectIds)
-                    .order('code', { ascending: true });
+                    const typeKey = item.class_type || 'Other';
+                    if (!acc[sub.id].classTypes[typeKey]) {
+                        acc[sub.id].classTypes[typeKey] = new Set();
+                    }
+                    acc[sub.id].classTypes[typeKey].add(item.group_name);
 
-                if (subjectsError) throw subjectsError;
-                setSubjects(subjectsData || []);
+                    return acc;
+                }, {});
+
+                // Format for rendering
+                const formattedSubjects = Object.values(subjectGroups).map(s => ({
+                    ...s,
+                    classTypes: Object.entries(s.classTypes)
+                        .map(([type, groups]) => ({
+                            type,
+                            groups: Array.from(groups).sort()
+                        }))
+                        // Ensure 'Lecture' comes before others if possible
+                        .sort((a, b) => {
+                            if (a.type.toLowerCase() === 'lecture') return -1;
+                            if (b.type.toLowerCase() === 'lecture') return 1;
+                            return a.type.localeCompare(b.type);
+                        })
+                })).sort((a, b) => a.code.localeCompare(b.code));
+
+                setSubjects(formattedSubjects);
             }
         } catch (err) {
             console.error('Error fetching subjects:', err);
-            setError('Failed to load subjects.');
+            setError('Failed to load classes.');
         } finally {
             setLoading(false);
         }
@@ -143,6 +169,11 @@ const Subjects = () => {
 
     // Syllabus Helpers
     const fetchSyllabus = async (subjectId) => {
+        if (!subjectId || typeof subjectId !== 'string') {
+            console.warn('fetchSyllabus: Invalid subjectId', subjectId);
+            setSyllabus([]);
+            return;
+        }
         try {
             setLoadingSyllabus(true);
             const { data, error } = await supabase
@@ -255,8 +286,8 @@ const Subjects = () => {
     return (
         <div>
             <PageHeader
-                title={user?.role === 'lecturer' ? "My Subjects" : "Subjects"}
-                description={user?.role === 'lecturer' ? "List of subjects assigned to you for this semester." : null}
+                title={user?.role === 'lecturer' ? "My Classes" : "Subjects"}
+                description={user?.role === 'lecturer' ? "List of classes assigned to you for this semester." : null}
                 actionLabel={user?.role === 'admin' ? "Add Subject" : null}
                 onAction={user?.role === 'admin' ? (() => setIsModalOpen(true)) : null}
             />
@@ -272,26 +303,61 @@ const Subjects = () => {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
             ) : subjects.length > 0 ? (
-                <div className="bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-800">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-50 dark:divide-slate-800">
-                            <thead className="bg-slate-50 dark:bg-slate-950">
-                                <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Code</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Credits</th>
-                                    <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-50 dark:divide-slate-800">
-                                {subjects.map((subject) => (
-                                    <tr key={subject.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{subject.code}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{subject.name}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{subject.credits}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div className="flex justify-end space-x-3">
-                                                {user?.role === 'admin' && (
+                user?.role === 'lecturer' ? (
+                    <div className="space-y-4">
+                        {subjects.map((subject, idx) => (
+                            <div key={idx} className="bg-white dark:bg-slate-900 shadow-sm rounded-2xl border border-gray-100 dark:border-slate-800 p-6 hover:shadow-md transition-shadow">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                            <span className="text-indigo-600 dark:text-indigo-400">{idx + 1}.</span> {subject.code} - {subject.name}
+                                        </h3>
+                                        <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">{subject.credits} Credits</p>
+                                    </div>
+                                    <button
+                                        onClick={() => handleOpenSyllabus(subject)}
+                                        className="inline-flex items-center px-4 py-2 rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition-all hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+                                    >
+                                        <BookOpen size={16} className="mr-2" />
+                                        VIEW SYLLABUS
+                                    </button>
+                                </div>
+                                <div className="pl-6 space-y-3">
+                                    {subject.classTypes.map((ct, ctIdx) => (
+                                        <div key={ctIdx} className="flex items-start text-sm">
+                                            <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400 mr-3 shrink-0"></div>
+                                            <div>
+                                                <span className="font-bold text-gray-700 dark:text-slate-200 capitalize mr-2">{ct.type.toLowerCase()}</span>
+                                                <span className="text-indigo-600 dark:text-indigo-400 font-medium">
+                                                    [{ct.groups.join(', ')}]
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-800">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-50 dark:divide-slate-800">
+                                <thead className="bg-slate-50 dark:bg-slate-950">
+                                    <tr>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Code</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Credits</th>
+                                        <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-50 dark:divide-slate-800">
+                                    {subjects.map((subject, idx) => (
+                                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{subject.code || '-'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{subject.name || 'Unknown Subject'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{subject.credits}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                <div className="flex justify-end space-x-3">
                                                     <button
                                                         onClick={() => handleEditSubject(subject)}
                                                         className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
@@ -299,15 +365,13 @@ const Subjects = () => {
                                                     >
                                                         <Edit size={18} />
                                                     </button>
-                                                )}
-                                                <button
-                                                    onClick={() => handleOpenSyllabus(subject)}
-                                                    className="text-teal-600 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-300 transition-colors"
-                                                    title={user?.role === 'admin' ? "Manage Syllabus" : "View Syllabus"}
-                                                >
-                                                    <BookOpen size={18} />
-                                                </button>
-                                                {user?.role === 'admin' && (
+                                                    <button
+                                                        onClick={() => handleOpenSyllabus(subject)}
+                                                        className="text-teal-600 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-300 transition-colors"
+                                                        title="Manage Syllabus"
+                                                    >
+                                                        <BookOpen size={18} />
+                                                    </button>
                                                     <button
                                                         onClick={() => handleDeleteSubject(subject.id)}
                                                         className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
@@ -315,19 +379,19 @@ const Subjects = () => {
                                                     >
                                                         <Trash2 size={18} />
                                                     </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
+                )
             ) : (
                 <EmptyState
                     icon={BookOpen}
-                    message={user?.role === 'admin' ? "No subjects found. Add your first subject to get started." : "You are not currently assigned to any subjects."}
+                    message={user?.role === 'admin' ? "No subjects found. Add your first subject to get started." : "You are not currently assigned to any subjects. Check your timetable."}
                     actionLabel={user?.role === 'admin' ? "Add Subject" : null}
                     onAction={user?.role === 'admin' ? (() => {
                         setIsEditMode(false);

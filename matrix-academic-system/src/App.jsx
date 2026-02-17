@@ -42,7 +42,6 @@ function App() {
               <Route path="lecturer-dashboard" element={<LecturerDashboard />} />
               <Route path="lecturer-timetable" element={<LecturerTimetable />} />
               <Route path="my-students" element={<MyStudents />} />
-              <Route path="my-students" element={<MyStudents />} />
               <Route path="students" element={<Students />} />
               <Route path="lecturers" element={<Lecturers />} />
               <Route path="subjects" element={<Subjects />} />

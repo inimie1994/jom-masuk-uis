@@ -65,7 +65,11 @@ export const AuthProvider = ({ children }) => {
                             .select('logo_url')
                             .eq('id', profile.faculty_id)
                             .single();
-                        if (faculty) facultyLogo = faculty.logo_url;
+                        if (faculty && faculty.logo_url) {
+                            // Ensure it's a valid URL or a known relative path, 
+                            // though Settings already stores public URLs.
+                            facultyLogo = faculty.logo_url;
+                        }
                     }
 
                     const finalUser = {

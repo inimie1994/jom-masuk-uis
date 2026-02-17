@@ -66,16 +66,21 @@ const Assessments = () => {
 
             // If lecturer, only show subjects they teach
             if (user.role === 'lecturer' && user.lecturer_id) {
-                // Find subjects linked to this lecturer via classes
-                const { data: myClasses } = await supabase
-                    .from('classes')
+                // Find subjects linked to this lecturer via timetable
+                // We now prioritize timetable as the source of truth
+                const { data: timetableData, error: timetableError } = await supabase
+                    .from('timetable')
                     .select('subject_id')
                     .eq('lecturer_id', user.lecturer_id);
 
-                const subjectIds = myClasses?.map(c => c.subject_id) || [];
+                if (timetableError) throw timetableError;
 
-                if (subjectIds.length > 0) {
-                    query = query.in('id', subjectIds);
+                const subjectIds = new Set(
+                    (timetableData || []).map(t => t.subject_id).filter(Boolean)
+                );
+
+                if (subjectIds.size > 0) {
+                    query = query.in('id', Array.from(subjectIds));
                 } else {
                     setSubjects([]);
                     return;
