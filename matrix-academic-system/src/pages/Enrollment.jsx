@@ -92,7 +92,7 @@ const Enrollment = () => {
                 .select(`
                     id,
                     enrolled_at,
-                    students (id, name, matric_no, email)
+                    students (id, name, matric_no, email, student_group)
                 `)
                 .eq('class_id', classId);
 
@@ -234,6 +234,23 @@ const Enrollment = () => {
         }
     };
 
+    const handleUnenrollGroup = async (enrollmentIds) => {
+        try {
+            const { error } = await supabase
+                .from('enrollments')
+                .delete()
+                .in('id', enrollmentIds);
+
+            if (error) throw error;
+            setSuccess(`Successfully removed students from class.`);
+            setTimeout(() => setSuccess(null), 3000);
+            fetchEnrollments(selectedClass.id);
+        } catch (err) {
+            console.error('Error removing group:', err);
+            setError('Failed to remove group.');
+        }
+    };
+
     const toggleGroupSelection = (group) => {
         setSelectedGroups(prev =>
             prev.includes(group)
@@ -334,31 +351,55 @@ const Enrollment = () => {
                             <table className="min-w-full divide-y divide-gray-50 dark:divide-slate-800">
                                 <thead className="bg-slate-50 dark:bg-slate-950">
                                     <tr>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Matric No</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Group Name</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider text-center">Student Count</th>
                                         <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-50 dark:divide-slate-800">
-                                    {enrolledStudents.map((enrollment) => (
-                                        <tr key={enrollment.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                                {enrollment.students?.name}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
-                                                {enrollment.students?.matric_no}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <button
-                                                    onClick={() => handleUnenrollStudent(enrollment.id)}
-                                                    className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
-                                                    title="Remove Student"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {(() => {
+                                        // Group by student_group
+                                        const groupCounts = enrolledStudents.reduce((acc, curr) => {
+                                            const group = curr.students?.student_group || 'Unassigned';
+                                            if (!acc[group]) {
+                                                acc[group] = {
+                                                    count: 0,
+                                                    enrollments: []
+                                                };
+                                            }
+                                            acc[group].count += 1;
+                                            acc[group].enrollments.push(curr.id);
+                                            return acc;
+                                        }, {});
+
+                                        return Object.entries(groupCounts).map(([groupName, info]) => (
+                                            <tr key={groupName} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                    {groupName}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400 text-center font-medium">
+                                                    <span className="bg-gray-100 dark:bg-slate-800 px-3 py-1 rounded-full text-xs">
+                                                        {info.count} Students
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm(`Are you sure you want to remove all ${info.count} students from group "${groupName}" from this class?`)) {
+                                                                // Function to remove all enrollments for this group
+                                                                handleUnenrollGroup(info.enrollments);
+                                                            }
+                                                        }}
+                                                        className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors flex items-center justify-end ml-auto"
+                                                        title="Unenroll Group"
+                                                    >
+                                                        <Trash2 size={16} className="mr-1" />
+                                                        <span className="text-xs uppercase font-bold">Unenroll</span>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ));
+                                    })()}
                                 </tbody>
                             </table>
                         ) : (

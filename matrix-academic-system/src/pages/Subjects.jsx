@@ -27,22 +27,50 @@ const Subjects = () => {
     const [syllabusFormData, setSyllabusFormData] = useState({ week_number: '', topic: '', learning_outcomes: '' });
 
     useEffect(() => {
-        if (user?.faculty_id) {
+        if (user?.faculty_id || user?.lecturer_id) {
             fetchSubjects();
         }
-    }, [user?.faculty_id]);
+    }, [user?.faculty_id, user?.lecturer_id]);
 
     const fetchSubjects = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('subjects')
-                .select('*')
-                .eq('faculty_id', user.faculty_id)
-                .order('code', { ascending: true });
+            const isAdmin = user?.role === 'admin';
 
-            if (error) throw error;
-            setSubjects(data || []);
+            if (isAdmin && user?.faculty_id) {
+                const { data, error } = await supabase
+                    .from('subjects')
+                    .select('*')
+                    .eq('faculty_id', user.faculty_id)
+                    .order('code', { ascending: true });
+
+                if (error) throw error;
+                setSubjects(data || []);
+            } else if (user?.lecturer_id) {
+                // Fetch subjects assigned to this lecturer
+                const { data: myClasses, error: classesError } = await supabase
+                    .from('classes')
+                    .select('subject_id')
+                    .eq('lecturer_id', user.lecturer_id);
+
+                if (classesError) throw classesError;
+
+                const subjectIds = [...new Set(myClasses.map(c => c.subject_id))];
+
+                if (subjectIds.length === 0) {
+                    setSubjects([]);
+                    return;
+                }
+
+                const { data: subjectsData, error: subjectsError } = await supabase
+                    .from('subjects')
+                    .select('*')
+                    .in('id', subjectIds)
+                    .order('code', { ascending: true });
+
+                if (subjectsError) throw subjectsError;
+                setSubjects(subjectsData || []);
+            }
         } catch (err) {
             console.error('Error fetching subjects:', err);
             setError('Failed to load subjects.');
@@ -227,9 +255,10 @@ const Subjects = () => {
     return (
         <div>
             <PageHeader
-                title="Subjects"
-                actionLabel="Add Subject"
-                onAction={() => setIsModalOpen(true)}
+                title={user?.role === 'lecturer' ? "My Subjects" : "Subjects"}
+                description={user?.role === 'lecturer' ? "List of subjects assigned to you for this semester." : null}
+                actionLabel={user?.role === 'admin' ? "Add Subject" : null}
+                onAction={user?.role === 'admin' ? (() => setIsModalOpen(true)) : null}
             />
 
             {error && (
@@ -262,27 +291,31 @@ const Subjects = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{subject.credits}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex justify-end space-x-3">
-                                                <button
-                                                    onClick={() => handleEditSubject(subject)}
-                                                    className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
-                                                    title="Edit Subject"
-                                                >
-                                                    <Edit size={18} />
-                                                </button>
+                                                {user?.role === 'admin' && (
+                                                    <button
+                                                        onClick={() => handleEditSubject(subject)}
+                                                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
+                                                        title="Edit Subject"
+                                                    >
+                                                        <Edit size={18} />
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => handleOpenSyllabus(subject)}
                                                     className="text-teal-600 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-300 transition-colors"
-                                                    title="Manage Syllabus"
+                                                    title={user?.role === 'admin' ? "Manage Syllabus" : "View Syllabus"}
                                                 >
                                                     <BookOpen size={18} />
                                                 </button>
-                                                <button
-                                                    onClick={() => handleDeleteSubject(subject.id)}
-                                                    className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
-                                                    title="Delete Subject"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
+                                                {user?.role === 'admin' && (
+                                                    <button
+                                                        onClick={() => handleDeleteSubject(subject.id)}
+                                                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                                                        title="Delete Subject"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -294,13 +327,13 @@ const Subjects = () => {
             ) : (
                 <EmptyState
                     icon={BookOpen}
-                    message="No subjects found. Add your first subject to get started."
-                    actionLabel="Add Subject"
-                    onAction={() => {
+                    message={user?.role === 'admin' ? "No subjects found. Add your first subject to get started." : "You are not currently assigned to any subjects."}
+                    actionLabel={user?.role === 'admin' ? "Add Subject" : null}
+                    onAction={user?.role === 'admin' ? (() => {
                         setIsEditMode(false);
                         setFormData({ code: '', name: '', credits: 3 });
                         setIsModalOpen(true);
-                    }}
+                    }) : null}
                 />
             )}
 

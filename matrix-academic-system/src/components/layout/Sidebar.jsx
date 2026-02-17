@@ -41,6 +41,7 @@ const Sidebar = ({ isMobile, className = '' }) => {
     const lecturerNavItems = [
         { path: '/lecturer-dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { path: '/lecturer-timetable', label: 'Timetable', icon: CalendarDays },
+        { path: '/subjects', label: 'My Subjects', icon: BookOpen },
         { path: '/my-students', label: 'My Students', icon: Users },
         { path: '/attendance', label: 'Mark Attendance', icon: CalendarCheck },
         { path: '/assessments', label: 'Assessments', icon: FileText },

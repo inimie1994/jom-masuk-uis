@@ -88,7 +88,9 @@ const Lecturers = () => {
     const fetchWorkload = async (lecturerId) => {
         try {
             setLoadingWorkload(true);
-            const { data, error } = await supabase
+
+            // Fetch Workload manually assigned
+            const { data: workloadData, error: workloadError } = await supabase
                 .from('workload')
                 .select(`
                     id,
@@ -101,8 +103,35 @@ const Lecturers = () => {
                 .eq('lecturer_id', lecturerId)
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
-            setWorkloads(data || []);
+            if (workloadError) throw workloadError;
+
+            // Fetch Timetable entries to get dynamic group names
+            const { data: timetableData, error: timetableError } = await supabase
+                .from('timetable')
+                .select('subject_id, class_type, group_name')
+                .eq('lecturer_id', lecturerId);
+
+            if (timetableError) throw timetableError;
+
+            // Process workload to include timetable group info
+            const enhancedWorkload = (workloadData || []).map(work => {
+                // Find matching timetable entries for this subject and type
+                const matchingSlots = (timetableData || []).filter(t =>
+                    t.subject_id === work.subjects?.id &&
+                    t.class_type === work.type
+                );
+
+                // Get unique unique groups
+                const groups = [...new Set(matchingSlots.map(t => t.group_name))].filter(Boolean);
+                const derivedGroup = groups.length > 0 ? groups.join(', ') : work.student_group;
+
+                return {
+                    ...work,
+                    displayReference: derivedGroup
+                };
+            });
+
+            setWorkloads(enhancedWorkload);
         } catch (err) {
             console.error('Error fetching workload:', err);
             setError('Failed to load workload.');
@@ -344,7 +373,12 @@ const Lecturers = () => {
                                                 <BookOpen size={20} />
                                             </div>
                                             <div>
-                                                <h4 className="font-semibold text-gray-900 dark:text-gray-100">{work.subjects?.code} - {work.subjects?.name}</h4>
+                                                <h4 className="font-semibold text-gray-900 dark:text-gray-100">
+                                                    {work.subjects?.code}
+                                                    {work.displayReference && <span className="text-indigo-600 dark:text-indigo-400 ml-1">({work.displayReference})</span>}
+                                                    <span className="text-gray-400 mx-1">-</span>
+                                                    {work.subjects?.name}
+                                                </h4>
                                                 <div className="flex items-center mt-1 space-x-4 text-sm text-gray-500 dark:text-gray-400">
                                                     <span className="flex items-center">
                                                         <span className={`w-2 h-2 rounded-full mr-2 ${work.type === 'Lecture' ? 'bg-blue-400' :
@@ -352,12 +386,7 @@ const Lecturers = () => {
                                                             }`}></span>
                                                         {work.type}
                                                     </span>
-                                                    {work.student_group && (
-                                                        <span className="flex items-center text-xs font-semibold bg-gray-100 dark:bg-slate-700 px-2 py-0.5 rounded text-gray-600 dark:text-gray-300">
-                                                            <User size={12} className="mr-1" />
-                                                            {work.student_group}
-                                                        </span>
-                                                    )}
+                                                    {/* Removed old student_group badge as it's now in the title */}
                                                     <span className="flex items-center">
                                                         <Clock size={14} className="mr-1" />
                                                         {work.hours} Hour{work.hours > 1 ? 's' : ''}

@@ -19,12 +19,32 @@ const MyStudents = () => {
     const fetchMyStudents = async () => {
         try {
             setLoading(true);
+            let currentLecturerId = user.lecturer_id;
+
+            // Fallback: fetch lecturer_id if missing from context but user exists
+            if (!currentLecturerId && user?.id) {
+                const { data: userData } = await supabase
+                    .from('users')
+                    .select('lecturer_id')
+                    .eq('id', user.id)
+                    .single();
+
+                if (userData?.lecturer_id) {
+                    currentLecturerId = userData.lecturer_id;
+                }
+            }
+
+            if (!currentLecturerId) {
+                console.log('No lecturer ID found for user');
+                setStudents([]);
+                return;
+            }
 
             // 1. Get my classes
             const { data: myClasses, error: classesError } = await supabase
                 .from('classes')
-                .select('id, subject_id, student_group, subjects(code, name)')
-                .eq('lecturer_id', user.lecturer_id);
+                .select('id, subject_id, section, subjects(code, name)')
+                .eq('lecturer_id', currentLecturerId);
 
             if (classesError) throw classesError;
 
@@ -35,37 +55,54 @@ const MyStudents = () => {
                 return;
             }
 
-            // 2. Get enrollments for these classes
+            // 2. Get enrollments (just IDs to avoid RLS complexity with joins)
             const { data: enrollments, error: enrollmentsError } = await supabase
                 .from('enrollments')
-                .select(`
-                    student_id,
-                    class_id,
-                    students (id, name, matric_no, email, phone)
-                `)
+                .select('student_id, class_id')
                 .in('class_id', classIds);
 
             if (enrollmentsError) throw enrollmentsError;
 
-            // 3. Map back to a flat structure
+            if (enrollments.length === 0) {
+                setStudents([]);
+                return;
+            }
+
+            const studentIds = [...new Set(enrollments.map(e => e.student_id))];
+
+            // 3. Get student details directly
+            // Note: RLS on students table requires checking enrollments, so we hope independent check works better
+            // OR we rely on a simplified policy / public access if necessary, but sticking to existing RLS first.
+            const { data: studentsData, error: studentsError } = await supabase
+                .from('students')
+                .select('id, name, matric_no, email, phone')
+                .in('id', studentIds);
+
+            if (studentsError) throw studentsError;
+
+            // 4. Map back to a flat structure
             const studentMap = new Map();
+            const studentLookup = new Map(studentsData.map(s => [s.id, s]));
 
             enrollments.forEach(e => {
-                if (!e.students) return;
+                const student = studentLookup.get(e.student_id);
+                if (!student) return;
 
                 // Find the class details
                 const classInfo = myClasses.find(c => c.id === e.class_id);
+                if (!classInfo) return;
+
                 const uniqueKey = `${e.student_id}-${classInfo.subject_id}`; // Unique per student per subject
 
                 studentMap.set(uniqueKey, {
-                    id: e.students.id,
-                    name: e.students.name,
-                    matric_no: e.students.matric_no,
-                    email: e.students.email,
-                    phone: e.students.phone,
+                    id: student.id,
+                    name: student.name,
+                    matric_no: student.matric_no,
+                    email: student.email,
+                    phone: student.phone,
                     subject_code: classInfo.subjects.code,
                     subject_name: classInfo.subjects.name,
-                    group: classInfo.student_group
+                    group: classInfo.section
                 });
             });
 

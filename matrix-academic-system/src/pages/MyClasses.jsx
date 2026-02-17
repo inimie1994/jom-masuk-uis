@@ -42,7 +42,7 @@ const MyClasses = () => {
 
     const getSlotData = (day, hour) => {
         return timetable.find(t =>
-            t.day_of_week === day &&
+            t.day === day &&
             t.start_time.startsWith(hour.toString().padStart(2, '0'))
         );
     };
@@ -84,7 +84,7 @@ const MyClasses = () => {
                                                     </div>
                                                     <div className="text-[10px] text-gray-500 dark:text-gray-500 mt-1 flex justify-between">
                                                         <span>{slot.rooms?.name}</span>
-                                                        <span className="font-medium bg-white dark:bg-slate-800 px-1 rounded">{slot.student_group}</span>
+                                                        <span className="font-medium bg-white dark:bg-slate-800 px-1 rounded">{slot.group_name}</span>
                                                     </div>
                                                     {slot.class_type && (
                                                         <div className="absolute top-1 right-1">
