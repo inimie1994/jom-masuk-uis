@@ -10,8 +10,11 @@ import {
     Edit2,
     CheckCircle,
     BarChart2,
-    Save
+    Save,
+    Printer,
+    ArrowLeft
 } from 'lucide-react';
+import StudentMarksPrintTemplate from '../components/assessments/StudentMarksPrintTemplate';
 
 const Assessments = () => {
     const { user } = useAuth();
@@ -41,6 +44,10 @@ const Assessments = () => {
 
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
+
+    // Print State
+    const [isPrinting, setIsPrinting] = useState(false);
+    const [printData, setPrintData] = useState({ students: [], grades: [] });
 
     useEffect(() => {
         if (user?.faculty_id) {
@@ -189,6 +196,78 @@ const Assessments = () => {
         }
     };
 
+    const handlePrint = async () => {
+        if (!selectedSubject) return;
+        setLoading(true);
+        try {
+            // 1. Get classes for subject
+            const { data: classesData, error: classesError } = await supabase
+                .from('classes')
+                .select('id')
+                .eq('subject_id', selectedSubject);
+
+            if (classesError) throw classesError;
+            const classIds = classesData.map(c => c.id);
+
+            // 2. Get Students
+            let uniqueStudents = [];
+            if (classIds.length > 0) {
+                const { data: enrollmentsData, error: enrollmentsError } = await supabase
+                    .from('enrollments')
+                    .select(`
+                        student_id,
+                        students (id, name, matric_no, student_group)
+                    `)
+                    .in('class_id', classIds)
+                    .order('student_id');
+
+                if (enrollmentsError) throw enrollmentsError;
+
+                const uniqueStudentsMap = new Map();
+                enrollmentsData.forEach(e => {
+                    if (e.students) uniqueStudentsMap.set(e.students.id, e.students);
+                });
+                uniqueStudents = Array.from(uniqueStudentsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+            }
+
+            // 3. Get All Grades for this subject (all assessments)
+            // fetch grades where assessment_id is in current 'assessments' list
+            const assessmentIds = assessments.map(a => a.id);
+            let allGrades = [];
+
+            if (assessmentIds.length > 0) {
+                const { data: gradesData, error: gradesError } = await supabase
+                    .from('grades')
+                    .select('*')
+                    .in('assessment_id', assessmentIds);
+
+                if (gradesError) throw gradesError;
+                allGrades = gradesData;
+            }
+
+            console.log("Print Data prepared:", {
+                classIds,
+                studentCount: uniqueStudents.length,
+                gradeCount: allGrades.length
+            });
+
+            if (uniqueStudents.length === 0) {
+                alert("No students enrolled in this subject's classes.");
+                setLoading(false);
+                return;
+            }
+
+            setPrintData({ students: uniqueStudents, grades: allGrades });
+            setIsPrinting(true);
+
+        } catch (err) {
+            console.error("Error preparing print data:", err);
+            setError("Failed to prepare print data.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // --- Grading Logic ---
 
     const startGrading = async (assessment) => {
@@ -311,6 +390,35 @@ const Assessments = () => {
     };
 
 
+    if (isPrinting) {
+        return (
+            <div className="bg-white min-h-screen">
+                <div className="bg-gray-100 p-4 flex justify-between items-center print:hidden sticky top-0 z-50">
+                    <button
+                        onClick={() => setIsPrinting(false)}
+                        className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-sm font-bold uppercase"
+                    >
+                        <ArrowLeft size={16} className="mr-2" /> Back
+                    </button>
+                    <div className="font-bold text-lg">Print Preview</div>
+                    <button
+                        onClick={() => window.print()}
+                        className="flex items-center px-4 py-2 bg-primary text-white rounded shadow-sm hover:bg-primary/90 text-sm font-bold uppercase"
+                    >
+                        <Printer size={16} className="mr-2" /> Print
+                    </button>
+                </div>
+                <StudentMarksPrintTemplate
+                    subject={subjects.find(s => s.id === selectedSubject)}
+                    assessments={assessments} // Pass all assessments, sorted by date in fetchAssessments
+                    students={printData.students}
+                    grades={printData.grades}
+                    lecturer={user} // Pass current user as lecturer
+                />
+            </div>
+        );
+    }
+
     if (gradingAssessment) {
         return (
             <div className="space-y-6">
@@ -403,6 +511,17 @@ const Assessments = () => {
                     ))}
                 </select>
             </div>
+
+            {selectedSubject && (
+                <button
+                    onClick={handlePrint}
+                    disabled={loading}
+                    className="ml-auto flex items-center px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-700 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-700 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+                >
+                    <Printer size={16} className="mr-2" />
+                    Print Marks
+                </button>
+            )}
 
             {error && (
                 <div className="bg-red-50 dark:bg-red-900/10 text-red-500 dark:text-red-400 p-4 rounded-xl mb-4 text-sm border border-red-100 dark:border-red-900/30 flex justify-between items-center transition-all">
