@@ -255,22 +255,30 @@ const Subjects = () => {
         const reader = new FileReader();
         reader.onload = async (evt) => {
             try {
-                const bstr = evt.target.result;
-                const wb = XLSX.read(bstr, { type: 'binary' });
+                const dataBuffer = evt.target.result;
+                const wb = XLSX.read(dataBuffer, { type: 'array' });
                 const wsName = wb.SheetNames[0];
                 const ws = wb.Sheets[wsName];
-                const data = XLSX.utils.sheet_to_json(ws);
+                const jsonData = XLSX.utils.sheet_to_json(ws);
+
+                if (!jsonData || jsonData.length === 0) {
+                    alert('No data found in Excel.');
+                    return;
+                }
 
                 // Validation and Transformation
-                const formattedData = data.map(row => ({
-                    subject_id: selectedSubjectForSyllabus.id,
-                    week_number: row.week_number || row['Week'] || row['week'] || row['week_number'] || 0,
-                    topic: row.topic || row['Topic'] || '',
-                    learning_outcomes: row.learning_outcomes || row['Learning Outcomes'] || row['learning_outcomes'] || ''
-                })).filter(row => row.week_number && row.topic);
+                const formattedData = jsonData.map(row => {
+                    const weekNum = row.week_number || row['Week'] || row['week'] || 0;
+                    return {
+                        subject_id: selectedSubjectForSyllabus.id,
+                        week_number: parseInt(weekNum),
+                        topic: row.topic || row['Topic'] || '',
+                        learning_outcomes: row.learning_outcomes || row['Learning Outcomes'] || row['learning_outcomes'] || ''
+                    };
+                }).filter(row => row.week_number > 0 && row.topic);
 
                 if (formattedData.length === 0) {
-                    alert('No valid rows found in Excel.');
+                    alert('No valid rows found in Excel. Ensure "week_number" (or "Week") and "topic" (or "Topic") columns exist.');
                     return;
                 }
 
@@ -280,12 +288,14 @@ const Subjects = () => {
 
                 alert(`Successfully imported ${formattedData.length} topics.`);
                 fetchSyllabus(selectedSubjectForSyllabus.id);
+                // Clear input
+                e.target.value = '';
             } catch (err) {
                 console.error('Error importing Excel:', err);
-                alert('Failed to import Excel.');
+                alert(`Failed to import Excel: ${err.message || 'Unknown error'}`);
             }
         };
-        reader.readAsBinaryString(file);
+        reader.readAsArrayBuffer(file);
     };
 
     return (

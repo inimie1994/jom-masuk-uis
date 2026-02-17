@@ -9,6 +9,7 @@ const PrintableAttendanceSheet = ({
     attendanceData,
     lecturerName,
     logoUrl,
+    className
 }) => {
     // Helper to format month name in Malay usually found in these forms
     const getMonthName = (dateStr) => {
@@ -29,7 +30,7 @@ const PrintableAttendanceSheet = ({
     };
 
     return (
-        <div className="hidden print:block print:w-full bg-white text-black p-4 text-[10px] font-sans leading-tight">
+        <div className={`hidden print:block print:w-full bg-white text-black p-4 text-[10px] font-sans leading-tight ${className || ''}`}>
             <style type="text/css" media="print">
                 {`
                     @page { size: landscape; margin: 10mm; }

@@ -10,6 +10,7 @@ import {
     BookOpen,
     Save,
     Check,
+    X,
     Printer,
     FileSpreadsheet
 } from 'lucide-react';
@@ -38,6 +39,12 @@ const Attendance = () => {
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
     const [saving, setSaving] = useState(false);
+
+    // Print State
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    const [printMode, setPrintMode] = useState('single'); // 'single' | 'all'
+    const [allMonthsData, setAllMonthsData] = useState([]); // Array of { month, dates, attendanceData }
+    const [isGeneratingPrint, setIsGeneratingPrint] = useState(false);
 
     // Initial Fetch: Groups
     useEffect(() => {
@@ -425,8 +432,276 @@ const Attendance = () => {
         return Object.values(attendanceData[studentId]).filter(s => s === 'Present').length;
     };
 
-    const handlePrint = () => {
-        window.print();
+    const handlePrint = async (mode = 'single') => {
+        setPrintMode(mode);
+        setIsPrintModalOpen(false);
+
+        if (mode === 'single') {
+            setTimeout(() => window.print(), 100);
+        } else {
+            // Generate data for all months
+            setIsGeneratingPrint(true);
+            try {
+                // 1. Determine Date Range (Semester)
+                let start, end;
+                if (user?.faculty_id) {
+                    const { data: facultyData } = await supabase
+                        .from('faculties')
+                        .select('semester_start_date, semester_end_date')
+                        .eq('id', user.faculty_id)
+                        .single();
+
+                    if (facultyData) {
+                        start = new Date(facultyData.semester_start_date);
+                        end = new Date(facultyData.semester_end_date);
+                    }
+                }
+
+                if (!start || !end) {
+                    // Fallback to current year if no semester settings
+                    const year = new Date().getFullYear();
+                    start = new Date(year, 0, 1);
+                    end = new Date(year, 11, 31);
+                }
+
+                // 2. Refresh Holidays
+                const { data: holidays } = await supabase
+                    .from('holidays')
+                    .select('name, date')
+                    .eq('faculty_id', user.faculty_id);
+
+                // 3. Iterate Months
+                const monthsData = [];
+                let current = new Date(start);
+                // Adjust to first day of month
+                current.setDate(1);
+
+                while (current <= end) {
+                    const monthStr = current.toISOString().slice(0, 7);
+
+                    // Generate Dates
+                    const dates = generateDatesFromTimetable(monthStr, timetable, { start: start.toISOString(), end: end.toISOString() }, holidays || []);
+
+                    if (dates.length > 0) {
+                        // Fetch Attendance Data for this month
+                        const startOfMonth = `${monthStr}-01`;
+                        const endOfMonth = new Date(current.getFullYear(), current.getMonth() + 1, 0).toISOString().split('T')[0];
+
+                        const { data: sessions } = await supabase
+                            .from('attendance_sessions')
+                            .select('id, date, start_time')
+                            .filter('group_names', 'cs', `{${selectedGroup}}`)
+                            .eq('subject_id', selectedSubject)
+                            .gte('date', startOfMonth)
+                            .lte('date', endOfMonth);
+
+                        const map = {};
+                        if (sessions && sessions.length > 0) {
+                            const sessionIds = sessions.map(s => s.id);
+                            const { data: records } = await supabase
+                                .from('attendance_records')
+                                .select('session_id, student_id, status')
+                                .in('session_id', sessionIds);
+
+                            records?.forEach(r => {
+                                const session = sessions.find(s => s.id === r.session_id);
+                                if (session) {
+                                    const key = `${session.date}_${session.start_time}`;
+                                    if (!map[r.student_id]) map[r.student_id] = {};
+                                    map[r.student_id][key] = r.status;
+                                }
+                            });
+                        }
+
+                        monthsData.push({
+                            month: monthStr,
+                            dates: dates,
+                            attendanceData: map
+                        });
+                    }
+
+                    // Next Month
+                    current.setMonth(current.getMonth() + 1);
+                }
+
+                setAllMonthsData(monthsData);
+                setTimeout(() => window.print(), 500);
+
+            } catch (err) {
+                console.error("Error generating print report:", err);
+                setError("Failed to generate print report.");
+            } finally {
+                setIsGeneratingPrint(false);
+            }
+        }
+    };
+
+    const handleClearAll = async () => {
+        if (!window.confirm("Are you sure you want to clear ALL attendance records for this month? This action cannot be undone.")) return;
+
+        setLoading(true);
+        try {
+            const startOfMonth = `${selectedMonth}-01`;
+            const endOfMonth = new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1], 0).toISOString().split('T')[0];
+
+            // 1. Find relevant sessions
+            const { data: sessions, error: sessionsError } = await supabase
+                .from('attendance_sessions')
+                .select('id')
+                .filter('group_names', 'cs', `{${selectedGroup}}`)
+                .eq('subject_id', selectedSubject)
+                .gte('date', startOfMonth)
+                .lte('date', endOfMonth);
+
+            if (sessionsError) throw sessionsError;
+
+            if (sessions.length > 0) {
+                const sessionIds = sessions.map(s => s.id);
+
+                // 2. Delete records
+                const { error: deleteError } = await supabase
+                    .from('attendance_records')
+                    .delete()
+                    .in('session_id', sessionIds);
+
+                if (deleteError) throw deleteError;
+
+                setSuccessMessage("Attendance records cleared successfully.");
+                fetchTimetableAndAttendance(); // Refresh
+                setTimeout(() => setSuccessMessage(null), 3000);
+            } else {
+                setSuccessMessage("No records found to clear.");
+                setTimeout(() => setSuccessMessage(null), 3000);
+            }
+
+        } catch (err) {
+            console.error("Error clearing records:", err);
+            setError("Failed to clear records.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleMarkAllOnDate = async (column) => {
+        if (!window.confirm(`Mark all students as Present for ${column.displayDate} (${column.startTime})?`)) return;
+
+        setLoading(true);
+        try {
+            // 1. Ensure Session Exists (Dry/extracted logic from toggleAttendance)
+            let sessionId;
+            const { data: sessionData } = await supabase
+                .from('attendance_sessions')
+                .select('id')
+                .filter('group_names', 'cs', `{${selectedGroup}}`)
+                .eq('subject_id', selectedSubject)
+                .eq('date', column.date)
+                .eq('start_time', column.startTime)
+                .single();
+
+            if (sessionData) {
+                sessionId = sessionData.id;
+            } else {
+                const timetableEntry = timetable.find(t => t.id === column.timetableId);
+                const { data: newSession, error: createError } = await supabase
+                    .from('attendance_sessions')
+                    .insert([{
+                        group_names: timetableEntry?.group_names || [selectedGroup],
+                        subject_id: selectedSubject,
+                        date: column.date,
+                        start_time: column.startTime,
+                        end_time: column.endTime,
+                        class_type: column.type,
+                        room: timetableEntry?.room,
+                        lecturer_id: timetableEntry?.lecturer_id,
+                        faculty_id: user.faculty_id
+                    }])
+                    .select()
+                    .single();
+
+                if (createError) throw createError;
+                sessionId = newSession.id;
+            }
+
+            // 2. Bulk Upsert Records
+            const upsertData = students.map(student => ({
+                session_id: sessionId,
+                student_id: student.id,
+                status: 'Present'
+            }));
+
+            const { error: upsertError } = await supabase
+                .from('attendance_records')
+                .upsert(upsertData, { onConflict: 'session_id,student_id' });
+
+            if (upsertError) throw upsertError;
+
+            // 3. Update Local State
+            const key = `${column.date}_${column.startTime}`;
+            setAttendanceData(prev => {
+                const next = { ...prev };
+                students.forEach(student => {
+                    if (!next[student.id]) next[student.id] = {};
+                    next[student.id][key] = 'Present';
+                });
+                return next;
+            });
+
+            setSuccessMessage(`All students marked as Present for ${column.displayDate}.`);
+            setTimeout(() => setSuccessMessage(null), 3000);
+
+        } catch (err) {
+            console.error("Error marking all students:", err);
+            setError("Failed to mark all students.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUntickAllOnDate = async (column) => {
+        if (!window.confirm(`Clear ALL attendance records for ${column.displayDate} (${column.startTime})?`)) return;
+
+        setLoading(true);
+        try {
+            // 1. Find Session ID
+            const { data: sessionData } = await supabase
+                .from('attendance_sessions')
+                .select('id')
+                .filter('group_names', 'cs', `{${selectedGroup}}`)
+                .eq('subject_id', selectedSubject)
+                .eq('date', column.date)
+                .eq('start_time', column.startTime)
+                .single();
+
+            if (sessionData) {
+                // 2. Delete all records for this session
+                const { error: deleteError } = await supabase
+                    .from('attendance_records')
+                    .delete()
+                    .eq('session_id', sessionData.id);
+
+                if (deleteError) throw deleteError;
+
+                // 3. Update Local State
+                const key = `${column.date}_${column.startTime}`;
+                setAttendanceData(prev => {
+                    const next = { ...prev };
+                    Object.keys(next).forEach(studentId => {
+                        if (next[studentId]) {
+                            delete next[studentId][key];
+                        }
+                    });
+                    return next;
+                });
+
+                setSuccessMessage(`Attendance records cleared for ${column.displayDate}.`);
+                setTimeout(() => setSuccessMessage(null), 3000);
+            }
+        } catch (err) {
+            console.error("Error clearing attendance records:", err);
+            setError("Failed to clear attendance records.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleExportExcel = () => {
@@ -514,16 +789,50 @@ const Attendance = () => {
                             <FileSpreadsheet size={16} className="mr-2" />
                             Excel
                         </button>
+
+                        <div className="relative">
+                            <button
+                                onClick={() => setIsPrintModalOpen(!isPrintModalOpen)}
+                                disabled={!selectedGroup || !selectedSubject || isGeneratingPrint}
+                                className="px-4 py-2 border border-blue-200 dark:border-blue-800 rounded-xl text-xs font-bold uppercase tracking-widest text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center disabled:opacity-50"
+                            >
+                                <Printer size={16} className="mr-2" />
+                                {isGeneratingPrint ? 'Generating...' : 'Print'}
+                            </button>
+
+                            {isPrintModalOpen && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 z-50 overflow-hidden">
+                                    <button
+                                        onClick={() => handlePrint('single')}
+                                        className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors border-b border-gray-100 dark:border-slate-700"
+                                    >
+                                        Current Month
+                                    </button>
+                                    <button
+                                        onClick={() => handlePrint('all')}
+                                        className="w-full text-left px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                                    >
+                                        All Months (Semester)
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
                         <button
-                            onClick={handlePrint}
+                            onClick={handleClearAll}
                             disabled={!selectedGroup || !selectedSubject}
-                            className="px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-xl text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center disabled:opacity-50"
+                            className="px-4 py-2 border border-red-200 dark:border-red-800 rounded-xl text-xs font-bold uppercase tracking-widest text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex items-center disabled:opacity-50"
                         >
-                            <Printer size={16} className="mr-2" />
-                            Print
+                            Clear All
                         </button>
                     </div>
                 </div>
+
+                {successMessage && (
+                    <div className="bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 p-4 rounded-xl border border-green-100 dark:border-green-800/30 text-sm">
+                        {successMessage}
+                    </div>
+                )}
 
                 {error && (
                     <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-xl border border-red-100 dark:border-red-800/30 text-sm">
@@ -560,6 +869,24 @@ const Attendance = () => {
                                                                 col.type === 'Tutorial' ? 'bg-green-100 text-green-700' :
                                                                     'bg-orange-100 text-orange-700'
                                                                 }`}>{col.type?.slice(0, 1)}</span>
+                                                        )}
+                                                        {!col.isHoliday && (
+                                                            <div className="flex gap-1 mt-1 justify-center">
+                                                                <button
+                                                                    onClick={() => handleMarkAllOnDate(col)}
+                                                                    title="Mark all present"
+                                                                    className="p-1 rounded-md text-gray-400 hover:text-primary hover:bg-primary/10 transition-all"
+                                                                >
+                                                                    <Check size={12} strokeWidth={3} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleUntickAllOnDate(col)}
+                                                                    title="Untick all"
+                                                                    className="p-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                                                                >
+                                                                    <X size={12} strokeWidth={3} />
+                                                                </button>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </th>
@@ -624,27 +951,56 @@ const Attendance = () => {
                         <p>Select a Group and Subject to view attendance.</p>
                     </div>
                 )}
-            </div>
+            </div >
 
             {/* Printable Component (Hidden unless printing) */}
-            {selectedGroup && selectedSubject && (
-                <PrintableAttendanceSheet
-                    month={selectedMonth}
-                    group={selectedGroup}
-                    subject={subjects.find(s => s.id === selectedSubject)}
-                    students={students}
-                    dates={dateColumns}
-                    attendanceData={attendanceData}
-                    lecturerName={
-                        user.role === 'lecturer'
-                            ? user.name
-                            : (timetable.length > 0 && timetable[0].lecturers
-                                ? timetable[0].lecturers.name
-                                : "__________________________")
-                    }
-                    logoUrl={user?.faculty_logo}
-                />
-            )}
+            {
+                selectedGroup && selectedSubject && (
+                    <>
+                        {printMode === 'single' ? (
+                            <PrintableAttendanceSheet
+                                month={selectedMonth}
+                                group={selectedGroup}
+                                subject={subjects.find(s => s.id === selectedSubject)}
+                                students={students}
+                                dates={dateColumns}
+                                attendanceData={attendanceData}
+                                lecturerName={
+                                    user.role === 'lecturer'
+                                        ? user.name
+                                        : (timetable.length > 0 && timetable[0].lecturers
+                                            ? timetable[0].lecturers.name
+                                            : "__________________________")
+                                }
+                                logoUrl={user?.faculty_logo}
+                            />
+                        ) : (
+                            <div className="print:block hidden">
+                                {allMonthsData.map((data, idx) => (
+                                    <PrintableAttendanceSheet
+                                        key={idx}
+                                        month={data.month}
+                                        group={selectedGroup}
+                                        subject={subjects.find(s => s.id === selectedSubject)}
+                                        students={students}
+                                        dates={data.dates}
+                                        attendanceData={data.attendanceData}
+                                        lecturerName={
+                                            user.role === 'lecturer'
+                                                ? user.name
+                                                : (timetable.length > 0 && timetable[0].lecturers
+                                                    ? timetable[0].lecturers.name
+                                                    : "__________________________")
+                                        }
+                                        logoUrl={user?.faculty_logo}
+                                        className="print:break-after-page"
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </>
+                )
+            }
         </>
     );
 };

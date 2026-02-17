@@ -32,15 +32,15 @@ const StudentDetailsModal = ({ isOpen, onClose, student }) => {
             const [enrollRes, attendRes, gradesRes] = await Promise.all([
                 supabase
                     .from('enrollments')
-                    .select('*, subjects(code, name, credit_hours)')
+                    .select('*, classes(subjects(code, name, credits))')
                     .eq('student_id', student.id),
                 supabase
                     .from('attendance_records')
-                    .select('*, attendance_sessions(id, date, type, subjects(code, name))')
+                    .select('*, attendance_sessions(id, date, class_type, subjects(code, name))')
                     .eq('student_id', student.id),
                 supabase
                     .from('grades')
-                    .select('*, assessments(title, total_marks, weightage, type, subjects(code, name))')
+                    .select('*, assessments(name, total_marks, weightage, subjects(code, name))')
                     .eq('student_id', student.id)
             ]);
 
@@ -66,8 +66,8 @@ const StudentDetailsModal = ({ isOpen, onClose, student }) => {
         if (!attendance.length) return { overall: 0, bySubject: {} };
 
         const total = attendance.length;
-        const present = attendance.filter(r => r.status === 'present').length;
-        const overall = Math.round((present / total) * 100);
+        const present = attendance.filter(r => r.status === 'Present').length;
+        const overall = total > 0 ? Math.round((present / total) * 100) : 0;
 
         const bySubject = {};
         attendance.forEach(record => {
@@ -78,7 +78,7 @@ const StudentDetailsModal = ({ isOpen, onClose, student }) => {
                 bySubject[subjectName] = { total: 0, present: 0 };
             }
             bySubject[subjectName].total++;
-            if (record.status === 'present') {
+            if (record.status === 'Present') {
                 bySubject[subjectName].present++;
             }
         });
@@ -140,8 +140,8 @@ const StudentDetailsModal = ({ isOpen, onClose, student }) => {
                                 <div className="flex items-center">
                                     <div className="w-1.5 h-10 rounded-full bg-primary mr-3"></div>
                                     <div>
-                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{enr.subjects?.name}</p>
-                                        <p className="text-xs text-gray-500 dark:text-slate-400 font-medium">{enr.subjects?.code}</p>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">{enr.classes?.subjects?.name}</p>
+                                        <p className="text-xs text-gray-500 dark:text-slate-400 font-medium">{enr.classes?.subjects?.code}</p>
                                     </div>
                                 </div>
                             </div>
@@ -208,17 +208,17 @@ const StudentDetailsModal = ({ isOpen, onClose, student }) => {
                             {subjectGrades.map((grade) => (
                                 <li key={grade.id} className="px-4 py-3 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{grade.assessments?.title}</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{grade.assessments?.name}</p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                                            {grade.assessments?.type} • Weightage: {grade.assessments?.weightage}%
+                                            {grade.assessments?.subjects?.name} • Weightage: {grade.assessments?.weightage}%
                                         </p>
                                     </div>
                                     <div className="text-right">
                                         <span className="block text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                                            {grade.score} / {grade.assessments?.total_marks}
+                                            {grade.marks_obtained} / {grade.assessments?.total_marks}
                                         </span>
                                         <span className="text-xs text-gray-500">
-                                            {Math.round((grade.score / grade.assessments?.total_marks) * 100)}%
+                                            {Math.round((grade.marks_obtained / (grade.assessments?.total_marks || 1)) * 100)}%
                                         </span>
                                     </div>
                                 </li>

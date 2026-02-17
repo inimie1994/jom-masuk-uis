@@ -149,7 +149,9 @@ const Assessments = () => {
         try {
             const payload = {
                 faculty_id: user.faculty_id,
-                ...formData
+                ...formData,
+                total_marks: parseFloat(formData.total_marks),
+                weightage: parseFloat(formData.weightage)
             };
 
             if (editingAssessment) {
@@ -171,7 +173,7 @@ const Assessments = () => {
             setTimeout(() => setSuccessMessage(null), 3000);
         } catch (err) {
             console.error('Error saving assessment:', err);
-            setError('Failed to save assessment.');
+            setError(`Failed to save assessment: ${err.message || 'Check your permissions.'}`);
         }
     };
 
