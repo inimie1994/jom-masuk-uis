@@ -49,9 +49,11 @@ const Enrollment = () => {
                     id,
                     section,
                     semester,
+                    is_active,
                     subjects (code, name)
                 `)
                 .eq('faculty_id', user.faculty_id)
+                .eq('is_active', true)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -105,6 +107,21 @@ const Enrollment = () => {
             setLoadingEnrollments(false);
         }
     };
+
+    const groupedClasses = classes.reduce((acc, cls) => {
+        const subCode = cls.subjects?.code || 'Unknown';
+        if (!acc[subCode]) {
+            acc[subCode] = {
+                code: subCode,
+                name: cls.subjects?.name || 'Unknown Subject',
+                classes: []
+            };
+        }
+        acc[subCode].classes.push(cls);
+        return acc;
+    }, {});
+
+    const sortedSubjects = Object.values(groupedClasses).sort((a, b) => a.code.localeCompare(b.code));
 
     const resetModal = () => {
         setIsModalOpen(false);
@@ -289,29 +306,34 @@ const Enrollment = () => {
                             <div className="flex justify-center p-4">
                                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                             </div>
-                        ) : classes.length > 0 ? (
-                            <ul className="space-y-2">
-                                {classes.map((cls) => (
-                                    <li key={cls.id}>
+                        ) : sortedSubjects.length > 0 ? (
+                            <div className="space-y-2">
+                                {sortedSubjects.map((sub) => {
+                                    const isSelectedSub = selectedClass && groupedClasses[selectedClass.subjects?.code]?.code === sub.code;
+
+                                    return (
                                         <button
-                                            onClick={() => setSelectedClass(cls)}
-                                            className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between group ${selectedClass?.id === cls.id
+                                            key={sub.code}
+                                            onClick={() => {
+                                                // Default to the first class of the subject if not already selected
+                                                if (sub.classes.length > 0) {
+                                                    setSelectedClass(sub.classes[0]);
+                                                }
+                                            }}
+                                            className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between group ${isSelectedSub
                                                 ? 'bg-pastel-indigo dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 shadow-sm border border-indigo-100 dark:border-indigo-800/30'
                                                 : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-gray-700 dark:text-gray-300 border border-transparent'
                                                 }`}
                                         >
                                             <div>
-                                                <div className="font-bold">{cls.subjects?.code}</div>
-                                                <div className="text-sm opacity-80">{cls.subjects?.name}</div>
-                                                <div className="text-xs text-gray-400 mt-1 uppercase tracking-wider font-semibold">
-                                                    Section {cls.section} • {cls.semester}
-                                                </div>
+                                                <div className="font-bold">{sub.code}</div>
+                                                <div className="text-sm opacity-80">{sub.name}</div>
                                             </div>
-                                            <ChevronRight size={16} className={`opacity-0 group-hover:opacity-100 transition-all ${selectedClass?.id === cls.id ? 'opacity-100 text-indigo-600' : 'text-gray-400'}`} />
+                                            <ChevronRight size={16} className={`opacity-0 group-hover:opacity-100 transition-all ${isSelectedSub ? 'opacity-100 text-indigo-600' : 'text-gray-400'}`} />
                                         </button>
-                                    </li>
-                                ))}
-                            </ul>
+                                    );
+                                })}
+                            </div>
                         ) : (
                             <div className="p-4 text-center text-gray-500 text-sm italic">No classes found.</div>
                         )}
@@ -321,15 +343,34 @@ const Enrollment = () => {
                 {/* Right Column: Enrolled Students */}
                 <div className="md:col-span-8 bg-white dark:bg-slate-900 rounded-2xl shadow-pastel border border-gray-100 dark:border-slate-800 flex flex-col overflow-hidden">
                     <div className="p-4 border-b border-gray-50 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
-                        <h3 className="font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider text-xs">
-                            {selectedClass
-                                ? `Enrollments: ${selectedClass.subjects?.code} (Section ${selectedClass.section})`
-                                : 'Select a class to view enrollments'}
-                        </h3>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider text-xs">
+                                {selectedClass
+                                    ? `Enrollments: ${selectedClass.subjects?.code}`
+                                    : 'Select a subject to view enrollments'}
+                            </h3>
+
+                            {selectedClass && (
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    {groupedClasses[selectedClass.subjects?.code]?.classes.map((cls) => (
+                                        <button
+                                            key={cls.id}
+                                            onClick={() => setSelectedClass(cls)}
+                                            className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all border ${selectedClass.id === cls.id
+                                                    ? 'bg-primary text-white border-primary shadow-sm'
+                                                    : 'bg-white dark:bg-slate-800 text-gray-500 dark:text-slate-400 border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                                }`}
+                                        >
+                                            - {cls.section}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         {selectedClass && (
                             <button
                                 onClick={() => setIsModalOpen(true)}
-                                className="inline-flex items-center px-4 py-1.5 border border-transparent text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm text-white bg-primary hover:opacity-90 transition-all"
+                                className="inline-flex items-center px-4 py-1.5 border border-transparent text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm text-white bg-primary hover:opacity-90 transition-all ml-4"
                             >
                                 <UserPlus size={16} className="mr-1.5" />
                                 Enroll Student

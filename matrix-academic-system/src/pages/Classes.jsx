@@ -131,6 +131,7 @@ const Classes = () => {
                                     <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Subject</th>
                                     <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Section</th>
                                     <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Semester</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                                     <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
                                 </tr>
                             </thead>
@@ -142,6 +143,29 @@ const Classes = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{cls.section}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{cls.semester}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        const { error } = await supabase
+                                                            .from('classes')
+                                                            .update({ is_active: !cls.is_active })
+                                                            .eq('id', cls.id);
+                                                        if (error) throw error;
+                                                        fetchClasses();
+                                                    } catch (err) {
+                                                        console.error('Error toggling status:', err);
+                                                        setError('Failed to update class status.');
+                                                    }
+                                                }}
+                                                className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${cls.is_active
+                                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800/50'
+                                                    : 'bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-gray-400 border border-gray-200 dark:border-slate-700'
+                                                    }`}
+                                            >
+                                                {cls.is_active ? 'Active' : 'Inactive'}
+                                            </button>
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <button
                                                 onClick={() => handleDeleteClass(cls.id)}

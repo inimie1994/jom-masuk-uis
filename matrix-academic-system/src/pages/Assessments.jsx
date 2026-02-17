@@ -32,7 +32,8 @@ const Assessments = () => {
         description: '',
         total_marks: 100,
         weightage: 0,
-        date: ''
+        date: '',
+        clo: 'CLO 1'
     });
 
     // Grading Mode State
@@ -134,7 +135,8 @@ const Assessments = () => {
                 description: assessment.description || '',
                 total_marks: assessment.total_marks,
                 weightage: assessment.weightage,
-                date: assessment.date || ''
+                date: assessment.date || '',
+                clo: assessment.clo || 'CLO 1'
             });
         } else {
             setEditingAssessment(null);
@@ -144,7 +146,8 @@ const Assessments = () => {
                 description: '',
                 total_marks: 100,
                 weightage: 0,
-                date: ''
+                date: '',
+                clo: 'CLO 1'
             });
         }
         setIsModalOpen(true);
@@ -513,14 +516,32 @@ const Assessments = () => {
             </div>
 
             {selectedSubject && (
-                <button
-                    onClick={handlePrint}
-                    disabled={loading}
-                    className="ml-auto flex items-center px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-700 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-700 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
-                >
-                    <Printer size={16} className="mr-2" />
-                    Print Marks
-                </button>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex gap-2">
+                        {['CLO 1', 'CLO 2', 'CLO 3'].map(clo => {
+                            const totalWeightage = assessments
+                                .filter(a => a.clo === clo)
+                                .reduce((sum, a) => sum + (parseFloat(a.weightage) || 0), 0);
+
+                            return (
+                                <div key={clo} className="px-3 py-1.5 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{clo}:</span>
+                                    <span className={`text-xs font-bold ${totalWeightage > 0 ? 'text-primary' : 'text-gray-500'}`}>
+                                        {totalWeightage}%
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <button
+                        onClick={handlePrint}
+                        disabled={loading}
+                        className="flex items-center px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-700 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-700 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+                    >
+                        <Printer size={16} className="mr-2" />
+                        Print Marks
+                    </button>
+                </div>
             )}
 
             {error && (
@@ -557,10 +578,19 @@ const Assessments = () => {
                         <div key={assessment.id} className="bg-white dark:bg-slate-900 rounded-2xl shadow-pastel border border-gray-100 dark:border-slate-800 p-6 flex flex-col justify-between hover:shadow-pastel-lg transition-all group">
                             <div>
                                 <div className="flex justify-between items-start mb-4">
-                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">{assessment.name}</h3>
-                                    <span className="bg-pastel-indigo text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-widest">
-                                        {assessment.weightage}%
-                                    </span>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary transition-colors">{assessment.name}</h3>
+                                        <div className="flex gap-2 mt-1">
+                                            <span className="bg-pastel-indigo text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest">
+                                                {assessment.weightage}%
+                                            </span>
+                                            {assessment.clo && (
+                                                <span className="bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest">
+                                                    {assessment.clo}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 line-clamp-2 italic leading-relaxed">{assessment.description || 'No description provided.'}</p>
                                 <div className="space-y-2">
@@ -652,6 +682,19 @@ const Assessments = () => {
                                 onChange={(e) => setFormData({ ...formData, weightage: e.target.value })}
                             />
                         </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">CLO (Course Learning Outcome)</label>
+                        <select
+                            required
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                            value={formData.clo}
+                            onChange={(e) => setFormData({ ...formData, clo: e.target.value })}
+                        >
+                            <option value="CLO 1">CLO 1</option>
+                            <option value="CLO 2">CLO 2</option>
+                            <option value="CLO 3">CLO 3</option>
+                        </select>
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">Date (Optional)</label>
