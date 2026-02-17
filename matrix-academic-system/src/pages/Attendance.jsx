@@ -153,7 +153,7 @@ const Attendance = () => {
     };
 
     // Helper: Generate dates for the month based on timetable days
-    const generateDatesFromTimetable = (monthStr, timetableData) => {
+    const generateDatesFromTimetable = (monthStr, timetableData, semesterSettings = {}, holidays = []) => {
         const [year, month] = monthStr.split('-').map(Number);
         const daysInMonth = new Date(year, month, 0).getDate();
         const dates = [];
@@ -165,28 +165,46 @@ const Attendance = () => {
             timetableMap[entry.day].push(entry);
         });
 
+        // Holiday Map for O(1) lookup
+        const holidayMap = {};
+        holidays.forEach(h => {
+            holidayMap[h.date] = h.name;
+        });
+
+        const normalizeDate = (dateStr) => {
+            if (!dateStr) return null;
+            const [y, m, d] = dateStr.split('-').map(Number);
+            return new Date(y, m - 1, d);
+        };
+
+        const semesterStart = normalizeDate(semesterSettings.start);
+        const semesterEnd = normalizeDate(semesterSettings.end);
+
         for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
             const dateObj = new Date(year, month - 1, d);
+
+            // 1. Filter by Semester Dates (if set)
+            if (semesterStart && dateObj < semesterStart) continue;
+            if (semesterEnd && dateObj > semesterEnd) continue;
+
             const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
 
             if (timetableMap[dayName]) {
-                // If there are multiple classes on the same day for the SAME subject/group,
-                // we should probably list them as separate columns or handle them.
-                // For this request, let's assume one slot per day per subject or combine them.
-                // But the user mentioned specific dates.
-                // Let's create a column for EACH time slot if multiple exist?
-                // Or just one column per Date? The ref image implies Date columns.
-                // Let's do one column per unique Time Slot per Date.
+                const isHoliday = !!holidayMap[dateStr];
+                const holidayName = holidayMap[dateStr];
 
                 timetableMap[dayName].forEach(slot => {
                     dates.push({
-                        date: dateObj.toISOString().split('T')[0], // YYYY-MM-DD
+                        date: dateStr, // YYYY-MM-DD
                         dayName: dayName,
                         displayDate: `${d}/${month}`,
                         startTime: slot.start_time,
                         endTime: slot.end_time,
                         type: slot.class_type,
-                        timetableId: slot.id
+                        timetableId: slot.id,
+                        isHoliday: isHoliday,
+                        holidayName: holidayName
                     });
                 });
             }
@@ -198,7 +216,33 @@ const Attendance = () => {
         setLoading(true);
         setError(null);
         try {
-            // 1. Fetch Timetable for this Group + Subject
+            // 1. Fetch Semester Settings & Holidays
+            let semesterSettings = {};
+            let holidays = [];
+
+            if (user?.faculty_id) {
+                const { data: facultyData } = await supabase
+                    .from('faculties')
+                    .select('semester_start_date, semester_end_date')
+                    .eq('id', user.faculty_id)
+                    .single();
+
+                if (facultyData) {
+                    semesterSettings = {
+                        start: facultyData.semester_start_date,
+                        end: facultyData.semester_end_date
+                    };
+                }
+
+                const { data: holidayData } = await supabase
+                    .from('holidays')
+                    .select('name, date')
+                    .eq('faculty_id', user.faculty_id);
+
+                if (holidayData) holidays = holidayData;
+            }
+
+            // 2. Fetch Timetable for this Group + Subject
             const { data: timetableData, error: timetableError } = await supabase
                 .from('timetable')
                 .select('*, lecturers(name)')
@@ -208,8 +252,8 @@ const Attendance = () => {
             if (timetableError) throw timetableError;
             setTimetable(timetableData || []);
 
-            // 2. Generate Columns
-            const columns = generateDatesFromTimetable(selectedMonth, timetableData || []);
+            // 3. Generate Columns
+            const columns = generateDatesFromTimetable(selectedMonth, timetableData || [], semesterSettings, holidays);
             setDateColumns(columns);
 
             if (columns.length === 0) {
@@ -503,14 +547,18 @@ const Attendance = () => {
                                             <th className="px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider w-16 sticky left-0 bg-slate-50 dark:bg-slate-950 z-10 border-r border-gray-200 dark:border-slate-800">#</th>
                                             <th className="px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider w-48 sticky left-16 bg-slate-50 dark:bg-slate-950 z-10 border-r border-gray-200 dark:border-slate-800">Student Name</th>
                                             {dateColumns.map((col, idx) => (
-                                                <th key={idx} className="px-2 py-3 text-center min-w-[50px] border-r border-gray-100 dark:border-slate-800/50">
-                                                    <div className="flex flex-col items-center">
-                                                        <span className="text-xs font-bold text-gray-900 dark:text-white">{col.displayDate}</span>
+                                                <th key={idx} className={`px-2 py-3 text-center min-w-[50px] border-r border-gray-100 dark:border-slate-800/50 ${col.isHoliday ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
+                                                    <div className="flex flex-col items-center" title={col.holidayName}>
+                                                        <span className={`text-xs font-bold ${col.isHoliday ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>{col.displayDate}</span>
                                                         <span className="text-[9px] text-gray-400 uppercase tracking-wider">{col.dayName.slice(0, 3)}</span>
-                                                        <span className={`text-[8px] px-1 rounded mt-0.5 ${col.type === 'Lecture' ? 'bg-blue-100 text-blue-700' :
-                                                            col.type === 'Tutorial' ? 'bg-green-100 text-green-700' :
-                                                                'bg-orange-100 text-orange-700'
-                                                            }`}>{col.type?.slice(0, 1)}</span>
+                                                        {col.isHoliday ? (
+                                                            <span className="text-[8px] px-1 rounded mt-0.5 bg-red-100 text-red-700 font-bold max-w-[40px] truncate">{col.holidayName}</span>
+                                                        ) : (
+                                                            <span className={`text-[8px] px-1 rounded mt-0.5 ${col.type === 'Lecture' ? 'bg-blue-100 text-blue-700' :
+                                                                col.type === 'Tutorial' ? 'bg-green-100 text-green-700' :
+                                                                    'bg-orange-100 text-orange-700'
+                                                                }`}>{col.type?.slice(0, 1)}</span>
+                                                        )}
                                                     </div>
                                                 </th>
                                             ))}
@@ -535,19 +583,26 @@ const Attendance = () => {
                                                     const isPresent = attendanceData[student.id]?.[key] === 'Present';
 
                                                     return (
-                                                        <td key={cIdx} className="px-2 py-3 text-center border-r border-gray-50 dark:border-slate-800/50">
-                                                            <button
-                                                                onClick={() => toggleAttendance(student.id, col)}
-                                                                className={`
-                                                                w-6 h-6 rounded-md flex items-center justify-center transition-all mx-auto
-                                                                ${isPresent
-                                                                        ? 'bg-primary text-white shadow-sm'
-                                                                        : 'bg-gray-100 dark:bg-slate-800 text-transparent hover:bg-gray-200 dark:hover:bg-slate-700'
-                                                                    }
-                                                            `}
-                                                            >
-                                                                <Check size={14} className={isPresent ? 'opacity-100' : 'opacity-0'} />
-                                                            </button>
+
+                                                        <td key={cIdx} className={`px-2 py-3 text-center border-r border-gray-50 dark:border-slate-800/50 ${col.isHoliday ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
+                                                            {col.isHoliday ? (
+                                                                <div className="w-6 h-6 mx-auto flex items-center justify-center text-red-200 dark:text-red-900/40">
+                                                                    <span className="block w-1.5 h-1.5 rounded-full bg-current"></span>
+                                                                </div>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => toggleAttendance(student.id, col)}
+                                                                    className={`
+                                                                    w-6 h-6 rounded-md flex items-center justify-center transition-all mx-auto
+                                                                    ${isPresent
+                                                                            ? 'bg-primary text-white shadow-sm'
+                                                                            : 'bg-gray-100 dark:bg-slate-800 text-transparent hover:bg-gray-200 dark:hover:bg-slate-700'
+                                                                        }
+                                                                `}
+                                                                >
+                                                                    <Check size={14} className={isPresent ? 'opacity-100' : 'opacity-0'} />
+                                                                </button>
+                                                            )}
                                                         </td>
                                                     );
                                                 })}

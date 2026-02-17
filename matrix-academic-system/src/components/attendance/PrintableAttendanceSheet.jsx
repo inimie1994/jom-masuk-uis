@@ -101,7 +101,7 @@ const PrintableAttendanceSheet = ({
                     </tr>
                     <tr className="h-6">
                         {displayDates.map((col, idx) => (
-                            <th key={idx} className="border border-black text-[8px] w-6 h-6 font-normal" style={{ minWidth: '24px' }}>
+                            <th key={idx} className={`border border-black text-[8px] w-6 h-6 font-normal ${col?.isHoliday ? 'bg-gray-300' : ''}`} style={{ minWidth: '24px' }}>
                                 {/* Ensure dates are only shown if they exist, otherwise empty */}
                                 {col ? col.displayDate : ''}
                             </th>
@@ -117,6 +117,10 @@ const PrintableAttendanceSheet = ({
                             {displayDates.map((col, cIdx) => {
                                 if (!col) return <td key={cIdx} className="border border-black"></td>;
 
+                                if (col.isHoliday) {
+                                    return <td key={cIdx} className="border border-black bg-gray-300"></td>;
+                                }
+
                                 const key = `${col.date}_${col.startTime}`;
                                 const isPresent = attendanceData[student.id]?.[key] === 'Present';
                                 return (
@@ -131,6 +135,23 @@ const PrintableAttendanceSheet = ({
                     ))}
                 </tbody>
             </table>
+
+            {/* Holiday Notes */}
+            {dates.filter(d => d.isHoliday).length > 0 && (
+                <div className="mb-4 text-[9px]">
+                    <span className="font-bold underline italic">*NOTA:</span>
+                    <ul className="list-none p-0 inline-flex flex-wrap gap-x-4 ml-2">
+                        {[...new Map(dates.filter(d => d.isHoliday).map(d => [d.date, d])).values()]
+                            .sort((a, b) => a.date.localeCompare(b.date))
+                            .map((h, i) => (
+                                <li key={i} className="italic capitalize">
+                                    {h.holidayName.toLowerCase()} - {h.displayDate}
+                                </li>
+                            ))
+                        }
+                    </ul>
+                </div>
+            )}
 
             {/* Footer / Notes */}
             <div className="text-center text-[8px] italic mb-8">

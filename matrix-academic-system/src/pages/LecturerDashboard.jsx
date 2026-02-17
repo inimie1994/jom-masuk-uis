@@ -68,7 +68,8 @@ const LecturerDashboard = () => {
             // It has `subject_id` and `student_group`.
             // I need to find classes where lecturer_id = me, and match subject_id and student_group.
 
-            const today = new Date().toISOString().split('T')[0];
+            const now = new Date();
+            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
             // Detailed query: Find my classes first
             const { data: myClasses } = await supabase
