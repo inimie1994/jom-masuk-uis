@@ -112,7 +112,7 @@ const LecturerTimetable = () => {
                             <div className="mt-1 space-y-0.5">
                                 <div className="flex items-center text-[10px] opacity-80">
                                     <Users size={10} className="mr-1" />
-                                    {classStartingHere.group_name}
+                                    <span className="truncate">{Array.isArray(classStartingHere.group_names) ? classStartingHere.group_names.join(', ') : (classStartingHere.group_names || classStartingHere.group_name)}</span>
                                 </div>
                                 <div className="flex items-center text-[10px] opacity-80">
                                     <MapPin size={10} className="mr-1" />

@@ -78,10 +78,10 @@ const Attendance = () => {
                 // Fetch groups from timetable
                 const { data: timetableData } = await supabase
                     .from('timetable')
-                    .select('group_name')
+                    .select('group_names')
                     .eq('lecturer_id', user.lecturer_id);
 
-                const myGroups = [...new Set(timetableData?.map(t => t.group_name).filter(Boolean))];
+                const myGroups = [...new Set(timetableData?.flatMap(t => t.group_names || []).filter(Boolean))];
 
                 if (myGroups.length > 0) {
                     query = query.in('student_group', myGroups);
@@ -112,7 +112,7 @@ const Attendance = () => {
                     subject_id,
                     subjects (id, code, name)
                 `)
-                .eq('group_name', selectedGroup);
+                .filter('group_names', 'cs', `{${selectedGroup}}`);
 
             if (user.role === 'lecturer' && user.lecturer_id) {
                 query = query.eq('lecturer_id', user.lecturer_id);
@@ -248,7 +248,7 @@ const Attendance = () => {
             const { data: timetableData, error: timetableError } = await supabase
                 .from('timetable')
                 .select('*, lecturers(name)')
-                .eq('group_name', selectedGroup)
+                .filter('group_names', 'cs', `{${selectedGroup}}`)
                 .eq('subject_id', selectedSubject);
 
             if (timetableError) throw timetableError;
@@ -271,7 +271,7 @@ const Attendance = () => {
             const { data: sessions, error: sessionsError } = await supabase
                 .from('attendance_sessions')
                 .select('id, date, start_time')
-                .eq('group_name', selectedGroup)
+                .filter('group_names', 'cs', `{${selectedGroup}}`)
                 .eq('subject_id', selectedSubject)
                 .gte('date', startOfMonth)
                 .lte('date', endOfMonth);
@@ -348,7 +348,7 @@ const Attendance = () => {
             const { data: sessionData, error: sessionFindError } = await supabase
                 .from('attendance_sessions')
                 .select('id')
-                .eq('group_name', selectedGroup)
+                .filter('group_names', 'cs', `{${selectedGroup}}`)
                 .eq('subject_id', selectedSubject)
                 .eq('date', column.date)
                 .eq('start_time', column.startTime)
@@ -366,7 +366,7 @@ const Attendance = () => {
                 const { data: newSession, error: createError } = await supabase
                     .from('attendance_sessions')
                     .insert([{
-                        group_name: selectedGroup,
+                        group_names: timetableEntry?.group_names || [selectedGroup],
                         subject_id: selectedSubject,
                         date: column.date,
                         start_time: column.startTime,

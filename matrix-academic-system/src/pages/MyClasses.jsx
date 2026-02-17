@@ -26,10 +26,9 @@ const MyClasses = () => {
                 .select(`
                     *,
                     subjects (code, name),
-                    rooms (name),
                     lecturers (name)
                 `)
-                .eq('lecturer_id', user.lecturer_id);
+                .eq('lecturer_id', user?.lecturer_id);
 
             if (error) throw error;
             setTimetable(data || []);
@@ -83,8 +82,10 @@ const MyClasses = () => {
                                                         {slot.subjects?.name}
                                                     </div>
                                                     <div className="text-[10px] text-gray-500 dark:text-gray-500 mt-1 flex justify-between">
-                                                        <span>{slot.rooms?.name}</span>
-                                                        <span className="font-medium bg-white dark:bg-slate-800 px-1 rounded">{slot.group_name}</span>
+                                                        <span>{slot.room}</span>
+                                                        <span className="font-medium bg-white dark:bg-slate-800 px-1 rounded">
+                                                            {Array.isArray(slot.group_names) ? slot.group_names.join(', ') : slot.group_names}
+                                                        </span>
                                                     </div>
                                                     {slot.class_type && (
                                                         <div className="absolute top-1 right-1">

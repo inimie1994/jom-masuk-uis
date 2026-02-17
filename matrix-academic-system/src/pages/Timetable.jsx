@@ -62,7 +62,7 @@ const Timetable = () => {
         start_time: '08:00',
         end_time: '09:00',
         room: '',
-        group_name: '' // Added group_name to form data
+        group_names: []
     });
 
     const [error, setError] = useState(null);
@@ -94,7 +94,7 @@ const Timetable = () => {
             const { data, error } = await supabase
                 .from('students')
                 .select('student_group')
-                .eq('faculty_id', user.faculty_id)
+                .eq('faculty_id', user?.faculty_id)
                 .not('student_group', 'is', null);
 
             if (error) throw error;
@@ -115,7 +115,7 @@ const Timetable = () => {
             const { data, error } = await supabase
                 .from('subjects')
                 .select('id, code, name')
-                .eq('faculty_id', user.faculty_id)
+                .eq('faculty_id', user?.faculty_id)
                 .order('code');
             if (error) throw error;
             setSubjects(data || []);
@@ -129,7 +129,7 @@ const Timetable = () => {
             const { data, error } = await supabase
                 .from('lecturers')
                 .select('id, name')
-                .eq('faculty_id', user.faculty_id)
+                .eq('faculty_id', user?.faculty_id)
                 .order('name');
             if (error) throw error;
             setLecturers(data || []);
@@ -143,6 +143,7 @@ const Timetable = () => {
 
         try {
             setLoading(true);
+            setError(null);
             let query = supabase
                 .from('timetable')
                 .select(`
@@ -150,11 +151,11 @@ const Timetable = () => {
                     subjects (id, code, name),
                     lecturers (name)
                 `)
-                .eq('faculty_id', user.faculty_id);
+                .eq('faculty_id', user?.faculty_id);
 
             // Apply filter based on view mode
             if (viewMode === 'group') {
-                query = query.eq('group_name', selectedFilterId);
+                query = query.contains('group_names', [selectedFilterId]);
             } else if (viewMode === 'subject') {
                 query = query.eq('subject_id', selectedFilterId);
             } else if (viewMode === 'lecturer') {
@@ -192,7 +193,7 @@ const Timetable = () => {
                 start_time: existingClass.start_time.slice(0, 5),
                 end_time: existingClass.end_time.slice(0, 5),
                 room: existingClass.room || '',
-                group_name: existingClass.group_name
+                group_names: Array.isArray(existingClass.group_names) ? existingClass.group_names : (existingClass.group_names ? [existingClass.group_names] : [])
             });
             setIsModalOpen(true);
         } else {
@@ -207,7 +208,7 @@ const Timetable = () => {
                 start_time: `${hour.toString().padStart(2, '0')}:00`,
                 end_time: `${(hour + 1).toString().padStart(2, '0')}:00`,
                 room: '',
-                group_name: viewMode === 'group' ? selectedFilterId : ''
+                group_names: viewMode === 'group' ? [selectedFilterId] : []
             };
 
             setFormData(initialData);
@@ -223,8 +224,8 @@ const Timetable = () => {
 
         let query = supabase
             .from('timetable')
-            .select('id, group_name, lecturers(name), room, start_time, end_time, lecturer_id')
-            .eq('faculty_id', user.faculty_id)
+            .select('id, group_names, lecturers(name), room, start_time, end_time, lecturer_id')
+            .eq('faculty_id', user?.faculty_id)
             .eq('day', data.day)
             .lt('start_time', data.end_time)
             .gt('end_time', data.start_time);
@@ -237,8 +238,10 @@ const Timetable = () => {
         if (conflictError) throw conflictError;
 
         for (const conflict of conflicts) {
-            if (conflict.group_name === data.group_name) {
-                return `Group conflict: Group ${data.group_name} is already scheduled for another class in this time slot.`;
+            // Check if any group in data.group_names exists in conflict.group_names
+            const groupConflict = data.group_names.some(g => conflict.group_names?.includes(g));
+            if (groupConflict) {
+                return `Group conflict: One or more groups are already scheduled for another class in this time slot.`;
             }
             if (data.lecturer_id && conflict.lecturer_id === data.lecturer_id) {
                 return `Lecturer conflict: This lecturer is already teaching another class in this time slot.`;
@@ -252,16 +255,19 @@ const Timetable = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setLoading(true);
         setError(null);
 
         // Basic check
         if (formData.start_time >= formData.end_time) {
             setError("End time must be after start time.");
+            setLoading(false);
             return;
         }
 
-        if (!formData.group_name) {
-            setError("Student group is required.");
+        if (formData.group_names.length === 0) {
+            setError("Please select at least one student group.");
+            setLoading(false);
             return;
         }
 
@@ -270,36 +276,30 @@ const Timetable = () => {
             const overlapMsg = await checkOverlap(formData, editingClass?.id);
             if (overlapMsg) {
                 setError(overlapMsg);
+                setLoading(false);
                 return;
             }
 
             const payload = {
-                faculty_id: user.faculty_id,
-                group_name: formData.group_name,
-                subject_id: formData.subject_id,
-                lecturer_id: formData.lecturer_id || null,
-                class_type: formData.class_type,
-                day: formData.day,
-                start_time: formData.start_time,
-                end_time: formData.end_time,
-                room: formData.room
+                ...formData,
+                faculty_id: user?.faculty_id
             };
 
+            let res;
             if (editingClass) {
-                const { error } = await supabase
+                res = await supabase
                     .from('timetable')
                     .update(payload)
                     .eq('id', editingClass.id);
-                if (error) throw error;
-                setSuccess('Class updated successfully.');
             } else {
-                const { error } = await supabase
+                res = await supabase
                     .from('timetable')
                     .insert([payload]);
-                if (error) throw error;
-                setSuccess('Class scheduled successfully.');
             }
 
+            if (res.error) throw res.error;
+
+            setSuccess(editingClass ? 'Class updated successfully!' : 'Class scheduled successfully!');
             setTimeout(() => setSuccess(null), 3000);
             setIsModalOpen(false);
             setEditingClass(null);
@@ -374,11 +374,6 @@ const Timetable = () => {
                                     <span className="text-[10px] font-medium truncate opacity-90">
                                         {classStartingHere.subjects?.name}
                                     </span>
-                                    {viewMode !== 'group' && (
-                                        <span className="shrink-0 px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 text-[9px] font-bold tracking-wider uppercase">
-                                            {classStartingHere.group_name}
-                                        </span>
-                                    )}
                                 </div>
                             </div>
                             <div className="mt-1 space-y-0.5">
@@ -395,6 +390,10 @@ const Timetable = () => {
                                 <div className="flex items-center text-[10px] opacity-80">
                                     <Clock size={10} className="mr-1" />
                                     {classStartingHere.start_time.slice(0, 5)} - {classStartingHere.end_time.slice(0, 5)}
+                                </div>
+                                <div className="flex items-start text-[9px] font-bold mt-1 bg-white/20 dark:bg-black/20 px-1 rounded">
+                                    <Users size={10} className="mr-1 mt-0.5 shrink-0" />
+                                    <span className="truncate">{Array.isArray(classStartingHere.group_names) ? classStartingHere.group_names.join(', ') : classStartingHere.group_names}</span>
                                 </div>
                             </div>
                         </div>
@@ -441,7 +440,7 @@ const Timetable = () => {
                         start_time: '08:00',
                         end_time: '09:00',
                         room: '',
-                        group_name: viewMode === 'group' ? selectedFilterId : ''
+                        group_names: viewMode === 'group' ? [selectedFilterId] : []
                     });
                     setIsModalOpen(true);
                 }}
@@ -522,7 +521,7 @@ const Timetable = () => {
                     </div>
                 ) : (
                     <div className="min-w-[1000px] p-4">
-                        <div className="grid grid-cols-[100px_repeat(10,1fr)] mb-2 border-b border-gray-200 dark:border-slate-700 pb-2">
+                        <div className="grid grid-cols-[100px_repeat(10,minmax(0,1fr))] mb-2 border-b border-gray-200 dark:border-slate-700 pb-2">
                             <div className="font-bold text-gray-400 text-xs uppercase tracking-wider text-center pt-2">Day / Time</div>
                             {START_HOURS.map(hour => (
                                 <div key={hour} className="text-center font-semibold text-gray-600 dark:text-gray-300 text-sm py-2">
@@ -553,23 +552,39 @@ const Timetable = () => {
                 title={editingClass ? "Edit Class" : "Schedule Class"}
             >
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Group Name Field - Always visible but pre-filled if in group mode */}
+                    {/* Multi-Group Selection */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Student Group</label>
-                        <div className="mt-1 flex rounded-md shadow-sm">
-                            <input
-                                type="text"
-                                required
-                                className="block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
-                                value={formData.group_name}
-                                onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
-                                placeholder="e.g FA01"
-                                list="group-suggestions"
-                            />
-                            <datalist id="group-suggestions">
-                                {groups.map(g => <option key={g} value={g} />)}
-                            </datalist>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Student Groups (Select Multiple)</label>
+                        <div className="mt-1 p-3 bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
+                            {groups.map(group => (
+                                <label key={group} className="flex items-center space-x-2 p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded transition-colors cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="rounded border-gray-300 text-primary focus:ring-primary dark:bg-slate-800"
+                                        checked={formData.group_names.includes(group)}
+                                        onChange={(e) => {
+                                            const newGroups = e.target.checked
+                                                ? [...formData.group_names, group]
+                                                : formData.group_names.filter(g => g !== group);
+                                            setFormData({ ...formData, group_names: newGroups });
+                                        }}
+                                    />
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">{group}</span>
+                                </label>
+                            ))}
+                            {groups.length === 0 && (
+                                <div className="col-span-full text-center text-xs text-gray-500 py-4">No groups found.</div>
+                            )}
                         </div>
+                        {formData.group_names.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                                {formData.group_names.map(g => (
+                                    <span key={g} className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold rounded-full border border-indigo-200 dark:border-indigo-800/50">
+                                        {g}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

@@ -46,60 +46,68 @@ const LecturerDashboard = () => {
             const now = new Date();
             const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-            // 1. Get ALL assignment sources
-            const [classesRes, timetableRes, workloadRes] = await Promise.all([
-                supabase.from('classes').select('id, subject_id, section, subjects(name, code)').eq('lecturer_id', lecturerId),
-                supabase.from('timetable').select('id, subject_id, group_name, subjects(name, code)').eq('lecturer_id', lecturerId),
-                supabase.from('workload').select('id, subject_id, student_group, subjects(name, code)').eq('lecturer_id', lecturerId)
-            ]);
+            // 1. Fetch Timetable (Source of Truth for Active Classes)
+            const { data: timetableData, error: timetableError } = await supabase
+                .from('timetable')
+                .select('id, subject_id, group_names, subjects(name, code)')
+                .eq('lecturer_id', lecturerId);
 
-            const assignmentItems = [];
+            if (timetableError) throw timetableError;
+
+            const timetableItems = timetableData || [];
+
+            // Derive unique subject IDs and Groups
             const subjectMap = new Map();
-            const classIds = new Set();
+            const groupMap = new Map(); // group_name -> Set(subject_id)
 
-            if (classesRes.data) {
-                classesRes.data.forEach(c => {
-                    assignmentItems.push({ ...c, type: 'class', group: c.section });
-                    classIds.add(c.id);
-                    if (c.subjects) subjectMap.set(c.subject_id, c.subjects);
+            timetableItems.forEach(t => {
+                if (t.subjects) subjectMap.set(t.subject_id, t.subjects);
+                const groups = Array.isArray(t.group_names) ? t.group_names : [t.group_names];
+                groups.forEach(groupName => {
+                    if (groupName) {
+                        if (!groupMap.has(groupName)) {
+                            groupMap.set(groupName, new Set());
+                        }
+                        groupMap.get(groupName).add(t.subject_id);
+                    }
                 });
-            }
-            if (timetableRes.data) {
-                timetableRes.data.forEach(t => {
-                    assignmentItems.push({ ...t, type: 'timetable', group: t.group_name });
-                    classIds.add(t.id);
-                    if (t.subjects) subjectMap.set(t.subject_id, t.subjects);
-                });
-            }
-            if (workloadRes.data) {
-                workloadRes.data.forEach(w => {
-                    assignmentItems.push({ ...w, type: 'workload', group: w.student_group });
-                    if (w.subjects) subjectMap.set(w.subject_id, w.subjects);
-                });
-            }
+            });
 
-            setMyClasses(assignmentItems);
+            const uniqueSubjectIds = Array.from(subjectMap.keys());
+            const uniqueGroups = Array.from(groupMap.keys());
+
+            setMyClasses(timetableItems.map(t => ({
+                ...t,
+                type: 'timetable',
+                section: Array.isArray(t.group_names) ? t.group_names.join(', ') : t.group_names
+            })));
             setMySubjects(Array.from(subjectMap.values()));
 
             // 2. Total Students
+            // Fetch students who are in the groups I teach
             let totalStudentsCount = 0;
-            const validClassIds = Array.from(classIds).filter(id => id && typeof id === 'string');
-            if (validClassIds.length > 0) {
+            if (uniqueGroups.length > 0) {
+                // We need to count unique students in these groups
+                // Optimally: Get count of students where student_group IN uniqueGroups
+                // But we only want to count them if they are taking a subject I teach? 
+                // "Total Students" usually implies total enrollment count.
+                // Let's stick to the logic: Count students in my groups.
+
                 const { count } = await supabase
-                    .from('enrollments')
+                    .from('students')
                     .select('*', { count: 'exact', head: true })
-                    .in('class_id', validClassIds);
+                    .in('student_group', uniqueGroups);
+
                 totalStudentsCount = count || 0;
             }
 
             // 3. Active/Upcoming Assessments
             let assessmentsData = [];
-            const validSubjectIds = Array.from(subjectMap.keys()).filter(id => id && typeof id === 'string');
-            if (validSubjectIds.length > 0) {
+            if (uniqueSubjectIds.length > 0) {
                 const { data } = await supabase
                     .from('assessments')
                     .select('*, subjects(code, name)')
-                    .in('subject_id', validSubjectIds)
+                    .in('subject_id', uniqueSubjectIds)
                     .gte('date', today)
                     .order('date', { ascending: true })
                     .limit(5);
@@ -109,12 +117,12 @@ const LecturerDashboard = () => {
 
             // 4. Update Stats
             setStats({
-                classes: assignmentItems.length,
+                classes: timetableItems.length, // Number of slots/classes
                 students: totalStudentsCount,
                 subjects: subjectMap.size
             });
 
-            // 5. Upcoming Sessions
+            // 5. Upcoming Sessions (Attendance)
             const { data: upcoming } = await supabase
                 .from('attendance_sessions')
                 .select('*, subjects(code, name)')
@@ -127,18 +135,27 @@ const LecturerDashboard = () => {
             setUpcomingClasses(upcoming || []);
 
             // 6. Pending Attendance
+            // Logic: Find past sessions for my groups/subjects that have NO records
+            // To do this efficiently, we can query attendance_sessions where 
+            // lecturer_id = me AND date < today AND NOT EXISTS (records)
+            // Supabase doesn't support NOT EXISTS easily in JS client without RPC or manual filter.
+            // We'll keep the existing fetch-then-filter approach but restrict it to my groups if needed.
+            // Actually, querying by lecturer_id is safe enough.
+
             const { data: pastSessions } = await supabase
                 .from('attendance_sessions')
-                .select('id, date, start_time, group_name, subjects(code, name), attendance_records(id)')
+                .select('id, date, start_time, group_names, subjects(code, name), attendance_records(id)')
                 .eq('lecturer_id', lecturerId)
                 .lt('date', today)
                 .order('date', { ascending: false })
-                .limit(10);
+                .limit(20); // slightly higher limit to find pending ones
 
-            const pending = pastSessions?.filter(s => !s.attendance_records || s.attendance_records.length === 0) || [];
+            const pending = pastSessions?.filter(s => !s.attendance_records || s.attendance_records.length === 0).slice(0, 10) || [];
             setPendingAttendance(pending);
 
-            // 7. Fetch Workload (Specifically for the widget)
+            // 7. Workload
+            // We can re-use timetable data if we want, or fetch workload table if it tracks official hours distinct from timetable.
+            // Assuming 'workload' table is the official source for "Hours/Week".
             const { data: wData } = await supabase
                 .from('workload')
                 .select('*, subjects(code, name)')
@@ -188,7 +205,7 @@ const LecturerDashboard = () => {
                                         to={`/attendance?session=${session.id}`}
                                         className="block text-xs font-medium text-orange-900 dark:text-orange-200 hover:underline"
                                     >
-                                        • {new Date(session.date).toLocaleDateString()} - {session.subjects?.code || 'Unknown'} ({session.group_name})
+                                        • {new Date(session.date).toLocaleDateString()} - {session.subjects?.code || 'Unknown'} ({Array.isArray(session.group_names) ? session.group_names.join(', ') : (session.group_names || 'No Group')})
                                     </Link>
                                 ))}
                             </div>

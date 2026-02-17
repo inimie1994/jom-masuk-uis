@@ -50,7 +50,7 @@ const Subjects = () => {
                 // Fetch timetable entries assigned to this lecturer
                 const { data, error } = await supabase
                     .from('timetable')
-                    .select('group_name, class_type, subjects(id, code, name, credits)')
+                    .select('group_names, class_type, subjects(id, code, name, credits)')
                     .eq('lecturer_id', user.lecturer_id);
 
                 if (error) throw error;
@@ -74,7 +74,12 @@ const Subjects = () => {
                     if (!acc[sub.id].classTypes[typeKey]) {
                         acc[sub.id].classTypes[typeKey] = new Set();
                     }
-                    acc[sub.id].classTypes[typeKey].add(item.group_name);
+
+                    if (Array.isArray(item.group_names)) {
+                        item.group_names.forEach(g => acc[sub.id].classTypes[typeKey].add(g));
+                    } else if (item.group_names) {
+                        acc[sub.id].classTypes[typeKey].add(item.group_names);
+                    }
 
                     return acc;
                 }, {});

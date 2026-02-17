@@ -57,7 +57,7 @@ const Lecturers = () => {
             const { data, error } = await supabase
                 .from('lecturers')
                 .select('*')
-                .eq('faculty_id', user.faculty_id)
+                .eq('faculty_id', user?.faculty_id)
                 .order('name', { ascending: true });
 
             if (error) throw error;
@@ -75,7 +75,7 @@ const Lecturers = () => {
             const { data, error } = await supabase
                 .from('subjects')
                 .select('id, code, name')
-                .eq('faculty_id', user.faculty_id)
+                .eq('faculty_id', user?.faculty_id)
                 .order('code', { ascending: true });
 
             if (error) throw error;
@@ -108,21 +108,18 @@ const Lecturers = () => {
             // Fetch Timetable entries to get dynamic group names
             const { data: timetableData, error: timetableError } = await supabase
                 .from('timetable')
-                .select('subject_id, class_type, group_name')
+                .select('subject_id, class_type, group_names')
                 .eq('lecturer_id', lecturerId);
 
             if (timetableError) throw timetableError;
 
             // Process workload to include timetable group info
             const enhancedWorkload = (workloadData || []).map(work => {
-                // Find matching timetable entries for this subject and type
-                const matchingSlots = (timetableData || []).filter(t =>
+                // Get unique groups
+                const groups = [...new Set((timetableData || []).filter(t =>
                     t.subject_id === work.subjects?.id &&
                     t.class_type === work.type
-                );
-
-                // Get unique unique groups
-                const groups = [...new Set(matchingSlots.map(t => t.group_name))].filter(Boolean);
+                ).flatMap(t => Array.isArray(t.group_names) ? t.group_names : [t.group_names]))].filter(Boolean);
                 const derivedGroup = groups.length > 0 ? groups.join(', ') : work.student_group;
 
                 return {
@@ -158,7 +155,7 @@ const Lecturers = () => {
                     name: lecturerForm.name,
                     username: lecturerForm.username,
                     password: lecturerForm.password,
-                    faculty_id: user.faculty_id
+                    faculty_id: user?.faculty_id
                 }
             });
 
@@ -203,7 +200,7 @@ const Lecturers = () => {
                     .update({ lecturer_id: selectedLecturer.id })
                     .eq('subject_id', workloadForm.subject_id)
                     .eq('section', workloadForm.student_group)
-                    .eq('faculty_id', user.faculty_id);
+                    .eq('faculty_id', user?.faculty_id);
             }
 
             setIsWorkloadModalOpen(false);

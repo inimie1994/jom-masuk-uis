@@ -58,7 +58,7 @@ const MyStudents = () => {
             // We now rely on timetable as the source of truth for "active classes" 
             const { data: timetableData, error: timetableError } = await supabase
                 .from('timetable')
-                .select('id, subject_id, group_name, subjects(code, name)')
+                .select('id, subject_id, group_names, subjects(code, name)')
                 .eq('lecturer_id', currentLecturerId);
 
             if (timetableError) throw timetableError;
@@ -73,13 +73,16 @@ const MyStudents = () => {
 
             // Process timetable to get unique group-subject combinations
             timetableData.forEach(t => {
-                if (t.group_name && t.subject_id) {
-                    if (!activeGroupsMap.has(t.group_name)) {
-                        activeGroupsMap.set(t.group_name, new Set());
+                const groups = Array.isArray(t.group_names) ? t.group_names : [t.group_names];
+                groups.forEach(groupName => {
+                    if (groupName && t.subject_id) {
+                        if (!activeGroupsMap.has(groupName)) {
+                            activeGroupsMap.set(groupName, new Set());
+                        }
+                        activeGroupsMap.get(groupName).add(t.subject_id);
+                        subjectInfoMap.set(t.subject_id, t.subjects);
                     }
-                    activeGroupsMap.get(t.group_name).add(t.subject_id);
-                    subjectInfoMap.set(t.subject_id, t.subjects);
-                }
+                });
             });
 
             if (activeGroupsMap.size === 0) {
