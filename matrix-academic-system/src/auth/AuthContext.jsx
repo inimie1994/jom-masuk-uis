@@ -62,13 +62,12 @@ export const AuthProvider = ({ children }) => {
                     if (profile.faculty_id) {
                         const { data: faculty } = await supabase
                             .from('faculties')
-                            .select('logo_url')
+                            .select('name, logo_url')
                             .eq('id', profile.faculty_id)
                             .single();
-                        if (faculty && faculty.logo_url) {
-                            // Ensure it's a valid URL or a known relative path, 
-                            // though Settings already stores public URLs.
+                        if (faculty) {
                             facultyLogo = faculty.logo_url;
+                            profile.faculty_name = faculty.name;
                         }
                     }
 

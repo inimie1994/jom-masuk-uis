@@ -93,3 +93,12 @@ h6 {
 .dark .custom-scrollbar {
   scrollbar-color: #334155 transparent;
 }
+
+/* Line clamping utility */
+.truncate-2-lines {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

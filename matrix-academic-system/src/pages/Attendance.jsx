@@ -426,8 +426,11 @@ const Attendance = () => {
 
     // Calculate total presence for a student
     const calculateTotal = (studentId) => {
-        if (!attendanceData[studentId]) return 0;
-        return Object.values(attendanceData[studentId]).filter(s => s === 'Present').length;
+        const presentCount = attendanceData[studentId]
+            ? Object.values(attendanceData[studentId]).filter(s => s === 'Present').length
+            : 0;
+        const holidayCount = dateColumns.filter(col => col.isHoliday).length;
+        return presentCount + holidayCount;
     };
 
     const handlePrint = async (mode = 'single') => {
@@ -913,8 +916,8 @@ const Attendance = () => {
 
                                                         <td key={cIdx} className={`px-2 py-3 text-center border-r border-gray-50 dark:border-slate-800/50 ${col.isHoliday ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
                                                             {col.isHoliday ? (
-                                                                <div className="w-6 h-6 mx-auto flex items-center justify-center text-red-200 dark:text-red-900/40">
-                                                                    <span className="block w-1.5 h-1.5 rounded-full bg-current"></span>
+                                                                <div className="w-6 h-6 mx-auto flex items-center justify-center text-red-600 dark:text-red-400 font-bold text-xs">
+                                                                    C
                                                                 </div>
                                                             ) : (
                                                                 <button

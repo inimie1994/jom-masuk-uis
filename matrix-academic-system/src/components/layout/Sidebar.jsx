@@ -67,11 +67,24 @@ const Sidebar = ({ isMobile, className = '' }) => {
         >
             <div className="h-16 flex items-center justify-between px-4 border-b border-gray-100 dark:border-slate-800">
                 {!collapsed && (
-                    user?.faculty_logo ? (
-                        <img src={user.faculty_logo} alt="Faculty Logo" className="h-8 w-auto object-contain" />
-                    ) : (
-                        <span className="text-xl font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">Matrix</span>
-                    )
+                    <div className="flex items-center gap-3 overflow-hidden">
+                        {user?.faculty_logo ? (
+                            <img src={user.faculty_logo} alt="Faculty Logo" className="h-10 w-auto object-contain flex-shrink-0" />
+                        ) : (
+                            <div className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-slate-800 flex items-center justify-center flex-shrink-0">
+                                <span className="text-xl font-bold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent italic">M</span>
+                            </div>
+                        )}
+                        <div className="flex flex-col min-w-0">
+                            {user?.faculty_name ? (
+                                <span className={`font-bold leading-tight dark:text-white uppercase truncate-2-lines ${user.faculty_name.length > 25 ? 'text-[9px]' : 'text-[10px]'}`}>
+                                    {user.faculty_name}
+                                </span>
+                            ) : (
+                                <span className="text-xl font-bold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">Matrix</span>
+                            )}
+                        </div>
+                    </div>
                 )}
                 {!isMobile && (
                     <button onClick={toggleSidebar} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 dark:text-slate-400 dark:hover:text-white transition-colors">

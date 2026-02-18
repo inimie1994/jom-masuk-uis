@@ -25,8 +25,11 @@ const PrintableAttendanceSheet = ({
     }
 
     const calculateTotal = (studentId) => {
-        if (!attendanceData[studentId]) return 0;
-        return Object.values(attendanceData[studentId]).filter(s => s === 'Present').length;
+        const presentCount = attendanceData[studentId]
+            ? Object.values(attendanceData[studentId]).filter(s => s === 'Present').length
+            : 0;
+        const holidayCount = dates.filter(d => d.isHoliday).length;
+        return presentCount + holidayCount;
     };
 
     const STUDENTS_PER_PAGE = 15;
@@ -100,18 +103,18 @@ const PrintableAttendanceSheet = ({
 
                         {/* Header / Logo Section */}
                         <div className="border border-black flex mb-2">
-                            <div className="w-24 border-r border-black p-2 flex items-center justify-center">
-                                <img src={logoUrl || "/vite.svg"} alt="Logo" className={`h-16 w-auto ${!logoUrl ? 'grayscale' : 'object-contain'}`} />
+                            <div className="w-15 border-r border-black p-1 flex items-center justify-center">
+                                <img src={logoUrl || "/vite.svg"} alt="Logo" className={`h-10 w-auto ${!logoUrl ? 'grayscale' : 'object-contain'}`} />
                             </div>
                             <div className="flex-1 flex flex-col justify-center text-center font-bold">
-                                <div className="border-b border-black py-2 text-lg">UNIVERSITI ISLAM SELANGOR</div>
-                                <div className="py-2 text-lg">BORANG KEHADIRAN PELAJAR</div>
+                                <div className="border-b border-black py-1 text-lg">UNIVERSITI ISLAM SELANGOR</div>
+                                <div className="py-1 text-lg">BORANG KEHADIRAN PELAJAR</div>
                             </div>
                         </div>
 
                         {/* Info Section */}
-                        <div className="grid grid-cols-2 gap-x-8 mb-2 font-bold uppercase">
-                            <div className="grid grid-cols-[100px_10px_1fr] gap-y-1">
+                        <div className="grid grid-cols-2 gap-x-4 mb-2 font-bold uppercase text-[9px]">
+                            <div className="grid grid-cols-[80px_5px_1fr] gap-y-0.5">
                                 <div>NAMA TENAGA</div>
                                 <div>:</div>
                                 <div className="uppercase">{lecturerName || "__________________________"}</div>
@@ -128,7 +131,7 @@ const PrintableAttendanceSheet = ({
                                 <div>:</div>
                                 <div>{getMonthName(month)}</div>
                             </div>
-                            <div className="grid grid-cols-[140px_10px_1fr] gap-y-1">
+                            <div className="grid grid-cols-[120px_5px_1fr] gap-y-0.5">
                                 <div>SESI/ TAHUN AKADEMIK</div>
                                 <div>:</div>
                                 <div>2025/2026</div>
@@ -144,7 +147,7 @@ const PrintableAttendanceSheet = ({
                         </div>
 
                         {/* Table */}
-                        <table className="w-full border-collapse border border-black text-center mb-4 print-table">
+                        <table className="w-full border-collapse border border-black text-center mb-2 print-table">
                             <thead>
                                 <tr className="bg-gray-200 print:bg-gray-200">
                                     <th className="border border-black w-8" rowSpan={2} style={{ verticalAlign: 'middle' }}>BIL.</th>
@@ -173,7 +176,7 @@ const PrintableAttendanceSheet = ({
                                             if (!col) return <td key={cIdx} className="border border-black"></td>;
 
                                             if (col.isHoliday) {
-                                                return <td key={cIdx} className="border border-black bg-gray-300"></td>;
+                                                return <td key={cIdx} className="border border-black bg-gray-300 font-bold">C</td>;
                                             }
 
                                             const key = `${col.date}_${col.startTime}`;
