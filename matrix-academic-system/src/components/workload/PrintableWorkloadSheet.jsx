@@ -5,6 +5,7 @@ import uisLogo from '../../assets/LOGO-RASMI-UIS cropped.png';
 const PrintableWorkloadSheet = ({
     lecturer,
     timetable,
+    activities = [],
     studentCounts,
     semesterSession = "SEMESTER I SESI 2025/2026",
     className
@@ -31,9 +32,26 @@ const PrintableWorkloadSheet = ({
     // Group by Subject ID to potentially merge rows or just list them
     // The template shows listing courses. If a course has multiple slots, they are listed.
     // We will list each timetable entry.
-    const sortedTimetable = [...timetable].sort((a, b) => {
+    const sortedTimetable = [...timetable, ...activities.map(a => ({
+        ...a,
+        isActivity: true,
+        subjects: {
+            code: 'AKTIVITI',
+            name: a.activity_name ? `${a.activity_type}: ${a.activity_name}` : a.activity_type
+        },
+        group_names: [],
+        class_type: 'Activity'
+    }))].sort((a, b) => {
         const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        if (a.subjects?.code !== b.subjects?.code) return (a.subjects?.code || '').localeCompare(b.subjects?.code || '');
+        // Sort Activities to the bottom if desired, or mix them in. 
+        // Let's mix them in by day/time, but maybe group by 'Subject' first?
+        // If we mix them, 'AKTIVITI' will be just another subject code.
+        if (a.subjects?.code !== b.subjects?.code) {
+            // Put AKTIVITI at the end
+            if (a.subjects?.code === 'AKTIVITI') return 1;
+            if (b.subjects?.code === 'AKTIVITI') return -1;
+            return (a.subjects?.code || '').localeCompare(b.subjects?.code || '');
+        }
         if (days.indexOf(a.day) !== days.indexOf(b.day)) return days.indexOf(a.day) - days.indexOf(b.day);
         return a.start_time.localeCompare(b.start_time);
     });
@@ -53,22 +71,33 @@ const PrintableWorkloadSheet = ({
         const studentCount = groups.reduce((sum, group) => sum + (studentCounts[group] || 0), 0);
 
         const isLecture = item.class_type === 'Lecture';
+        const isActivity = item.isActivity;
+
         const lectureHours = isLecture ? hours : 0;
-        const tutorialHours = !isLecture ? hours : 0; // Assuming everything else is tutorial-like for now or add Lab column if needed
+        const tutorialHours = (!isLecture && !isActivity) ? hours : 0;
+        // For activities, we don't count them as Lecture or Tutorial hours for now, 
+        // or we could add a column. But usually 'Teaching Hours' refers to classes.
+        // If we want to include them in the total, we can.
+        // Let's assume they contribute to "Total Teaching Hours" only if requested, 
+        // but usually non-teaching activities are separate. 
+        // However, the request says "workload report", so maybe they should be just listed.
+        // Let's keep them out of "Lecture" and "Tutorial" columns but valid in the "Hours" column?
+        // Or maybe just show dash?
+        const displayHours = isActivity ? hours : hours; // Show hours for everything in the total column?
 
         totalStudents += studentCount; // Note: This might double count if same students attend multiple classes. 
         // But based on the template "BILANGAN PELAJAR" column sum, it seems to sum per row.
         totalLectureHours += lectureHours;
         totalTutorialHours += tutorialHours;
-        totalTeachingHours += hours;
+        totalTeachingHours += displayHours;
 
         return {
             ...item,
-            hours,
-            studentCount,
-            lectureHours,
-            tutorialHours,
-            dayTime: `${item.day.toUpperCase()} / ${formatTime(item.start_time)} - ${formatTime(item.end_time).replace(' ', '')}`
+            hours: displayHours,
+            studentCount: isActivity ? '-' : studentCount,
+            lectureHours: isActivity ? '-' : lectureHours,
+            tutorialHours: isActivity ? '-' : tutorialHours,
+            dayTime: `${item.day ? item.day.toUpperCase() : ''} / ${formatTime(item.start_time)} - ${formatTime(item.end_time).replace(' ', '')}`
         };
     });
 

@@ -29,6 +29,7 @@ const LecturerReports = () => {
     // Print State
     const [printMode, setPrintMode] = useState(null); // 'subject' or 'workload'
     const [workloadTimetable, setWorkloadTimetable] = useState([]);
+    const [workloadActivities, setWorkloadActivities] = useState([]);
     const [workloadStudentCounts, setWorkloadStudentCounts] = useState({});
     const [lecturerDetails, setLecturerDetails] = useState(null);
 
@@ -207,6 +208,15 @@ const LecturerReports = () => {
 
             if (timetableError) throw timetableError;
 
+            // 2b. Fetch Activities for this lecturer
+            const { data: activitiesData, error: activitiesError } = await supabase
+                .from('lecturer_activities')
+                .select('*')
+                .eq('lecturer_id', user.lecturer_id)
+                .order('day');
+
+            if (activitiesError) throw activitiesError;
+
             // 3. Extract all unique groups involved
             const allGroups = new Set();
             (timetableData || []).forEach(item => {
@@ -238,6 +248,7 @@ const LecturerReports = () => {
             }
 
             setWorkloadTimetable(timetableData || []);
+            setWorkloadActivities(activitiesData || []);
             setWorkloadStudentCounts(counts);
             setPrintMode('workload');
 
@@ -731,6 +742,7 @@ const LecturerReports = () => {
                 <PrintableWorkloadSheet
                     lecturer={lecturerDetails}
                     timetable={workloadTimetable}
+                    activities={workloadActivities}
                     studentCounts={workloadStudentCounts}
                 />
             )}

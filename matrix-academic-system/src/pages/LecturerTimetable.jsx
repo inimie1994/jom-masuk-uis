@@ -9,7 +9,8 @@ import {
     MapPin,
     User,
     Users,
-    Trash2
+    Trash2,
+    Plus
 } from 'lucide-react';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -38,6 +39,7 @@ const LecturerTimetable = () => {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
     const [timetable, setTimetable] = useState([]);
+    const [activities, setActivities] = useState([]); // New state for activities
     const [subjects, setSubjects] = useState([]);
     const [groups, setGroups] = useState([]); // Available groups for selection
 
@@ -45,13 +47,22 @@ const LecturerTimetable = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingClass, setEditingClass] = useState(null);
     const [formData, setFormData] = useState({
-        subject_id: '',
-        class_type: 'Lecture',
+        // Common fields
+        type: 'Class', // 'Class' or 'Activity'
         day: 'Monday',
         start_time: '08:00',
         end_time: '09:00',
+
+        // Class specific
+        subject_id: '',
+        class_type: 'Lecture',
         room: '',
-        group_names: []
+        group_names: [],
+
+        // Activity specific
+        activity_type: 'Research', // 'Research', 'Consultation', 'Meeting', 'Other'
+        activity_name: '',
+        description: ''
     });
 
     const [error, setError] = useState(null);
@@ -98,6 +109,7 @@ const LecturerTimetable = () => {
     };
 
     const fetchTimetable = async () => {
+        // Fetch Classes
         const { data: timetableData, error: timetableError } = await supabase
             .from('timetable')
             .select(`
@@ -108,39 +120,80 @@ const LecturerTimetable = () => {
 
         if (timetableError) throw timetableError;
         setTimetable(timetableData || []);
+
+        // Fetch Activities
+        const { data: activitiesData, error: activitiesError } = await supabase
+            .from('lecturer_activities')
+            .select('*')
+            .eq('lecturer_id', user.lecturer_id);
+
+        if (activitiesError) throw activitiesError;
+        setActivities(activitiesData || []);
     };
 
     const handleSlotClick = (day, hour) => {
         const timeStr = `${hour.toString().padStart(2, '0')}:00:00`;
-        // Check if there is already a class at this slot
+
+        // Check if there is already a CLASS at this slot
         const existingClass = timetable.find(t =>
             t.day === day &&
             t.start_time <= timeStr &&
             t.end_time > timeStr
         );
 
+        // Check if there is already an ACTIVITY at this slot
+        const existingActivity = activities.find(a =>
+            a.day === day &&
+            a.start_time <= timeStr &&
+            a.end_time > timeStr
+        );
+
         if (existingClass) {
-            setEditingClass(existingClass);
+            setEditingClass({ ...existingClass, type: 'Class' });
             setFormData({
+                type: 'Class',
                 subject_id: existingClass.subject_id,
                 class_type: existingClass.class_type || 'Lecture',
                 day: existingClass.day,
                 start_time: existingClass.start_time.slice(0, 5),
                 end_time: existingClass.end_time.slice(0, 5),
                 room: existingClass.room || '',
-                group_names: Array.isArray(existingClass.group_names) ? existingClass.group_names : (existingClass.group_names ? [existingClass.group_names] : [])
+                group_names: Array.isArray(existingClass.group_names) ? existingClass.group_names : (existingClass.group_names ? [existingClass.group_names] : []),
+                activity_type: 'Research',
+                activity_name: '',
+                description: ''
+            });
+            setIsModalOpen(true);
+        } else if (existingActivity) {
+            setEditingClass({ ...existingActivity, type: 'Activity' });
+            setFormData({
+                type: 'Activity',
+                subject_id: '',
+                class_type: 'Lecture',
+                day: existingActivity.day,
+                start_time: existingActivity.start_time.slice(0, 5),
+                end_time: existingActivity.end_time.slice(0, 5),
+                room: '',
+                group_names: [],
+                activity_type: existingActivity.activity_type,
+                activity_name: existingActivity.activity_name,
+                description: existingActivity.description || ''
             });
             setIsModalOpen(true);
         } else {
             setEditingClass(null);
             setFormData({
+                type: 'Class',
                 subject_id: '',
                 class_type: 'Lecture',
                 day: day,
                 start_time: `${hour.toString().padStart(2, '0')}:00`,
                 end_time: `${(hour + 1).toString().padStart(2, '0')}:00`,
                 room: '',
-                group_names: []
+                group_names: [],
+                activity_type: 'Research',
+                activity_name: '',
+                description: ''
             });
             setIsModalOpen(true);
         }
@@ -193,68 +246,97 @@ const LecturerTimetable = () => {
             return;
         }
 
-        if (formData.group_names.length === 0) {
-            setError("Please select at least one student group.");
-            setLoading(false);
-            return;
-        }
-
         try {
-            // Check for overlaps
-            const overlapMsg = await checkOverlap(formData, editingClass?.id);
-            if (overlapMsg) {
-                setError(overlapMsg);
-                setLoading(false);
-                return;
-            }
+            if (formData.type === 'Class') {
+                if (formData.group_names.length === 0) {
+                    throw new Error("Please select at least one student group.");
+                }
 
-            const payload = {
-                ...formData,
-                lecturer_id: user.lecturer_id, // Force current lecturer
-                subject_id: formData.subject_id || null,
-                faculty_id: user?.faculty_id
-            };
+                // Check for overlaps (Classes only for now, logic can be extended)
+                const overlapMsg = await checkOverlap(formData, editingClass?.id);
+                if (overlapMsg) {
+                    throw new Error(overlapMsg);
+                }
 
-            let res;
-            if (editingClass) {
-                res = await supabase
-                    .from('timetable')
-                    .update(payload)
-                    .eq('id', editingClass.id);
+                const payload = {
+                    day: formData.day,
+                    start_time: formData.start_time,
+                    end_time: formData.end_time,
+                    room: formData.room,
+                    group_names: formData.group_names,
+                    subject_id: formData.subject_id,
+                    class_type: formData.class_type,
+                    lecturer_id: user.lecturer_id,
+                    faculty_id: user?.faculty_id
+                };
+
+                let res;
+                if (editingClass) {
+                    res = await supabase
+                        .from('timetable')
+                        .update(payload)
+                        .eq('id', editingClass.id);
+                } else {
+                    res = await supabase
+                        .from('timetable')
+                        .insert([payload]);
+                }
+                if (res.error) throw res.error;
+
             } else {
-                res = await supabase
-                    .from('timetable')
-                    .insert([payload]);
+                // Handle Activity
+                const payload = {
+                    day: formData.day,
+                    start_time: formData.start_time,
+                    end_time: formData.end_time,
+                    activity_type: formData.activity_type,
+                    activity_name: formData.activity_name,
+                    description: formData.description,
+                    lecturer_id: user.lecturer_id
+                };
+
+                let res;
+                if (editingClass) {
+                    res = await supabase
+                        .from('lecturer_activities')
+                        .update(payload)
+                        .eq('id', editingClass.id);
+                } else {
+                    res = await supabase
+                        .from('lecturer_activities')
+                        .insert([payload]);
+                }
+                if (res.error) throw res.error;
             }
 
-            if (res.error) throw res.error;
-
-            setSuccess(editingClass ? 'Class updated successfully!' : 'Class scheduled successfully!');
+            setSuccess('Schedule updated successfully!');
             setTimeout(() => setSuccess(null), 3000);
             setIsModalOpen(false);
             setEditingClass(null);
             await fetchTimetable();
         } catch (err) {
-            console.error('Error saving class:', err);
-            setError(err.message || 'Failed to save class schedule.');
+            console.error('Error saving schedule:', err);
+            setError(err.message || 'Failed to save schedule.');
         } finally {
             setLoading(false);
         }
     };
 
     const handleDelete = async () => {
-        if (!editingClass || !window.confirm('Are you sure you want to delete this class?')) return;
+        if (!editingClass || !window.confirm('Are you sure you want to delete this item?')) return;
 
         try {
             setLoading(true);
+            const table = editingClass.type === 'Activity' ? 'lecturer_activities' : 'timetable';
+
             const { error: deleteError } = await supabase
-                .from('timetable')
+                .from(table)
                 .delete()
                 .eq('id', editingClass.id);
 
             if (deleteError) throw deleteError;
 
-            setSuccess('Class deleted successfully.');
+            setSuccess('Item deleted successfully.');
             setTimeout(() => setSuccess(null), 3000);
 
             setIsModalOpen(false);
@@ -262,8 +344,8 @@ const LecturerTimetable = () => {
 
             await fetchTimetable();
         } catch (err) {
-            console.error('Error deleting class:', err);
-            setError(err.message || 'Failed to delete class.');
+            console.error('Error deleting item:', err);
+            setError(err.message || 'Failed to delete item.');
         } finally {
             setLoading(false);
         }
@@ -281,6 +363,10 @@ const LecturerTimetable = () => {
                 t.day === day && t.start_time === startTimeStr
             );
 
+            const activityStartingHere = activities.find(a =>
+                a.day === day && a.start_time === startTimeStr
+            );
+
             if (classStartingHere) {
                 const startH = parseInt(classStartingHere.start_time.split(':')[0]);
                 const endH = parseInt(classStartingHere.end_time.split(':')[0]);
@@ -289,7 +375,7 @@ const LecturerTimetable = () => {
 
                 cells.push(
                     <div
-                        key={`${day}-${currentHour}`}
+                        key={`class-${day}-${currentHour}`}
                         className={`p-1 col-span-${duration} relative group`}
                         style={{ gridColumn: `span ${duration} / span ${duration}` }}
                         onClick={() => handleSlotClick(day, currentHour)}
@@ -321,10 +407,44 @@ const LecturerTimetable = () => {
                     </div>
                 );
                 p += duration;
+            } else if (activityStartingHere) {
+                const startH = parseInt(activityStartingHere.start_time.split(':')[0]);
+                const endH = parseInt(activityStartingHere.end_time.split(':')[0]);
+                let duration = endH - startH;
+                if (duration < 1) duration = 1;
+
+                cells.push(
+                    <div
+                        key={`activity-${day}-${currentHour}`}
+                        className={`p-1 col-span-${duration} relative group`}
+                        style={{ gridColumn: `span ${duration} / span ${duration}` }}
+                        onClick={() => handleSlotClick(day, currentHour)}
+                    >
+                        <div className="cursor-pointer h-full w-full rounded-md border p-2 shadow-sm transition-transform hover:scale-[1.02] flex flex-col justify-between overflow-hidden bg-orange-100 text-orange-900 border-orange-200 dark:bg-orange-900/40 dark:text-orange-100 dark:border-orange-800">
+                            <div>
+                                <div className="font-bold text-xs truncate uppercase tracking-tight">
+                                    {activityStartingHere.activity_type}
+                                </div>
+                                <div className="text-[10px] font-medium truncate mt-0.5 opacity-90">
+                                    {activityStartingHere.activity_name}
+                                </div>
+                            </div>
+                            <div className="mt-1 space-y-0.5">
+                                <div className="flex items-center text-[10px] opacity-80">
+                                    <Clock size={10} className="mr-1" />
+                                    {activityStartingHere.start_time.slice(0, 5)} - {activityStartingHere.end_time.slice(0, 5)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+                p += duration;
             } else {
                 // Check if this slot is occupied by a class starting earlier
                 const occupiedBy = timetable.find(t =>
                     t.day === day && t.start_time < startTimeStr && t.end_time > startTimeStr
+                ) || activities.find(a =>
+                    a.day === day && a.start_time < startTimeStr && a.end_time > startTimeStr
                 );
 
                 if (occupiedBy) {
@@ -360,17 +480,45 @@ const LecturerTimetable = () => {
                 onAction={() => {
                     setEditingClass(null);
                     setFormData({
+                        type: 'Class',
                         subject_id: '',
                         class_type: 'Lecture',
                         day: 'Monday',
                         start_time: '08:00',
                         end_time: '09:00',
                         room: '',
-                        group_names: []
+                        group_names: [],
+                        activity_type: '(PPP)',
+                        activity_name: '',
+                        description: ''
                     });
                     setIsModalOpen(true);
                 }}
-            />
+            >
+                <button
+                    onClick={() => {
+                        setEditingClass(null);
+                        setFormData({
+                            type: 'Activity',
+                            subject_id: '',
+                            class_type: 'Lecture',
+                            day: 'Monday',
+                            start_time: '08:00',
+                            end_time: '09:00',
+                            room: '',
+                            group_names: [],
+                            activity_type: '(PPP)',
+                            activity_name: '',
+                            description: ''
+                        });
+                        setIsModalOpen(true);
+                    }}
+                    className="flex items-center justify-center px-4 py-2 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition-all shadow-sm"
+                >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Other Task
+                </button>
+            </PageHeader>
 
             {error && (
                 <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-md mb-4 text-sm flex justify-between items-center animate-in mt-4">
@@ -418,84 +566,153 @@ const LecturerTimetable = () => {
                 title={editingClass ? "Edit Class" : "Schedule Class"}
             >
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Multi-Group Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Student Groups (Select Multiple)</label>
-                        <div className="mt-1 p-3 bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
-                            {groups.map(group => (
-                                <label key={group} className="flex items-center space-x-2 p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded transition-colors cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        className="rounded border-gray-300 text-primary focus:ring-primary dark:bg-slate-800"
-                                        checked={formData.group_names.includes(group)}
-                                        onChange={(e) => {
-                                            const newGroups = e.target.checked
-                                                ? [...formData.group_names, group]
-                                                : formData.group_names.filter(g => g !== group);
-                                            setFormData({ ...formData, group_names: newGroups });
-                                        }}
-                                    />
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">{group}</span>
-                                </label>
-                            ))}
-                            {groups.length === 0 && (
-                                <div className="col-span-full text-center text-xs text-gray-500 py-4">No groups found.</div>
-                            )}
-                        </div>
-                        {formData.group_names.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                                {formData.group_names.map(g => (
-                                    <span key={g} className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold rounded-full border border-indigo-200 dark:border-indigo-800/50">
-                                        {g}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Subject</label>
-                            <select
-                                required
-                                className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
-                                value={formData.subject_id}
-                                onChange={(e) => setFormData({ ...formData, subject_id: e.target.value })}
-                            >
-                                <option value="">Select Subject...</option>
-                                {subjects.map(s => (
-                                    <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Room</label>
+                    {/* Type Selector */}
+                    <div className="flex space-x-4 mb-4">
+                        <label className="flex items-center cursor-pointer">
                             <input
-                                type="text"
-                                className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
-                                value={formData.room}
-                                onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-                                placeholder="e.g. DK 1"
+                                type="radio"
+                                name="type"
+                                value="Class"
+                                checked={formData.type === 'Class'}
+                                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                className="mr-2 text-primary focus:ring-primary"
                             />
-                        </div>
+                            <span className="font-medium text-gray-700 dark:text-gray-200">Class (PdP)</span>
+                        </label>
+                        <label className="flex items-center cursor-pointer">
+                            <input
+                                type="radio"
+                                name="type"
+                                value="Activity"
+                                checked={formData.type === 'Activity'}
+                                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                className="mr-2 text-orange-500 focus:ring-orange-500"
+                            />
+                            <span className="font-medium text-gray-700 dark:text-gray-200">Other Activity</span>
+                        </label>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Class Type</label>
-                            <select
-                                required
-                                className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
-                                value={formData.class_type}
-                                onChange={(e) => setFormData({ ...formData, class_type: e.target.value })}
-                            >
-                                <option value="Lecture">Lecture</option>
-                                <option value="Tutorial">Tutorial</option>
-                                <option value="Lab">Lab</option>
-                            </select>
-                        </div>
-                        {/* Hidden Lecturer Field - Implicitly Current User */}
-                    </div>
+                    {formData.type === 'Class' ? (
+                        <>
+                            {/* Class Form Fields */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Student Groups (Select Multiple)</label>
+                                <div className="mt-1 p-3 bg-gray-50 dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
+                                    {groups.map(group => (
+                                        <label key={group} className="flex items-center space-x-2 p-1.5 hover:bg-white dark:hover:bg-slate-800 rounded transition-colors cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="rounded border-gray-300 text-primary focus:ring-primary dark:bg-slate-800"
+                                                checked={formData.group_names.includes(group)}
+                                                onChange={(e) => {
+                                                    const newGroups = e.target.checked
+                                                        ? [...formData.group_names, group]
+                                                        : formData.group_names.filter(g => g !== group);
+                                                    setFormData({ ...formData, group_names: newGroups });
+                                                }}
+                                            />
+                                            <span className="text-sm text-gray-700 dark:text-gray-300">{group}</span>
+                                        </label>
+                                    ))}
+                                    {groups.length === 0 && (
+                                        <div className="col-span-full text-center text-xs text-gray-500 py-4">No groups found.</div>
+                                    )}
+                                </div>
+                                {formData.group_names.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-1">
+                                        {formData.group_names.map(g => (
+                                            <span key={g} className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold rounded-full border border-indigo-200 dark:border-indigo-800/50">
+                                                {g}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Subject</label>
+                                    <select
+                                        required
+                                        className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                        value={formData.subject_id}
+                                        onChange={(e) => setFormData({ ...formData, subject_id: e.target.value })}
+                                    >
+                                        <option value="">Select Subject...</option>
+                                        {subjects.map(s => (
+                                            <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Room</label>
+                                    <input
+                                        type="text"
+                                        className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                        value={formData.room}
+                                        onChange={(e) => setFormData({ ...formData, room: e.target.value })}
+                                        placeholder="e.g. DK 1"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Class Type</label>
+                                    <select
+                                        required
+                                        className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                        value={formData.class_type}
+                                        onChange={(e) => setFormData({ ...formData, class_type: e.target.value })}
+                                    >
+                                        <option value="Lecture">Lecture</option>
+                                        <option value="Tutorial">Tutorial</option>
+                                        <option value="Lab">Lab</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            {/* Activity Form Fields */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Activity Type</label>
+                                    <select
+                                        required
+                                        className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                        value={formData.activity_type}
+                                        onChange={(e) => setFormData({ ...formData, activity_type: e.target.value })}
+                                    >
+                                        <option value="(PPP)">(PPP)</option>
+                                        <option value="Konsultasi">Konsultasi</option>
+                                        <option value="Mentoring">Mentoring</option>
+                                        <option value="**">**</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Activity Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                        value={formData.activity_name}
+                                        onChange={(e) => setFormData({ ...formData, activity_name: e.target.value })}
+                                        placeholder="e.g. Dept Meeting"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description (Optional)</label>
+                                <textarea
+                                    className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                    value={formData.description}
+                                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                    rows="2"
+                                />
+                            </div>
+                        </>
+                    )}
 
                     <div className="grid grid-cols-3 gap-4">
                         <div>
@@ -538,7 +755,7 @@ const LecturerTimetable = () => {
                                 onClick={handleDelete}
                                 className="flex items-center text-red-600 hover:text-red-700 text-sm font-medium"
                             >
-                                <Trash2 size={16} className="mr-1" /> Delete Class
+                                <Trash2 size={16} className="mr-1" /> Delete Item
                             </button>
                         ) : (
                             <div></div>
