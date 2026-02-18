@@ -36,24 +36,9 @@ const PrintableWorkloadSheet = ({
     // Group by Subject ID to potentially merge rows or just list them
     // The template shows listing courses. If a course has multiple slots, they are listed.
     // We will list each timetable entry.
-    const sortedTimetable = [...timetable, ...activities.map(a => ({
-        ...a,
-        isActivity: true,
-        subjects: {
-            code: 'AKTIVITI',
-            name: a.activity_type
-        },
-        group_names: [],
-        class_type: 'Activity'
-    }))].sort((a, b) => {
+    const sortedTimetable = [...timetable].sort((a, b) => {
         const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        // Sort Activities to the bottom if desired, or mix them in. 
-        // Let's mix them in by day/time, but maybe group by 'Subject' first?
-        // If we mix them, 'AKTIVITI' will be just another subject code.
         if (a.subjects?.code !== b.subjects?.code) {
-            // Put AKTIVITI at the end
-            if (a.subjects?.code === 'AKTIVITI') return 1;
-            if (b.subjects?.code === 'AKTIVITI') return -1;
             return (a.subjects?.code || '').localeCompare(b.subjects?.code || '');
         }
         if (days.indexOf(a.day) !== days.indexOf(b.day)) return days.indexOf(a.day) - days.indexOf(b.day);

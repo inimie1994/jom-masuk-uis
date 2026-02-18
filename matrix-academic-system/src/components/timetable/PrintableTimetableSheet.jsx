@@ -46,8 +46,11 @@ const PrintableTimetableSheet = ({
     let grandTotalPdp = 0;
     let grandTotalActivity = 0;
 
+    // Filter out placeholder activities
+    const filteredActivities = activities.filter(a => a.activity_type !== '**');
+
     // Process totals
-    [...timetable, ...activities.map(a => ({ ...a, isActivity: true }))].forEach(item => {
+    [...timetable, ...filteredActivities.map(a => ({ ...a, isActivity: true }))].forEach(item => {
         const hours = calculateHours(item.start_time, item.end_time);
         if (item.day && dailyTotals[item.day]) {
             if (item.isActivity) {
@@ -134,35 +137,29 @@ const PrintableTimetableSheet = ({
 
             {/* Title */}
             <div className="text-center font-bold uppercase text-sm mb-2">
-                JUMLAH JAM KESELURUHAN SEMINGGU (VERSI 4.0) – {semesterSession}
+                JUMLAH JAM KESELURUHAN SEMINGGU (4.0) – {semesterSession}
             </div>
 
             {/* Main Table */}
             <table className="w-full border-collapse border border-black text-center">
                 <thead>
                     <tr className="h-10">
-                        <th className="print-cell w-20">Hari</th>
+                        <th rowSpan={2} className="print-cell w-20">Hari</th>
                         {TIME_SLOTS.map(hour => (
                             hour !== 13 ? (
-                                <th key={hour} className="print-cell w-24">
+                                <th key={hour} rowSpan={2} className="print-cell w-24">
                                     {hour}.00 –<br />{(hour + 1)}.00
                                 </th>
                             ) : (
-                                <th key={hour} className="print-cell w-8" style={{ writingMode: 'vertical-lr' }}>
+                                <th key={hour} rowSpan={2} className="print-cell w-8" style={{ writingMode: 'vertical-lr' }}>
                                     REHAT
                                 </th>
                             )
                         ))}
-                        <th className="print-cell w-16">PdP<br />(jam)</th>
-                        <th className="print-cell w-20">Lain-Lain<br />Aktiviti<br />(jam)</th>
+                        <th className="print-cell w-16 text-[9px]">PdP<br />(jam)</th>
+                        <th className="print-cell w-20 text-[9px]">Lain-Lain<br />Aktiviti<br />(jam)</th>
                     </tr>
-                    {/* Sub-header row logic merged into main header for simplicity based on image likely structure */}
                     <tr className="h-6">
-                        <th className="print-cell">Masa</th>
-                        {TIME_SLOTS.map(hour => (
-                            hour !== 13 ? (<th key={hour} className="print-cell"></th>) : null
-                        ))}
-                        {/* Rehat column span fix check below */}
                         <th className="print-cell bg-blue-light"></th>
                         <th className="print-cell bg-peach"></th>
                     </tr>
@@ -237,15 +234,15 @@ const PrintableTimetableSheet = ({
 
                     {/* Grand Total Row */}
                     <tr className="h-10 bg-gray-light">
-                        <td colSpan={TIME_SLOTS.length} className="print-cell text-right pr-4 font-bold">
+                        <td colSpan={11} className="print-cell text-right pr-4 font-bold">
                             Jumlah Jam
                         </td>
-                        <td className="print-cell font-bold text-sm">{grandTotalPdp}</td>
-                        <td className="print-cell font-bold text-sm">{grandTotalActivity}</td>
+                        <td className="print-cell font-bold text-sm bg-blue-light">{grandTotalPdp}</td>
+                        <td className="print-cell font-bold text-sm bg-peach">{grandTotalActivity}</td>
                     </tr>
-                    <tr className="h-10 text-white bg-gray-500 print:bg-gray-500">
-                        <td colSpan={TIME_SLOTS.length} className="print-cell text-right pr-4 font-bold text-white">
-                            Jumlah Jam Keseluruhan
+                    <tr className="h-10 text-white bg-gray-600 print:bg-gray-600 border-t-2 border-black">
+                        <td colSpan={11} className="print-cell text-right pr-4 font-bold text-white uppercase tracking-wider">
+                            Jumlah Jam Keseluruhan Seminggu
                         </td>
                         <td colSpan={2} className="print-cell font-bold text-sm text-white text-center">
                             {grandTotalPdp + grandTotalActivity}

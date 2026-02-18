@@ -64,7 +64,7 @@ const LecturerTimetable = () => {
         group_names: [],
 
         // Activity specific
-        activity_type: 'Research', // 'Research', 'Consultation', 'Meeting', 'Other'
+        activity_type: '**', // 'Research', 'Consultation', 'Meeting', 'Other'
         activity_name: '',
         description: ''
     });
@@ -143,7 +143,8 @@ const LecturerTimetable = () => {
                     code,
                     name,
                     faculties (
-                        name
+                        name,
+                        semester_name
                     )
                 )
             `)
@@ -188,7 +189,7 @@ const LecturerTimetable = () => {
                 end_time: existingClass.end_time.slice(0, 5),
                 room: existingClass.room || '',
                 group_names: Array.isArray(existingClass.group_names) ? existingClass.group_names : (existingClass.group_names ? [existingClass.group_names] : []),
-                activity_type: 'Research',
+                activity_type: '**',
                 activity_name: '',
                 description: ''
             });
@@ -220,7 +221,7 @@ const LecturerTimetable = () => {
                 end_time: `${(hour + 1).toString().padStart(2, '0')}:00`,
                 room: '',
                 group_names: [],
-                activity_type: 'Research',
+                activity_type: '**',
                 activity_name: '',
                 description: ''
             });
@@ -516,7 +517,7 @@ const LecturerTimetable = () => {
                         end_time: '09:00',
                         room: '',
                         group_names: [],
-                        activity_type: '(PPP)',
+                        activity_type: '**',
                         description: ''
                     });
                     setIsModalOpen(true);
@@ -542,7 +543,7 @@ const LecturerTimetable = () => {
                             end_time: '09:00',
                             room: '',
                             group_names: [],
-                            activity_type: '(PPP)',
+                            activity_type: '**',
                             description: ''
                         });
                         setIsModalOpen(true);
@@ -559,6 +560,7 @@ const LecturerTimetable = () => {
                     lecturer={lecturerDetails}
                     timetable={timetable}
                     activities={activities}
+                    semesterSession={lecturerDetails?.departments?.faculties?.semester_name || "SESI I 2024/2025"}
                 />
             )}
 
@@ -726,10 +728,10 @@ const LecturerTimetable = () => {
                                         value={formData.activity_type}
                                         onChange={(e) => setFormData({ ...formData, activity_type: e.target.value })}
                                     >
+                                        <option value="**">**</option>
                                         <option value="(PPP)">(PPP)</option>
                                         <option value="Konsultasi">Konsultasi</option>
                                         <option value="Mentoring">Mentoring</option>
-                                        <option value="**">**</option>
                                     </select>
                                 </div>
                             </div>

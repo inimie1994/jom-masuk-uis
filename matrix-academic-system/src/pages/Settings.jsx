@@ -17,6 +17,7 @@ const Settings = () => {
     // Attendance Settings State
     const [semesterStart, setSemesterStart] = useState('');
     const [semesterEnd, setSemesterEnd] = useState('');
+    const [semesterName, setSemesterName] = useState('');
     const [holidays, setHolidays] = useState([]);
     const [newHolidayName, setNewHolidayName] = useState('');
     const [newHolidayDate, setNewHolidayDate] = useState('');
@@ -42,6 +43,7 @@ const Settings = () => {
             if (facultyData) {
                 setSemesterStart(facultyData.semester_start_date || '');
                 setSemesterEnd(facultyData.semester_end_date || '');
+                setSemesterName(facultyData.semester_name || '');
             }
 
             // Fetch Holidays
@@ -156,7 +158,8 @@ const Settings = () => {
                 .from('faculties')
                 .update({
                     semester_start_date: semesterStart,
-                    semester_end_date: semesterEnd
+                    semester_end_date: semesterEnd,
+                    semester_name: semesterName
                 })
                 .eq('id', user.faculty_id);
 
@@ -464,7 +467,18 @@ const Settings = () => {
                                 <div>
                                     <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-4">Semester Duration</h4>
                                     <form onSubmit={handleUpdateSemester} className="bg-gray-50 dark:bg-slate-900/50 p-6 rounded-lg border border-gray-100 dark:border-slate-800">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Semester Name / Session</label>
+                                                <input
+                                                    type="text"
+                                                    value={semesterName}
+                                                    onChange={(e) => setSemesterName(e.target.value)}
+                                                    placeholder="e.g. SESI I 2024/2025"
+                                                    className="block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-slate-800 dark:text-white"
+                                                    required
+                                                />
+                                            </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Semester Start Date</label>
                                                 <input
@@ -493,7 +507,7 @@ const Settings = () => {
                                                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                                             >
                                                 <Save size={16} className="mr-2" />
-                                                Save Duration
+                                                Save Settings
                                             </button>
                                         </div>
                                     </form>
