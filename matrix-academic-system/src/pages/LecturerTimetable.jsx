@@ -10,8 +10,10 @@ import {
     User,
     Users,
     Trash2,
-    Plus
+    Plus,
+    Printer
 } from 'lucide-react';
+import PrintableTimetableSheet from '../components/timetable/PrintableTimetableSheet';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const START_HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
@@ -42,6 +44,8 @@ const LecturerTimetable = () => {
     const [activities, setActivities] = useState([]); // New state for activities
     const [subjects, setSubjects] = useState([]);
     const [groups, setGroups] = useState([]); // Available groups for selection
+    const [lecturerDetails, setLecturerDetails] = useState(null);
+    const [isPrinting, setIsPrinting] = useState(false);
 
     // Modal & Form State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -129,6 +133,31 @@ const LecturerTimetable = () => {
 
         if (activitiesError) throw activitiesError;
         setActivities(activitiesData || []);
+
+        // Fetch Lecturer Details for Print
+        const { data: lecturerData } = await supabase
+            .from('lecturers')
+            .select(`
+                *,
+                departments (
+                    code,
+                    name,
+                    faculties (
+                        name
+                    )
+                )
+            `)
+            .eq('id', user.lecturer_id)
+            .single();
+        setLecturerDetails(lecturerData);
+    };
+
+    const handlePrintTimetable = () => {
+        setIsPrinting(true);
+        setTimeout(() => {
+            window.print();
+            setTimeout(() => setIsPrinting(false), 1000);
+        }, 500);
     };
 
     const handleSlotClick = (day, hour) => {
@@ -290,7 +319,6 @@ const LecturerTimetable = () => {
                     start_time: formData.start_time,
                     end_time: formData.end_time,
                     activity_type: formData.activity_type,
-                    activity_name: formData.activity_name,
                     description: formData.description,
                     lecturer_id: user.lecturer_id
                 };
@@ -426,7 +454,7 @@ const LecturerTimetable = () => {
                                     {activityStartingHere.activity_type}
                                 </div>
                                 <div className="text-[10px] font-medium truncate mt-0.5 opacity-90">
-                                    {activityStartingHere.activity_name}
+                                    Activity
                                 </div>
                             </div>
                             <div className="mt-1 space-y-0.5">
@@ -489,12 +517,19 @@ const LecturerTimetable = () => {
                         room: '',
                         group_names: [],
                         activity_type: '(PPP)',
-                        activity_name: '',
                         description: ''
                     });
                     setIsModalOpen(true);
                 }}
             >
+
+                <button
+                    onClick={handlePrintTimetable}
+                    className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-sm mr-2"
+                >
+                    <Printer className="w-4 h-4 mr-2" />
+                    Print Timetable
+                </button>
                 <button
                     onClick={() => {
                         setEditingClass(null);
@@ -508,7 +543,6 @@ const LecturerTimetable = () => {
                             room: '',
                             group_names: [],
                             activity_type: '(PPP)',
-                            activity_name: '',
                             description: ''
                         });
                         setIsModalOpen(true);
@@ -519,6 +553,14 @@ const LecturerTimetable = () => {
                     Add Other Task
                 </button>
             </PageHeader>
+
+            {isPrinting && (
+                <PrintableTimetableSheet
+                    lecturer={lecturerDetails}
+                    timetable={timetable}
+                    activities={activities}
+                />
+            )}
 
             {error && (
                 <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-md mb-4 text-sm flex justify-between items-center animate-in mt-4">
@@ -689,17 +731,6 @@ const LecturerTimetable = () => {
                                         <option value="Mentoring">Mentoring</option>
                                         <option value="**">**</option>
                                     </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Activity Name</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
-                                        value={formData.activity_name}
-                                        onChange={(e) => setFormData({ ...formData, activity_name: e.target.value })}
-                                        placeholder="e.g. Dept Meeting"
-                                    />
                                 </div>
                             </div>
                             <div>

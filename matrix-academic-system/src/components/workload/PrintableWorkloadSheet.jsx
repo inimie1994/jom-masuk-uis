@@ -15,16 +15,20 @@ const PrintableWorkloadSheet = ({
         if (!start || !end) return 0;
         const startH = parseInt(start.split(':')[0]);
         const endH = parseInt(end.split(':')[0]);
+        if (isNaN(startH) || isNaN(endH)) return 0;
         return Math.max(0, endH - startH);
     };
 
     // Helper to format time
     const formatTime = (timeStr) => {
-        if (!timeStr) return '';
-        const [hour, minute] = timeStr.split(':');
+        if (!timeStr || typeof timeStr !== 'string') return '';
+        const parts = timeStr.split(':');
+        if (parts.length < 2) return timeStr;
+        const [hour, minute] = parts;
         const h = parseInt(hour);
+        if (isNaN(h)) return timeStr;
         const ampm = h >= 12 ? 'PETANG' : 'PAGI';
-        const displayH = h > 12 ? h - 12 : h;
+        const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
         return `${displayH}${minute === '00' ? '' : '.' + minute} ${ampm}`;
     };
 
@@ -37,7 +41,7 @@ const PrintableWorkloadSheet = ({
         isActivity: true,
         subjects: {
             code: 'AKTIVITI',
-            name: a.activity_name ? `${a.activity_type}: ${a.activity_name}` : a.activity_type
+            name: a.activity_type
         },
         group_names: [],
         class_type: 'Activity'
@@ -53,7 +57,7 @@ const PrintableWorkloadSheet = ({
             return (a.subjects?.code || '').localeCompare(b.subjects?.code || '');
         }
         if (days.indexOf(a.day) !== days.indexOf(b.day)) return days.indexOf(a.day) - days.indexOf(b.day);
-        return a.start_time.localeCompare(b.start_time);
+        return (a.start_time || '').localeCompare(b.start_time || '');
     });
 
     // Calculate totals
@@ -61,6 +65,21 @@ const PrintableWorkloadSheet = ({
     let totalLectureHours = 0;
     let totalTutorialHours = 0;
     let totalTeachingHours = 0;
+
+    // Calculate daily totals for summary table
+    const dailyTotals = {
+        Mon: { pdp: 0, activity: 0 },
+        Tue: { pdp: 0, activity: 0 },
+        Wed: { pdp: 0, activity: 0 },
+        Thu: { pdp: 0, activity: 0 },
+        Fri: { pdp: 0, activity: 0 },
+        Sat: { pdp: 0, activity: 0 },
+        Sun: { pdp: 0, activity: 0 }
+    };
+
+    const dayMap = {
+        'Monday': 'Mon', 'Tuesday': 'Tue', 'Wednesday': 'Wed', 'Thursday': 'Thu', 'Friday': 'Fri', 'Saturday': 'Sat', 'Sunday': 'Sun'
+    };
 
     const rows = sortedTimetable.map(item => {
         const hours = calculateHours(item.start_time, item.end_time);
@@ -90,6 +109,9 @@ const PrintableWorkloadSheet = ({
         totalLectureHours += lectureHours;
         totalTutorialHours += tutorialHours;
         totalTeachingHours += displayHours;
+
+        // Add to daily totals
+        // (Removed logic)
 
         return {
             ...item,
@@ -208,6 +230,8 @@ const PrintableWorkloadSheet = ({
                     </tr>
                 </tbody>
             </table>
+
+            {/* Total Hours Summary Table (Removed) */}
 
             {/* Signatures */}
             <div className="grid grid-cols-[350px_1fr] border border-black text-[10px] mb-6">
