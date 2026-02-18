@@ -12,7 +12,7 @@ const Subjects = () => {
     const [subjects, setSubjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [formData, setFormData] = useState({ code: '', name: '', credits: 3 });
+    const [formData, setFormData] = useState({ code: '', name: '', credits: 3, department_id: '' });
     const [error, setError] = useState(null);
 
     // Edit State
@@ -25,10 +25,12 @@ const Subjects = () => {
     const [syllabus, setSyllabus] = useState([]);
     const [loadingSyllabus, setLoadingSyllabus] = useState(false);
     const [syllabusFormData, setSyllabusFormData] = useState({ week_number: '', topic: '', learning_outcomes: '' });
+    const [departments, setDepartments] = useState([]);
 
     useEffect(() => {
         if (user?.faculty_id || user?.lecturer_id) {
             fetchSubjects();
+            if (user?.faculty_id) fetchDepartments();
         }
     }, [user?.faculty_id, user?.lecturer_id]);
 
@@ -40,7 +42,7 @@ const Subjects = () => {
             if (isAdmin && user?.faculty_id) {
                 const { data, error } = await supabase
                     .from('subjects')
-                    .select('*')
+                    .select('*, departments(code, name)')
                     .eq('faculty_id', user.faculty_id)
                     .order('code', { ascending: true });
 
@@ -110,6 +112,21 @@ const Subjects = () => {
         }
     };
 
+    const fetchDepartments = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('departments')
+                .select('id, code, name')
+                .eq('faculty_id', user?.faculty_id)
+                .order('name', { ascending: true });
+
+            if (error) throw error;
+            setDepartments(data || []);
+        } catch (err) {
+            console.error('Error fetching departments:', err);
+        }
+    };
+
     const handleCreateSubject = async (e) => {
         e.preventDefault();
         if (!user?.faculty_id) return;
@@ -138,7 +155,7 @@ const Subjects = () => {
             }
 
             setIsModalOpen(false);
-            setFormData({ code: '', name: '', credits: 3 });
+            setFormData({ code: '', name: '', credits: 3, department_id: '' });
             setIsEditMode(false);
             setEditingSubjectId(null);
             fetchSubjects();
@@ -149,7 +166,7 @@ const Subjects = () => {
     };
 
     const handleEditSubject = (subject) => {
-        setFormData({ code: subject.code, name: subject.name, credits: subject.credits });
+        setFormData({ code: subject.code, name: subject.name, credits: subject.credits, department_id: subject.department_id || '' });
         setEditingSubjectId(subject.id);
         setIsEditMode(true);
         setIsModalOpen(true);
@@ -361,6 +378,7 @@ const Subjects = () => {
                                     <tr>
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Code</th>
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Dept</th>
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Credits</th>
                                         <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
                                     </tr>
@@ -370,6 +388,7 @@ const Subjects = () => {
                                         <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{subject.code || '-'}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{subject.name || 'Unknown Subject'}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600 dark:text-indigo-400 uppercase">{subject.departments?.code || '-'}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{subject.credits}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <div className="flex justify-end space-x-3">
@@ -410,7 +429,7 @@ const Subjects = () => {
                     actionLabel={user?.role === 'admin' ? "Add Subject" : null}
                     onAction={user?.role === 'admin' ? (() => {
                         setIsEditMode(false);
-                        setFormData({ code: '', name: '', credits: 3 });
+                        setFormData({ code: '', name: '', credits: 3, department_id: '' });
                         setIsModalOpen(true);
                     }) : null}
                 />
@@ -464,6 +483,23 @@ const Subjects = () => {
                             value={formData.credits}
                             onChange={(e) => setFormData({ ...formData, credits: parseInt(e.target.value) })}
                         />
+                    </div>
+                    <div>
+                        <label htmlFor="department" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Department
+                        </label>
+                        <select
+                            id="department"
+                            required
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                            value={formData.department_id}
+                            onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
+                        >
+                            <option value="">Select Department...</option>
+                            {departments.map(dept => (
+                                <option key={dept.id} value={dept.id}>{dept.code} - {dept.name}</option>
+                            ))}
+                        </select>
                     </div>
                     <div className="flex justify-end space-x-3 pt-2">
                         <button

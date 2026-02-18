@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
+import PrintableWorkloadSheet from '../components/workload/PrintableWorkloadSheet';
 import {
     BarChart,
     Bar,
@@ -17,13 +18,20 @@ import {
     Pie,
     Cell
 } from 'recharts';
-import { Filter, UserCheck, BookOpen, Calendar, Activity, Printer } from 'lucide-react';
+import { Filter, UserCheck, BookOpen, Calendar, Activity, Printer, FileText } from 'lucide-react';
 
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const LecturerReports = () => {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
+
+    // Print State
+    const [printMode, setPrintMode] = useState(null); // 'subject' or 'workload'
+    const [workloadTimetable, setWorkloadTimetable] = useState([]);
+    const [workloadStudentCounts, setWorkloadStudentCounts] = useState({});
+    const [lecturerDetails, setLecturerDetails] = useState(null);
+
 
     // Data States
     const [enrollmentData, setEnrollmentData] = useState([]);
@@ -171,6 +179,76 @@ const LecturerReports = () => {
 
         } catch (error) {
             console.error('Error fetching report data:', error);
+        }
+    };
+
+    const handlePrintWorkload = async () => {
+        try {
+            // 1. Fetch current lecturer details (if not already fetched or full details needed)
+            const { data: lecturerData, error: lecturerError } = await supabase
+                .from('lecturers')
+                .select('*, departments(code, name)')
+                .eq('id', user.lecturer_id)
+                .single();
+
+            if (lecturerError) throw lecturerError;
+            setLecturerDetails(lecturerData);
+
+            // 2. Fetch Timetable for this lecturer
+            const { data: timetableData, error: timetableError } = await supabase
+                .from('timetable')
+                .select(`
+                    *,
+                    subjects (id, code, name),
+                    lecturers (name)
+                `)
+                .eq('lecturer_id', user.lecturer_id)
+                .order('day'); // Basic ordering, will sort more in component
+
+            if (timetableError) throw timetableError;
+
+            // 3. Extract all unique groups involved
+            const allGroups = new Set();
+            (timetableData || []).forEach(item => {
+                if (Array.isArray(item.group_names)) {
+                    item.group_names.forEach(g => allGroups.add(g));
+                } else if (item.group_names) {
+                    allGroups.add(item.group_names);
+                }
+            });
+            const uniqueGroups = Array.from(allGroups);
+
+            // 4. Fetch student counts for these groups
+            const counts = {};
+            if (uniqueGroups.length > 0) {
+                const { data: studentsData, error: studentsError } = await supabase
+                    .from('students')
+                    .select('student_group')
+                    .in('student_group', uniqueGroups)
+                    .eq('faculty_id', user?.faculty_id);
+
+                if (studentsError) throw studentsError;
+
+                // Aggregate counts
+                studentsData.forEach(s => {
+                    if (s.student_group) {
+                        counts[s.student_group] = (counts[s.student_group] || 0) + 1;
+                    }
+                });
+            }
+
+            setWorkloadTimetable(timetableData || []);
+            setWorkloadStudentCounts(counts);
+            setPrintMode('workload');
+
+            // Wait a moment for state to update and render before printing
+            setTimeout(() => {
+                window.print();
+                setTimeout(() => setPrintMode(null), 1000);
+            }, 500);
+
+        } catch (err) {
+            console.error("Error preparing workload print:", err);
         }
     };
 
@@ -589,32 +667,57 @@ const LecturerReports = () => {
                 <PageHeader title="Subject Performance Reports" />
             </div>
 
-            {/* Subject Selector & Actions */}
-            <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all print:hidden">
-                <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl text-indigo-600 dark:text-indigo-400">
-                        <BookOpen size={24} />
+            {/* Report Selection Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 transition-all print:hidden">
+                {/* Card 1: Workload Report (General) */}
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center justify-between gap-4">
+                    <div className="flex items-center space-x-4">
+                        <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl text-green-600 dark:text-green-400">
+                            <FileText size={24} />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-gray-900 dark:text-white leading-tight">Workload Report</h3>
+                            <p className="text-sm text-gray-500 dark:text-slate-400">Print your overall teaching workload sheet</p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="font-bold text-gray-900 dark:text-white leading-tight">Select Subject</h3>
-                        <p className="text-sm text-gray-500 dark:text-slate-400">Viewing analytics for class segments you manage</p>
-                    </div>
+                    <button
+                        onClick={handlePrintWorkload}
+                        className="flex items-center justify-center px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 whitespace-nowrap"
+                        title="Print Workload"
+                    >
+                        <Printer size={18} className="mr-2" />
+                        Print Workload
+                    </button>
                 </div>
 
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <select
-                        value={selectedSubject}
-                        onChange={(e) => setSelectedSubject(e.target.value)}
-                        className="block w-full sm:w-64 rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm font-medium dark:bg-slate-900 dark:text-white px-4 py-2.5 border transition-all hover:border-indigo-300 outline-none"
-                    >
-                        {subjects.map(s => (
-                            <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
-                        ))}
-                    </select>
-
+                {/* Card 2: Subject Report (Specific) */}
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center justify-between gap-4">
+                    <div className="flex items-center space-x-4 flex-1">
+                        <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl text-indigo-600 dark:text-indigo-400">
+                            <BookOpen size={24} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-gray-900 dark:text-white leading-tight">Subject Report</h3>
+                            <select
+                                value={selectedSubject}
+                                onChange={(e) => setSelectedSubject(e.target.value)}
+                                className="mt-1 block w-full rounded-lg border-gray-100 dark:border-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-xs font-medium dark:bg-slate-900 dark:text-white px-2 py-1.5 border transition-all hover:border-indigo-300 outline-none"
+                            >
+                                {subjects.map(s => (
+                                    <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
                     <button
-                        onClick={() => window.print()}
-                        className="flex items-center justify-center px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        onClick={() => {
+                            setPrintMode('subject');
+                            setTimeout(() => {
+                                window.print();
+                                setTimeout(() => setPrintMode(null), 1000);
+                            }, 500);
+                        }}
+                        className="flex items-center justify-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 whitespace-nowrap"
                         title="Print Class Report"
                     >
                         <Printer size={18} className="mr-2" />
@@ -623,8 +726,18 @@ const LecturerReports = () => {
                 </div>
             </div>
 
-            {/* Printable Report Section - Visible only in Print */}
-            <PrintableReport />
+            {/* Printable Components - Render based on mode */}
+            {printMode === 'workload' && (
+                <PrintableWorkloadSheet
+                    lecturer={lecturerDetails}
+                    timetable={workloadTimetable}
+                    studentCounts={workloadStudentCounts}
+                />
+            )}
+
+            {printMode === 'subject' && (
+                <PrintableReport />
+            )}
 
             {/* Normal Chart Views - Hidden in Print */}
             <div className="print:hidden">

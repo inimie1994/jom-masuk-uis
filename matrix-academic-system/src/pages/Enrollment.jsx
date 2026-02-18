@@ -9,7 +9,8 @@ import { UserPlus, Trash2, Users, ChevronRight, Layers, User } from 'lucide-reac
 const Enrollment = () => {
     const { user } = useAuth();
     const [classes, setClasses] = useState([]);
-    const [selectedClass, setSelectedClass] = useState(null);
+    const [selectedSubjectCode, setSelectedSubjectCode] = useState(null);
+    const [selectedClass, setSelectedClass] = useState(null); // Used primarily for the modal now
     const [enrolledStudents, setEnrolledStudents] = useState([]);
     const [availableStudents, setAvailableStudents] = useState([]); // For the add modal
     const [availableGroups, setAvailableGroups] = useState([]); // For group mode
@@ -33,12 +34,18 @@ const Enrollment = () => {
     }, [user?.faculty_id]);
 
     useEffect(() => {
-        if (selectedClass) {
-            fetchEnrollments(selectedClass.id);
+        if (selectedSubjectCode) {
+            const subjectClasses = groupedClasses[selectedSubjectCode]?.classes || [];
+            if (subjectClasses.length > 0) {
+                fetchEnrollments(subjectClasses.map(c => c.id));
+                // Set default class for modal
+                setSelectedClass(subjectClasses[0]);
+            }
         } else {
             setEnrolledStudents([]);
+            setSelectedClass(null);
         }
-    }, [selectedClass]);
+    }, [selectedSubjectCode, classes]); // Add classes to dependency to react correctly after fetch
 
     const fetchClasses = async () => {
         try {
@@ -85,18 +92,22 @@ const Enrollment = () => {
         }
     };
 
-    const fetchEnrollments = async (classId) => {
+    const fetchEnrollments = async (classIds) => {
         try {
             setLoadingEnrollments(true);
-            // Fetch enrollments and join with students table
+            const ids = Array.isArray(classIds) ? classIds : [classIds];
+
+            // Fetch enrollments and join with students and classes tables
             const { data, error } = await supabase
                 .from('enrollments')
                 .select(`
                     id,
                     enrolled_at,
+                    class_id,
+                    classes (section),
                     students (id, name, matric_no, email, student_group)
                 `)
-                .eq('class_id', classId);
+                .in('class_id', ids);
 
             if (error) throw error;
             setEnrolledStudents(data || []);
@@ -105,6 +116,15 @@ const Enrollment = () => {
             setError('Failed to load enrolled students.');
         } finally {
             setLoadingEnrollments(false);
+        }
+    };
+
+    const refreshCurrentEnrollments = () => {
+        if (selectedSubjectCode) {
+            const subjectClasses = groupedClasses[selectedSubjectCode]?.classes || [];
+            if (subjectClasses.length > 0) {
+                fetchEnrollments(subjectClasses.map(c => c.id));
+            }
         }
     };
 
@@ -159,7 +179,7 @@ const Enrollment = () => {
             resetModal();
             setSuccess('Student enrolled successfully.');
             setTimeout(() => setSuccess(null), 3000);
-            fetchEnrollments(selectedClass.id);
+            refreshCurrentEnrollments();
         } catch (err) {
             console.error('Error enrolling student:', err);
             if (err.code === '23505') {
@@ -223,7 +243,7 @@ const Enrollment = () => {
             resetModal();
             setSuccess(`Successfully enrolled ${newStudents.length} students from ${selectedGroups.length} groups.`);
             setTimeout(() => setSuccess(null), 3000);
-            fetchEnrollments(selectedClass.id);
+            refreshCurrentEnrollments();
 
         } catch (err) {
             console.error('Batch enrollment error:', err);
@@ -244,7 +264,7 @@ const Enrollment = () => {
             if (error) throw error;
             setSuccess('Student removed from class.');
             setTimeout(() => setSuccess(null), 3000);
-            fetchEnrollments(selectedClass.id);
+            refreshCurrentEnrollments();
         } catch (err) {
             console.error('Error removing student:', err);
             setError('Failed to remove student.');
@@ -261,7 +281,7 @@ const Enrollment = () => {
             if (error) throw error;
             setSuccess(`Successfully removed students from class.`);
             setTimeout(() => setSuccess(null), 3000);
-            fetchEnrollments(selectedClass.id);
+            refreshCurrentEnrollments();
         } catch (err) {
             console.error('Error removing group:', err);
             setError('Failed to remove group.');
@@ -309,16 +329,13 @@ const Enrollment = () => {
                         ) : sortedSubjects.length > 0 ? (
                             <div className="space-y-2">
                                 {sortedSubjects.map((sub) => {
-                                    const isSelectedSub = selectedClass && groupedClasses[selectedClass.subjects?.code]?.code === sub.code;
+                                    const isSelectedSub = selectedSubjectCode === sub.code;
 
                                     return (
                                         <button
                                             key={sub.code}
                                             onClick={() => {
-                                                // Default to the first class of the subject if not already selected
-                                                if (sub.classes.length > 0) {
-                                                    setSelectedClass(sub.classes[0]);
-                                                }
+                                                setSelectedSubjectCode(sub.code);
                                             }}
                                             className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between group ${isSelectedSub
                                                 ? 'bg-pastel-indigo dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 shadow-sm border border-indigo-100 dark:border-indigo-800/30'
@@ -345,29 +362,12 @@ const Enrollment = () => {
                     <div className="p-4 border-b border-gray-50 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950">
                         <div className="flex-1">
                             <h3 className="font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider text-xs">
-                                {selectedClass
-                                    ? `Enrollments: ${selectedClass.subjects?.code}`
+                                {selectedSubjectCode
+                                    ? `Enrollments: ${selectedSubjectCode}`
                                     : 'Select a subject to view enrollments'}
                             </h3>
-
-                            {selectedClass && (
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    {groupedClasses[selectedClass.subjects?.code]?.classes.map((cls) => (
-                                        <button
-                                            key={cls.id}
-                                            onClick={() => setSelectedClass(cls)}
-                                            className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all border ${selectedClass.id === cls.id
-                                                    ? 'bg-primary text-white border-primary shadow-sm'
-                                                    : 'bg-white dark:bg-slate-800 text-gray-500 dark:text-slate-400 border-gray-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
-                                                }`}
-                                        >
-                                            - {cls.section}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
                         </div>
-                        {selectedClass && (
+                        {selectedSubjectCode && (
                             <button
                                 onClick={() => setIsModalOpen(true)}
                                 className="inline-flex items-center px-4 py-1.5 border border-transparent text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm text-white bg-primary hover:opacity-90 transition-all ml-4"
@@ -379,7 +379,7 @@ const Enrollment = () => {
                     </div>
 
                     <div className="flex-1 overflow-y-auto">
-                        {!selectedClass ? (
+                        {!selectedSubjectCode ? (
                             <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8">
                                 <Users size={48} className="mb-4 opacity-10" />
                                 <p className="italic">Select a class from the left to manage enrollments.</p>
@@ -392,6 +392,7 @@ const Enrollment = () => {
                             <table className="min-w-full divide-y divide-gray-50 dark:divide-slate-800">
                                 <thead className="bg-slate-50 dark:bg-slate-950">
                                     <tr>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Section</th>
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Group Name</th>
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider text-center">Student Count</th>
                                         <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
@@ -399,24 +400,31 @@ const Enrollment = () => {
                                 </thead>
                                 <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-50 dark:divide-slate-800">
                                     {(() => {
-                                        // Group by student_group
+                                        // Group by Section + Student Group
                                         const groupCounts = enrolledStudents.reduce((acc, curr) => {
+                                            const section = curr.classes?.section || 'Unknown';
                                             const group = curr.students?.student_group || 'Unassigned';
-                                            if (!acc[group]) {
-                                                acc[group] = {
+                                            const key = `${section}-${group}`;
+                                            if (!acc[key]) {
+                                                acc[key] = {
+                                                    section,
+                                                    group,
                                                     count: 0,
                                                     enrollments: []
                                                 };
                                             }
-                                            acc[group].count += 1;
-                                            acc[group].enrollments.push(curr.id);
+                                            acc[key].count += 1;
+                                            acc[key].enrollments.push(curr.id);
                                             return acc;
                                         }, {});
 
-                                        return Object.entries(groupCounts).map(([groupName, info]) => (
-                                            <tr key={groupName} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                        return Object.values(groupCounts).map((info) => (
+                                            <tr key={`${info.section}-${info.group}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                                                    - {info.section}
+                                                </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                                    {groupName}
+                                                    {info.group}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400 text-center font-medium">
                                                     <span className="bg-gray-100 dark:bg-slate-800 px-3 py-1 rounded-full text-xs">
@@ -426,8 +434,7 @@ const Enrollment = () => {
                                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                     <button
                                                         onClick={() => {
-                                                            if (window.confirm(`Are you sure you want to remove all ${info.count} students from group "${groupName}" from this class?`)) {
-                                                                // Function to remove all enrollments for this group
+                                                            if (window.confirm(`Are you sure you want to remove all ${info.count} students from group "${info.group}" (Section ${info.section}) from this class?`)) {
                                                                 handleUnenrollGroup(info.enrollments);
                                                             }
                                                         }}
@@ -489,6 +496,28 @@ const Enrollment = () => {
                     </div>
 
                     <form onSubmit={handleEnroll} className="space-y-4">
+                        {/* Section Selector for Subjects with Multiple Classes */}
+                        {selectedSubjectCode && groupedClasses[selectedSubjectCode]?.classes.length > 1 && (
+                            <div>
+                                <label htmlFor="class-select" className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">
+                                    Select Section
+                                </label>
+                                <select
+                                    id="class-select"
+                                    required
+                                    className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                    value={selectedClass?.id || ''}
+                                    onChange={(e) => {
+                                        const cls = classes.find(c => c.id === e.target.value);
+                                        setSelectedClass(cls);
+                                    }}
+                                >
+                                    {groupedClasses[selectedSubjectCode]?.classes.map(cls => (
+                                        <option key={cls.id} value={cls.id}>- {cls.section}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                         {enrollmentMode === 'single' ? (
                             <div>
                                 <label htmlFor="student" className="block text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-1">

@@ -3,7 +3,8 @@ import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
 import Modal from '../components/common/Modal';
-import { Plus, Trash2, Clock, BookOpen, ChevronRight, Briefcase, Eye, Key, Mail, Lock, User } from 'lucide-react';
+import PrintableWorkloadSheet from '../components/workload/PrintableWorkloadSheet';
+import { Plus, Trash2, Clock, BookOpen, ChevronRight, Briefcase, Eye, Key, Mail, Lock, User, Printer } from 'lucide-react';
 
 const Lecturers = () => {
     const { user } = useAuth();
@@ -13,6 +14,7 @@ const Lecturers = () => {
     const [selectedLecturer, setSelectedLecturer] = useState(null);
     const [workloads, setWorkloads] = useState([]);
     const [loadingWorkload, setLoadingWorkload] = useState(false);
+    const [departments, setDepartments] = useState([]);
 
     // Modal States
     const [isAddLecturerModalOpen, setIsAddLecturerModalOpen] = useState(false);
@@ -24,6 +26,7 @@ const Lecturers = () => {
         name: '',
         username: '',
         password: '',
+        department_id: '',
     });
 
     const [workloadForm, setWorkloadForm] = useState({
@@ -40,6 +43,7 @@ const Lecturers = () => {
         if (user?.faculty_id) {
             fetchLecturers();
             fetchSubjects();
+            fetchDepartments();
         }
     }, [user?.faculty_id]);
 
@@ -56,7 +60,7 @@ const Lecturers = () => {
             setLoading(true);
             const { data, error } = await supabase
                 .from('lecturers')
-                .select('*')
+                .select('*, departments(code, name)')
                 .eq('faculty_id', user?.faculty_id)
                 .order('name', { ascending: true });
 
@@ -82,6 +86,21 @@ const Lecturers = () => {
             setSubjects(data || []);
         } catch (err) {
             console.error('Error fetching subjects:', err);
+        }
+    };
+
+    const fetchDepartments = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('departments')
+                .select('id, code, name')
+                .eq('faculty_id', user?.faculty_id)
+                .order('name', { ascending: true });
+
+            if (error) throw error;
+            setDepartments(data || []);
+        } catch (err) {
+            console.error('Error fetching departments:', err);
         }
     };
 
@@ -155,7 +174,8 @@ const Lecturers = () => {
                     name: lecturerForm.name,
                     username: lecturerForm.username,
                     password: lecturerForm.password,
-                    faculty_id: user?.faculty_id
+                    faculty_id: user?.faculty_id,
+                    department_id: lecturerForm.department_id
                 }
             });
 
@@ -163,7 +183,7 @@ const Lecturers = () => {
             if (data?.error) throw new Error(data.error);
 
             setIsAddLecturerModalOpen(false);
-            setLecturerForm({ name: '', username: '', password: '' });
+            setLecturerForm({ name: '', username: '', password: '', department_id: '' });
             fetchLecturers();
 
             // Log success to console for verification
@@ -229,6 +249,88 @@ const Lecturers = () => {
     };
 
     const [success, setSuccess] = useState(null);
+
+    // Printing State
+    const [printingLecturer, setPrintingLecturer] = useState(null);
+    const [printTimetableData, setPrintTimetableData] = useState([]);
+    const [printStudentCounts, setPrintStudentCounts] = useState({});
+    const [isPrinting, setIsPrinting] = useState(false);
+
+    const handlePrintWorkload = async (lecturer) => {
+        try {
+            setIsPrinting(true);
+            setPrintingLecturer(lecturer);
+
+            // 1. Fetch Timetable for this lecturer
+            const { data: timetableData, error: timetableError } = await supabase
+                .from('timetable')
+                .select(`
+                    *,
+                    subjects (id, code, name),
+                    lecturers (name)
+                `)
+                .eq('lecturer_id', lecturer.id)
+                .order('day'); // Basic ordering, will sort more in component
+
+            if (timetableError) throw timetableError;
+
+            // 2. Extract all unique groups involved
+            const allGroups = new Set();
+            (timetableData || []).forEach(item => {
+                if (Array.isArray(item.group_names)) {
+                    item.group_names.forEach(g => allGroups.add(g));
+                } else if (item.group_names) {
+                    allGroups.add(item.group_names);
+                }
+            });
+            const uniqueGroups = Array.from(allGroups);
+
+            // 3. Fetch student counts for these groups
+            // We need to count students where student_group is in uniqueGroups
+            const counts = {};
+            if (uniqueGroups.length > 0) {
+                const { data: studentsData, error: studentsError } = await supabase
+                    .from('students')
+                    .select('student_group')
+                    .in('student_group', uniqueGroups)
+                    .eq('faculty_id', user?.faculty_id);
+
+                if (studentsError) throw studentsError;
+
+                // Aggregate counts
+                studentsData.forEach(s => {
+                    if (s.student_group) {
+                        counts[s.student_group] = (counts[s.student_group] || 0) + 1;
+                    }
+                });
+            }
+
+            setPrintTimetableData(timetableData || []);
+            setPrintStudentCounts(counts);
+
+            // Wait a moment for state to update and render before printing
+            setTimeout(() => {
+                window.print();
+                setIsPrinting(false);
+                setPrintingLecturer(null); // Optional: clear after print to hide it, or keep it. 
+                // If we hide it immediately, print preview might lose content in some browsers.
+                // Better to keep it or use a separate "onAfterPrint" listener, but simple timeout often works.
+                // For now, let's NOT clear it immediately inside timeout to be safe, 
+                // or clear it after a longer delay.
+            }, 500);
+
+        } catch (err) {
+            console.error("Error preparing print:", err);
+            setError("Failed to generate print data.");
+            setIsPrinting(false);
+            setPrintingLecturer(null);
+        }
+    };
+
+    // Clear print data when window print dialog closes (optional, but hard to detect reliably across browsers)
+    // For now, we rely on the component being hidden via CSS print media query except when printing.
+    // But we conditionally render it only when `printingLecturer` is set to avoid overhead.
+
 
     const handleDeleteLecturer = async (lecturerId) => {
         if (!window.confirm('Delete this lecturer? (This will NOT delete the Auth User account currently)')) return;
@@ -305,24 +407,51 @@ const Lecturers = () => {
                                         >
                                             <div>
                                                 <div className="font-medium">{lecturer.name}</div>
-                                                {lecturer.email && <div className="text-xs text-gray-400 mt-0.5">{lecturer.email}</div>}
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    {lecturer.departments?.code && (
+                                                        <span className="text-[10px] font-bold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded uppercase">
+                                                            {lecturer.departments.code}
+                                                        </span>
+                                                    )}
+                                                    {lecturer.email && <span className="text-xs text-gray-400">{lecturer.email}</span>}
+                                                </div>
                                             </div>
                                             <ChevronRight size={16} className={`opacity-0 group-hover:opacity-100 transition-opacity ${selectedLecturer?.id === lecturer.id ? 'opacity-100 text-indigo-600' : 'text-gray-400'}`} />
                                         </button>
                                         <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
-                                                onClick={() => handleViewCredentials(lecturer)}
-                                                className="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                                                onClick={() => handlePrintWorkload(lecturer)}
+                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                title="Print Workload"
+                                            >
+                                                <Printer size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedLecturer(lecturer);
+                                                    setIsWorkloadModalOpen(true);
+                                                }}
+                                                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                title="Manage Workload"
+                                            >
+                                                <Briefcase size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setCredentialsView(lecturer);
+                                                    setIsViewCredentialsModalOpen(true);
+                                                }}
+                                                className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                                                 title="View Credentials"
                                             >
-                                                <Key size={16} />
+                                                <Key size={18} />
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteLecturer(lecturer.id)}
-                                                className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                                                title="Delete"
+                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Delete Lecturer"
                                             >
-                                                <Trash2 size={16} />
+                                                <Trash2 size={18} />
                                             </button>
                                         </div>
                                     </li>
@@ -474,6 +603,20 @@ const Lecturers = () => {
                         <p className="mt-1 text-xs text-gray-500">
                             Stored temporarily for admin view.
                         </p>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
+                        <select
+                            required
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                            value={lecturerForm.department_id}
+                            onChange={(e) => setLecturerForm({ ...lecturerForm, department_id: e.target.value })}
+                        >
+                            <option value="">Select Department...</option>
+                            {departments.map(dept => (
+                                <option key={dept.id} value={dept.id}>{dept.code} - {dept.name}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div className="flex justify-end space-x-3 pt-4">
