@@ -203,34 +203,59 @@ const Assessments = () => {
         if (!selectedSubject) return;
         setLoading(true);
         try {
-            // 1. Get classes for subject
-            const { data: classesData, error: classesError } = await supabase
-                .from('classes')
-                .select('id')
-                .eq('subject_id', selectedSubject);
-
-            if (classesError) throw classesError;
-            const classIds = classesData.map(c => c.id);
-
-            // 2. Get Students
+            // 1. Get Student List
             let uniqueStudents = [];
-            if (classIds.length > 0) {
-                const { data: enrollmentsData, error: enrollmentsError } = await supabase
-                    .from('enrollments')
-                    .select(`
-                        student_id,
-                        students (id, name, matric_no, student_group)
-                    `)
-                    .in('class_id', classIds)
-                    .order('student_id');
+            let classIds = [];
 
-                if (enrollmentsError) throw enrollmentsError;
+            if (user.role === 'lecturer' && user.lecturer_id) {
+                // For lecturers, find groups from timetable
+                const { data: timetableData, error: timetableError } = await supabase
+                    .from('timetable')
+                    .select('group_names')
+                    .eq('lecturer_id', user.lecturer_id)
+                    .eq('subject_id', selectedSubject);
 
-                const uniqueStudentsMap = new Map();
-                enrollmentsData.forEach(e => {
-                    if (e.students) uniqueStudentsMap.set(e.students.id, e.students);
-                });
-                uniqueStudents = Array.from(uniqueStudentsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+                if (timetableError) throw timetableError;
+
+                const myGroups = [...new Set(timetableData?.flatMap(t => t.group_names || []).filter(Boolean))];
+
+                if (myGroups.length > 0) {
+                    const { data: studentData, error: studentError } = await supabase
+                        .from('students')
+                        .select('id, name, matric_no, student_group')
+                        .in('student_group', myGroups)
+                        .eq('faculty_id', user.faculty_id);
+
+                    if (studentError) throw studentError;
+                    uniqueStudents = (studentData || []).sort((a, b) => a.name.localeCompare(b.name));
+                }
+            } else {
+                // For admins, use classes -> enrollments
+                const { data: classesData, error: classesError } = await supabase
+                    .from('classes')
+                    .select('id')
+                    .eq('subject_id', selectedSubject);
+
+                if (classesError) throw classesError;
+                classIds = classesData.map(c => c.id);
+
+                if (classIds.length > 0) {
+                    const { data: enrollmentsData, error: enrollmentsError } = await supabase
+                        .from('enrollments')
+                        .select(`
+                            student_id,
+                            students (id, name, matric_no, student_group)
+                        `)
+                        .in('class_id', classIds);
+
+                    if (enrollmentsError) throw enrollmentsError;
+
+                    const uniqueStudentsMap = new Map();
+                    enrollmentsData.forEach(e => {
+                        if (e.students) uniqueStudentsMap.set(e.students.id, e.students);
+                    });
+                    uniqueStudents = Array.from(uniqueStudentsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+                }
             }
 
             // 3. Get All Grades for this subject (all assessments)
@@ -281,45 +306,66 @@ const Assessments = () => {
         setError(null);
 
         try {
-            // 1. Get students enrolled in this subject
-            // We find students via classes for this subject.
-            // Assumption: we want ALL students taking this subject.
-            // Complex join: students -> enrollments -> classes -> subject
-            // Or simpler: find classes for subject, get enrollments.
+            let uniqueStudents = [];
+            let classIds = [];
 
-            // Let's first look if we can get unique students from enrollments for classes of this subject.
-            const { data: classesData, error: classesError } = await supabase
-                .from('classes')
-                .select('id')
-                .eq('subject_id', selectedSubject);
+            if (user.role === 'lecturer' && user.lecturer_id) {
+                // Find groups from timetable
+                const { data: timetableData, error: timetableError } = await supabase
+                    .from('timetable')
+                    .select('group_names')
+                    .eq('lecturer_id', user.lecturer_id)
+                    .eq('subject_id', selectedSubject);
 
-            if (classesError) throw classesError;
+                if (timetableError) throw timetableError;
 
-            const classIds = classesData.map(c => c.id);
+                const myGroups = [...new Set(timetableData?.flatMap(t => t.group_names || []).filter(Boolean))];
 
-            if (classIds.length === 0) {
-                setError("No classes found for this subject. Cannot determine students.");
+                if (myGroups.length > 0) {
+                    const { data: studentData, error: studentError } = await supabase
+                        .from('students')
+                        .select('id, name, matric_no, student_group')
+                        .in('student_group', myGroups)
+                        .eq('faculty_id', user.faculty_id);
+
+                    if (studentError) throw studentError;
+                    uniqueStudents = (studentData || []).sort((a, b) => a.name.localeCompare(b.name));
+                }
+            } else {
+                // Admin logic: get students via classes
+                const { data: classesData, error: classesError } = await supabase
+                    .from('classes')
+                    .select('id')
+                    .eq('subject_id', selectedSubject);
+
+                if (classesError) throw classesError;
+                classIds = classesData.map(c => c.id);
+
+                if (classIds.length > 0) {
+                    const { data: enrollmentsData, error: enrollmentsError } = await supabase
+                        .from('enrollments')
+                        .select(`
+                            student_id,
+                            students (id, name, matric_no, student_group)
+                        `)
+                        .in('class_id', classIds);
+
+                    if (enrollmentsError) throw enrollmentsError;
+
+                    const uniqueStudentsMap = new Map();
+                    enrollmentsData.forEach(e => {
+                        if (e.students) uniqueStudentsMap.set(e.students.id, e.students);
+                    });
+                    uniqueStudents = Array.from(uniqueStudentsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+                }
+            }
+
+            if (uniqueStudents.length === 0) {
+                setError("No students found for this subject/lecturer.");
                 setGradingLoading(false);
                 return;
             }
 
-            const { data: enrollmentsData, error: enrollmentsError } = await supabase
-                .from('enrollments')
-                .select(`
-                    student_id,
-                    students (id, name, matric_no, student_group)
-                `)
-                .in('class_id', classIds)
-                .order('student_id'); // We'll sort by name later
-
-            if (enrollmentsError) throw enrollmentsError;
-
-            // Deduplicate students (if enrolled in multiple sections? unlikely but safe)
-            const uniqueStudentsMap = new Map();
-            enrollmentsData.forEach(e => {
-                if (e.students) uniqueStudentsMap.set(e.students.id, e.students);
-            });
-            const uniqueStudents = Array.from(uniqueStudentsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
             setStudents(uniqueStudents);
 
             // 2. Get existing grades

@@ -1,6 +1,6 @@
-
 import { useEffect, useState } from 'react';
 import { getGrade } from '../../utils/gradeUtils';
+import { getProgramName } from '../../utils/programUtils';
 
 const StudentMarksPrintTemplate = ({ subject, assessments, students, grades, lecturer }) => {
     // Chunk students into groups of 15
@@ -150,7 +150,7 @@ const StudentMarksPrintTemplate = ({ subject, assessments, students, grades, lec
                                 <div className="grid grid-cols-[140px_10px_1fr]">
                                     <span>PROGRAM</span>
                                     <span>:</span>
-                                    <span>AL MADKHAL LI AL-AKIDAH AL-ISLAMIAH</span> {/* Hardcoded based on image, or fetch? Defaulting for now */}
+                                    <span>{getProgramName(chunk?.[0]?.student_group)}</span>
                                 </div>
                             </div>
                             <div>

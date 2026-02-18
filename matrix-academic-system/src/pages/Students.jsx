@@ -8,6 +8,8 @@ import { Plus, Trash2, Users, Download, Upload, LayoutList, Layers, Eye, Chevron
 import StudentDetailsModal from '../components/student/StudentDetailsModal';
 import * as XLSX from 'xlsx';
 
+import { PROGRAMS } from '../utils/programUtils';
+
 const Students = () => {
     const { user } = useAuth();
     const [students, setStudents] = useState([]);
@@ -304,6 +306,47 @@ const Students = () => {
         }));
     };
 
+    // Helper to group students by Program
+    const getStudentsByProgram = () => {
+        const grouped = {};
+
+        // Initialize all programs with empty arrays
+        Object.keys(PROGRAMS).forEach(code => {
+            grouped[code] = [];
+        });
+        grouped['Unknown'] = [];
+
+        students.forEach(student => {
+            // Extract program code from student_group (e.g., "FA01 2A" -> "FA01")
+            // Fallback to matric_no if group is missing (e.g., "25FA01..." -> "FA01")
+            let programCode = 'Unknown';
+
+            if (student.student_group) {
+                const parts = student.student_group.split(' ');
+                if (parts.length > 0 && PROGRAMS[parts[0]]) {
+                    programCode = parts[0];
+                }
+            } else if (student.matric_no) {
+                // Try to find known program code in matric no
+                for (const code of Object.keys(PROGRAMS)) {
+                    if (student.matric_no.includes(code)) {
+                        programCode = code;
+                        break;
+                    }
+                }
+            }
+
+            grouped[programCode].push(student);
+        });
+
+        // Convert to array
+        return Object.keys(grouped).map(code => ({
+            code,
+            name: PROGRAMS[code] || 'Unknown Program',
+            students: grouped[code]
+        })).filter(group => group.students.length > 0 || PROGRAMS[group.code]); // Keep empty programs? Maybe just keep all to show structure
+    };
+
     const TableView = ({ data }) => {
         const isAllSelected = data.length > 0 && data.every(s => selectedStudents.includes(s.id));
         const isSomeSelected = data.some(s => selectedStudents.includes(s.id)) && !isAllSelected;
@@ -412,6 +455,16 @@ const Students = () => {
                             <Layers size={14} className="mr-1 sm:mr-2" />
                             Groups
                         </button>
+                        <button
+                            onClick={() => setViewMode('program')}
+                            className={`flex items-center px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-sm font-medium rounded-lg transition-all ${viewMode === 'program'
+                                ? 'bg-white dark:bg-slate-600 shadow text-gray-900 dark:text-white'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                }`}
+                        >
+                            <LayoutList size={14} className="mr-1 sm:mr-2" />
+                            Programs
+                        </button>
                     </div>
 
                     <button
@@ -468,6 +521,98 @@ const Students = () => {
                     {viewMode === 'all' ? (
                         <div className="bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-800 mb-6">
                             <TableView data={students} />
+                        </div>
+                    ) : viewMode === 'program' ? (
+                        <div className="space-y-4">
+                            {getStudentsByProgram().map((program) => {
+                                const isExpanded = expandedGroups.includes(program.code);
+                                return (
+                                    <div key={program.code} className="bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-800 transition-all">
+                                        <button
+                                            onClick={() => toggleGroup(program.code)}
+                                            className="w-full text-left px-5 py-4 focus:outline-none hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between"
+                                        >
+                                            <div className="flex items-center">
+                                                <div className={`p-2 rounded-lg mr-3 transition-colors ${isExpanded ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                                                    <LayoutList size={18} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white flex items-center">
+                                                        <span className="mr-2 font-mono text-gray-500">{program.code}</span>
+                                                        {program.name}
+                                                        <span className="ml-2 sm:ml-3 text-[9px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-slate-700 px-1.5 sm:px-2.5 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap">
+                                                            {program.students.length} Students
+                                                        </span>
+                                                    </h3>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+                                                    <ChevronDown size={20} className="text-gray-400" />
+                                                </div>
+                                            </div>
+                                        </button>
+
+                                        {isExpanded && (
+                                            <div className="border-t border-gray-50 dark:border-slate-800 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                {program.students.length > 0 ? (
+                                                    <TableView data={program.students} />
+                                                ) : (
+                                                    <div className="p-8 text-center text-gray-400 italic text-sm">
+                                                        No students enrolled in this program yet.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : viewMode === 'program' ? (
+                        <div className="space-y-4">
+                            {getStudentsByProgram().map((program) => {
+                                const isExpanded = expandedGroups.includes(program.code);
+                                return (
+                                    <div key={program.code} className="bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-800 transition-all">
+                                        <button
+                                            onClick={() => toggleGroup(program.code)}
+                                            className="w-full text-left px-5 py-4 focus:outline-none hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between"
+                                        >
+                                            <div className="flex items-center">
+                                                <div className={`p-2 rounded-lg mr-3 transition-colors ${isExpanded ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                                                    <LayoutList size={18} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white flex items-center">
+                                                        <span className="mr-2 font-mono text-gray-500">{program.code}</span>
+                                                        {program.name}
+                                                        <span className="ml-2 sm:ml-3 text-[9px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-slate-700 px-1.5 sm:px-2.5 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap">
+                                                            {program.students.length} Students
+                                                        </span>
+                                                    </h3>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+                                                    <ChevronDown size={20} className="text-gray-400" />
+                                                </div>
+                                            </div>
+                                        </button>
+
+                                        {isExpanded && (
+                                            <div className="border-t border-gray-50 dark:border-slate-800 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                {program.students.length > 0 ? (
+                                                    <TableView data={program.students} />
+                                                ) : (
+                                                    <div className="p-8 text-center text-gray-400 italic text-sm">
+                                                        No students enrolled in this program yet.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="space-y-4">

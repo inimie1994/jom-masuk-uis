@@ -46,62 +46,58 @@ const Attendance = () => {
     const [allMonthsData, setAllMonthsData] = useState([]); // Array of { month, dates, attendanceData }
     const [isGeneratingPrint, setIsGeneratingPrint] = useState(false);
 
-    // Initial Fetch: Groups
+    // Initial Fetch: Subjects
     useEffect(() => {
         if (user?.faculty_id) {
-            fetchGroups();
+            fetchSubjects();
         }
     }, [user?.faculty_id]);
 
-    // When Group changes, fetch Subjects & Students
+    // When Subject changes, fetch Groups
+    useEffect(() => {
+        if (selectedSubject) {
+            fetchGroups(selectedSubject);
+            setSelectedGroup(''); // Reset group when subject changes
+            setStudents([]);
+            setAttendanceData({});
+        } else {
+            setGroups([]);
+        }
+    }, [selectedSubject]);
+
+    // When Group changes, fetch Students
     useEffect(() => {
         if (selectedGroup) {
-            fetchSubjects();
             fetchStudents();
-            setAttendanceData({}); // Clear old data
         } else {
-            setSubjects([]);
             setStudents([]);
         }
     }, [selectedGroup]);
 
-    // When Subject or Month changes, fetch Timetable & Attendance Data
+    // When Subject, Group or Month changes, fetch Timetable & Attendance Data
     useEffect(() => {
         if (selectedGroup && selectedSubject && selectedMonth) {
             fetchTimetableAndAttendance();
         }
     }, [selectedGroup, selectedSubject, selectedMonth]);
 
-    const fetchGroups = async () => {
+    const fetchGroups = async (subjectId) => {
         try {
+            // Find groups that take this subject from the timetable
             let query = supabase
-                .from('students')
-                .select('student_group')
-                .eq('faculty_id', user.faculty_id)
-                .not('student_group', 'is', null);
+                .from('timetable')
+                .select('group_names')
+                .eq('subject_id', subjectId);
 
-            // Lecturer filter logic
             if (user.role === 'lecturer' && user.lecturer_id) {
-                // Fetch groups from timetable
-                const { data: timetableData } = await supabase
-                    .from('timetable')
-                    .select('group_names')
-                    .eq('lecturer_id', user.lecturer_id);
-
-                const myGroups = [...new Set(timetableData?.flatMap(t => t.group_names || []).filter(Boolean))];
-
-                if (myGroups.length > 0) {
-                    query = query.in('student_group', myGroups);
-                } else {
-                    setGroups([]);
-                    return;
-                }
+                query = query.eq('lecturer_id', user.lecturer_id);
             }
 
             const { data, error } = await query;
             if (error) throw error;
-            const uniqueGroups = [...new Set(data.map(item => item.student_group))].sort();
-            setGroups(uniqueGroups);
+
+            const allGroups = [...new Set(data?.flatMap(t => t.group_names || []).filter(Boolean))].sort();
+            setGroups(allGroups);
         } catch (err) {
             console.error('Error fetching groups:', err);
         }
@@ -109,37 +105,39 @@ const Attendance = () => {
 
     const fetchSubjects = async () => {
         try {
-            // Fetch subjects associated with this group via timetables or classes
-            // For simplicity, we can just fetch all subjects or filter by what the group is enrolled in.
-            // A better approach is to fetch distinct subjects from the 'timetable' for this group.
-
-            let query = supabase
-                .from('timetable')
-                .select(`
-                    subject_id,
-                    subjects (id, code, name)
-                `)
-                .filter('group_names', 'cs', `{${selectedGroup}}`);
+            let query;
 
             if (user.role === 'lecturer' && user.lecturer_id) {
-                query = query.eq('lecturer_id', user.lecturer_id);
+                // For lecturers, only show subjects they teach
+                query = supabase
+                    .from('timetable')
+                    .select('subject_id, subjects(id, code, name)')
+                    .eq('lecturer_id', user.lecturer_id);
+
+                const { data, error } = await query;
+                if (error) throw error;
+
+                // Deduplicate
+                const uniqueSubjects = [];
+                const seen = new Set();
+                data.forEach(item => {
+                    if (item.subjects && !seen.has(item.subject_id)) {
+                        seen.add(item.subject_id);
+                        uniqueSubjects.push(item.subjects);
+                    }
+                });
+                setSubjects(uniqueSubjects.sort((a, b) => a.code.localeCompare(b.code)));
+            } else {
+                // For admins, show all subjects in faculty
+                const { data, error } = await supabase
+                    .from('subjects')
+                    .select('id, code, name')
+                    .eq('faculty_id', user.faculty_id)
+                    .order('code');
+
+                if (error) throw error;
+                setSubjects(data || []);
             }
-
-            const { data, error } = await query;
-
-            if (error) throw error;
-
-            // Deduplicate subjects
-            const uniqueSubjects = [];
-            const map = new Map();
-            data.forEach(item => {
-                if (!map.has(item.subject_id)) {
-                    map.set(item.subject_id, true);
-                    if (item.subjects) uniqueSubjects.push(item.subjects);
-                }
-            });
-
-            setSubjects(uniqueSubjects.sort((a, b) => a.code.localeCompare(b.code)));
         } catch (err) {
             console.error('Error fetching subjects:', err);
         }
@@ -751,29 +749,29 @@ const Attendance = () => {
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Group</label>
-                            <select
-                                value={selectedGroup}
-                                onChange={(e) => setSelectedGroup(e.target.value)}
-                                className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border w-64 transition-all"
-                            >
-                                <option value="">Select Group...</option>
-                                {groups.map(g => (
-                                    <option key={g} value={g}>{g}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Subject</label>
                             <select
                                 value={selectedSubject}
                                 onChange={(e) => setSelectedSubject(e.target.value)}
-                                disabled={!selectedGroup}
-                                className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border w-64 transition-all disabled:opacity-50"
+                                className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border w-64 transition-all"
                             >
                                 <option value="">Select Subject...</option>
                                 {subjects.map(s => (
                                     <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Group</label>
+                            <select
+                                value={selectedGroup}
+                                onChange={(e) => setSelectedGroup(e.target.value)}
+                                disabled={!selectedSubject}
+                                className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border w-64 transition-all disabled:opacity-50"
+                            >
+                                <option value="">Select Group...</option>
+                                {groups.map(g => (
+                                    <option key={g} value={g}>{g}</option>
                                 ))}
                             </select>
                         </div>
