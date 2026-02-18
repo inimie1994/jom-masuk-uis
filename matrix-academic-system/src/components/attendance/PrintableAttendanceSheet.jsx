@@ -36,10 +36,10 @@ const PrintableAttendanceSheet = ({
     const totalPages = Math.ceil(students.length / STUDENTS_PER_PAGE);
 
     return (
-        <div className={`printable-attendance-sheet hidden print:block print:w-full bg-white text-black text-[10px] font-sans leading-tight ${className || ''}`}>
+        <div className={`printable-attendance-sheet hidden print:block print:w-full bg-white text-black text-[9px] font-sans leading-tight ${className || ''}`}>
             <style type="text/css" media="print">
                 {`
-                    @page { size: landscape; margin: 10mm; }
+                    @page { size: landscape; margin: 5mm; }
                     
                     /* Hide everything in the body by default during print */
                     @media print {
@@ -103,43 +103,38 @@ const PrintableAttendanceSheet = ({
 
                         {/* Header / Logo Section */}
                         <div className="border border-black flex mb-2">
-                            <div className="w-15 border-r border-black p-1 flex items-center justify-center">
-                                <img src={logoUrl || "/vite.svg"} alt="Logo" className={`h-10 w-auto ${!logoUrl ? 'grayscale' : 'object-contain'}`} />
+                            <div className="w-15 border-r border-black p-0.5 flex items-center justify-center">
+                                <img src={logoUrl || "/vite.svg"} alt="Logo" className={`h-[35px] w-auto ${!logoUrl ? 'grayscale' : 'object-contain'}`} />
                             </div>
                             <div className="flex-1 flex flex-col justify-center text-center font-bold">
-                                <div className="border-b border-black py-1 text-lg">UNIVERSITI ISLAM SELANGOR</div>
-                                <div className="py-1 text-lg">BORANG KEHADIRAN PELAJAR</div>
+                                <div className="border-b border-black py-0.5 text-lg">UNIVERSITI ISLAM SELANGOR</div>
+                                <div className="py-0.5 text-lg">BORANG KEHADIRAN PELAJAR</div>
                             </div>
                         </div>
 
                         {/* Info Section */}
-                        <div className="grid grid-cols-2 gap-x-4 mb-2 font-bold uppercase text-[9px]">
-                            <div className="grid grid-cols-[80px_5px_1fr] gap-y-0.5">
+                        <div className="grid grid-cols-2 gap-x-4 mb-1 font-bold uppercase text-[8px]">
+                            <div className="grid grid-cols-[80px_5px_1fr] gap-y-0">
                                 <div>NAMA TENAGA</div>
                                 <div>:</div>
                                 <div className="uppercase">{lecturerName || "__________________________"}</div>
-
                                 <div>PROGRAM</div>
                                 <div>:</div>
                                 <div>{group}</div>
-
                                 <div>KOD</div>
                                 <div>:</div>
                                 <div>{subject?.code}</div>
-
                                 <div>BULAN</div>
                                 <div>:</div>
                                 <div>{getMonthName(month)}</div>
                             </div>
-                            <div className="grid grid-cols-[120px_5px_1fr] gap-y-0.5">
+                            <div className="grid grid-cols-[120px_5px_1fr] gap-y-0">
                                 <div>SESI/ TAHUN AKADEMIK</div>
                                 <div>:</div>
                                 <div>2025/2026</div>
-
                                 <div>SEMESTER/ KUMPULAN</div>
                                 <div>:</div>
                                 <div>{group}</div>
-
                                 <div>KURSUS</div>
                                 <div>:</div>
                                 <div>{subject?.name}</div>
@@ -147,19 +142,19 @@ const PrintableAttendanceSheet = ({
                         </div>
 
                         {/* Table */}
-                        <table className="w-full border-collapse border border-black text-center mb-2 print-table">
+                        <table className="w-full border-collapse border border-black text-center mb-1 print-table">
                             <thead>
                                 <tr className="bg-gray-200 print:bg-gray-200">
                                     <th className="border border-black w-8" rowSpan={2} style={{ verticalAlign: 'middle' }}>BIL.</th>
                                     <th className="border border-black w-24" rowSpan={2} style={{ verticalAlign: 'middle' }}>NO. MATRIK</th>
                                     <th className="border border-black text-left px-2" rowSpan={2} style={{ verticalAlign: 'middle' }}>NAMA</th>
-                                    <th className="border border-black h-6" colSpan={totalColumns} style={{ verticalAlign: 'middle' }}>TARIKH</th>
+                                    <th className="border border-black h-[20px]" colSpan={totalColumns} style={{ verticalAlign: 'middle' }}>TARIKH</th>
                                     <th className="border border-black w-12" rowSpan={2} style={{ verticalAlign: 'middle' }}>JUMLAH</th>
                                     <th className="border border-black w-20" rowSpan={2} style={{ verticalAlign: 'middle' }}>CATATAN</th>
                                 </tr>
-                                <tr className="h-6">
+                                <tr className="h-[20px]">
                                     {displayDates.map((col, idx) => (
-                                        <th key={idx} className={`border border-black text-[8px] w-6 h-6 font-normal ${col?.isHoliday ? 'bg-gray-300' : ''}`} style={{ minWidth: '24px' }}>
+                                        <th key={idx} className={`border border-black text-[8px] w-6 h-[20px] font-normal ${col?.isHoliday ? 'bg-gray-300' : ''}`} style={{ minWidth: '24px' }}>
                                             {/* Ensure dates are only shown if they exist, otherwise empty */}
                                             {col ? col.displayDate : ''}
                                         </th>
@@ -168,7 +163,7 @@ const PrintableAttendanceSheet = ({
                             </thead>
                             <tbody>
                                 {currentStudents.map((student, idx) => (
-                                    <tr key={student.id} className="h-6">
+                                    <tr key={student.id} className="h-[20px]">
                                         <td className="border border-black">{(pageIndex * STUDENTS_PER_PAGE) + idx + 1}</td>
                                         <td className="border border-black text-left px-1">{student.matric_no}</td>
                                         <td className="border border-black text-left px-2 uppercase">{student.name}</td>
@@ -196,7 +191,7 @@ const PrintableAttendanceSheet = ({
 
                         {/* Holiday Notes */}
                         {dates.filter(d => d.isHoliday).length > 0 && (
-                            <div className="mb-4 text-[9px]">
+                            <div className="mb-2 text-[8px]">
                                 <span className="font-bold underline italic">*NOTA:</span>
                                 <ul className="list-none p-0 inline-flex flex-wrap gap-x-4 ml-2">
                                     {[...new Map(dates.filter(d => d.isHoliday).map(d => [d.date, d])).values()]
@@ -215,24 +210,24 @@ const PrintableAttendanceSheet = ({
                         <div className="flex-1"></div>
 
                         {/* Footer / Notes */}
-                        <div className="text-center text-[8px] italic mb-8">
+                        <div className="text-center text-[7px] italic mb-4">
                             (NOTA: SIMPAN BORANG DALAM FAIL KURSUS)
                         </div>
 
-                        <div className="font-bold mb-12">
+                        <div className="font-bold mb-4 text-[9px]">
                             DIPERAKUKAN KELAS PENGAJARAN DI ATAS TELAH DILAKSANAKAN.
                         </div>
-
+                        <br />
                         <div className="flex justify-between items-end px-4">
                             <div className="text-center w-64">
-                                <div className="mb-2">Disediakan oleh:</div>
-                                <div className="border-b border-black border-dashed mb-1 h-12"></div>
-                                <div className="text-left text-[8px]">Tarikh:</div>
+                                <div className="mb-0.5 text-[8px]">Disediakan oleh:</div>
+                                <div className="border-b border-black border-dashed mb-0.5 h-6"></div>
+                                <div className="text-left text-[7px]">Tarikh:</div>
                             </div>
                             <div className="text-center w-64">
-                                <div className="mb-2">Disemak dan disahkan oleh:</div>
-                                <div className="border-b border-black border-dashed mb-1 h-12"></div>
-                                <div className="text-center text-[8px]">Tarikh:</div>
+                                <div className="mb-0.5 text-[8px]">Disemak dan disahkan oleh:</div>
+                                <div className="border-b border-black border-dashed mb-0.5 h-6"></div>
+                                <div className="text-center text-[7px]">Tarikh:</div>
                             </div>
                         </div>
                     </div>
