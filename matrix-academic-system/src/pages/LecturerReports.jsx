@@ -404,9 +404,36 @@ const LecturerReports = () => {
         };
 
         return (
-            <div className="hidden print:block font-serif text-black p-4">
+            <div className="printable-pdp-form hidden print:block font-serif text-black p-4">
                 <style>{`
                     @media print {
+                        /* Hide everything in the body by default during print */
+                        body > * {
+                            visibility: hidden !important;
+                        }
+                        
+                        /* Show only our printable component and its children */
+                        .printable-pdp-form,
+                        .printable-pdp-form * {
+                            visibility: visible !important;
+                        }
+                        
+                        /* Position the print content at the very top left */
+                        .printable-pdp-form {
+                            position: absolute !important;
+                            left: 0 !important;
+                            top: 0 !important;
+                            width: 100% !important;
+                            display: block !important;
+                        }
+
+                        /* Force all parents to allow overflow and height for pagination */
+                        html, body, #root, [class*="MainLayout"], [class*="layout"], [class*="container"] {
+                            height: auto !important;
+                            overflow: visible !important;
+                            display: block !important;
+                        }
+
                         thead { display: table-header-group; }
                         tfoot { display: table-footer-group; }
                         tr { page-break-inside: avoid; }

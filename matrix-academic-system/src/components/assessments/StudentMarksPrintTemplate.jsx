@@ -67,24 +67,48 @@ const StudentMarksPrintTemplate = ({ subject, assessments, students, grades, lec
     };
 
     return (
-        <div className="print-container bg-white text-black p-8 font-sans text-xs print:p-0">
+        <div className="printable-marks-sheet print-container bg-white text-black p-8 font-sans text-xs print:p-0">
             <style>
                 {`
                     @page {
                         size: A4 landscape;
                         margin: 10mm;
                     }
+
                     @media print {
-                        body {
-                            -webkit-print-color-adjust: exact;
+                        /* Hide everything in the body by default during print */
+                        body > * {
+                            visibility: hidden !important;
                         }
-                        .print-hidden {
-                            display: none !important;
+                        
+                        /* Show only our printable component and its children */
+                        .printable-marks-sheet,
+                        .printable-marks-sheet * {
+                            visibility: visible !important;
+                        }
+                        
+                        /* Position the print content at the very top left */
+                        .printable-marks-sheet {
+                            position: absolute !important;
+                            left: 0 !important;
+                            top: 0 !important;
+                            width: 100% !important;
+                            display: block !important;
+                        }
+
+                        /* Force all parents to allow overflow and height for pagination */
+                        html, body, #root, [class*="MainLayout"], [class*="layout"], [class*="container"] {
+                            height: auto !important;
+                            overflow: visible !important;
+                            display: block !important;
+                        }
+
+                        .page-break {
+                            page-break-after: always !important;
+                            page-break-inside: avoid !important;
                         }
                     }
-                    .page-break {
-                        page-break-after: always;
-                    }
+
                     table {
                         width: 100%;
                         border-collapse: collapse;
@@ -98,13 +122,12 @@ const StudentMarksPrintTemplate = ({ subject, assessments, students, grades, lec
                     th.bg-gray {
                         background-color: #d1d5db !important; /* Tailwind gray-300 */
                         color: black !important;
-                    }
                     .text-left { text-align: left; }
                 `}
             </style>
 
             {studentChunks.map((chunk, pageIndex) => (
-                <div key={pageIndex} className="page-break flex flex-col h-[95vh] justify-between relative">
+                <div key={pageIndex} className="page-break flex flex-col justify-between relative min-h-screen">
                     {/* 95vh to ensure fit within page, updated relative positioning */}
 
                     {/* --- HEADER --- */}
@@ -305,8 +328,9 @@ const StudentMarksPrintTemplate = ({ subject, assessments, students, grades, lec
                     </div>
 
                 </div>
-            ))}
-        </div>
+            ))
+            }
+        </div >
     );
 };
 
