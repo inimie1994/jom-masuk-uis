@@ -282,6 +282,8 @@ const Timetable = () => {
 
             const payload = {
                 ...formData,
+                lecturer_id: formData.lecturer_id || null,
+                subject_id: formData.subject_id || null,
                 faculty_id: user?.faculty_id
             };
 

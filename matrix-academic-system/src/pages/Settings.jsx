@@ -217,84 +217,82 @@ const Settings = () => {
             return;
         }
 
-        if (!confirm('This will import holidays from Google Calendar for the current semester range. Continue?')) return;
+        if (!confirm('This will import Public Holidays for Malaysia based on the semester duration. Continue?')) return;
 
         setLoadingHolidays(true);
         setMessage(null);
 
         try {
-            // Google Calendar ICS URL for Malaysia Holidays
-            const calendarUrl = 'https://calendar.google.com/calendar/ical/en.malaysia%23holiday%40group.v.calendar.google.com/public/basic.ics';
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(calendarUrl)}`;
-
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error(`External service error: ${response.status} ${response.statusText}`);
-
-            const text = await response.text();
-            if (!text || !text.includes('BEGIN:VEVENT')) {
-                throw new Error('Invalid or empty calendar data received');
-            }
-
-            // Regex to parse VEVENTs
-            const eventBlocks = text.split('BEGIN:VEVENT').slice(1);
-            const newHolidays = [];
-
             const semStart = new Date(semesterStart);
             const semEnd = new Date(semesterEnd);
+            const startYear = semStart.getFullYear();
+            const endYear = semEnd.getFullYear();
 
-            // Normalize dates to start of day for comparison
+            // Create list of years to fetch
+            const yearsToFetch = [];
+            for (let y = startYear; y <= endYear; y++) {
+                yearsToFetch.push(y);
+            }
+
+            // Fetch holidays for each year from Nager.Date API
+            // API Docs: https://date.nager.at/Api
+            const allFetchedHolidays = [];
+
+            for (const year of yearsToFetch) {
+                try {
+                    const response = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/MY`);
+                    if (!response.ok) throw new Error(`Failed to fetch for ${year}`);
+                    const data = await response.json();
+                    allFetchedHolidays.push(...data);
+                } catch (err) {
+                    console.error(`Error fetching holidays for ${year}:`, err);
+                    // Continue to next year even if one fails
+                }
+            }
+
+            if (allFetchedHolidays.length === 0) {
+                throw new Error('No holiday data could be retrieved.');
+            }
+
+            // Normalize and Filter
             semStart.setHours(0, 0, 0, 0);
             semEnd.setHours(23, 59, 59, 999);
 
-            eventBlocks.forEach(block => {
-                if (!block.includes('END:VEVENT')) return;
+            const holidaysToInsert = [];
+            const seenDates = new Set(); // Avoid duplicates from API or overlap
 
-                // Extract Summary (Name) - handle potential multi-line and different line endings
-                const summaryMatch = block.match(/SUMMARY:(.*?)(?:\r\n|\r|\n)/);
-                let name = summaryMatch ? summaryMatch[1].trim() : 'Unknown Holiday';
-                // Remove backslash escapes common in ICS
-                name = name.replace(/\\,/g, ',').replace(/\\;/g, ';');
+            allFetchedHolidays.forEach(h => {
+                const hDate = new Date(h.date);
+                hDate.setHours(0, 0, 0, 0);
 
-                // Extract Start Date
-                // Format: DTSTART;VALUE=DATE:20250101 or DTSTART:20250101T000000Z
-                const dtStartMatch = block.match(/DTSTART(?:;VALUE=DATE)?:(\d{8})/);
+                if (hDate >= semStart && hDate <= semEnd) {
+                    // Use localName if available, else name
+                    const name = h.localName || h.name;
+                    const dateStr = h.date; // YYYY-MM-DD
 
-                if (dtStartMatch) {
-                    const dateStr = dtStartMatch[1]; // YYYYMMDD
-                    const year = parseInt(dateStr.substring(0, 4));
-                    const month = parseInt(dateStr.substring(4, 6)) - 1;
-                    const day = parseInt(dateStr.substring(6, 8));
-
-                    const dateObj = new Date(year, month, day);
-
-                    // Filter by Semester Range
-                    if (dateObj >= semStart && dateObj <= semEnd) {
-                        const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-                        // Check for duplicates within this batch
-                        if (!newHolidays.find(h => h.date === formattedDate)) {
-                            newHolidays.push({
-                                faculty_id: user.faculty_id,
-                                name: name,
-                                date: formattedDate
-                            });
-                        }
+                    if (!seenDates.has(dateStr)) {
+                        seenDates.add(dateStr);
+                        holidaysToInsert.push({
+                            faculty_id: user.faculty_id,
+                            name: name,
+                            date: dateStr
+                        });
                     }
                 }
             });
 
-            if (newHolidays.length === 0) {
+            if (holidaysToInsert.length === 0) {
                 setMessage({ type: 'info', text: 'No holidays found within the specified semester dates.' });
             } else {
-                // Insert into Supabase (Upsert to avoid duplicates)
+                // Upsert to Supabase
                 const { error: upsertError } = await supabase
                     .from('holidays')
-                    .upsert(newHolidays, { onConflict: 'faculty_id, date' });
+                    .upsert(holidaysToInsert, { onConflict: 'faculty_id, date' });
 
                 if (upsertError) throw upsertError;
 
                 await fetchHolidays();
-                setMessage({ type: 'success', text: `Successfully imported ${newHolidays.length} holidays.` });
+                setMessage({ type: 'success', text: `Successfully imported ${holidaysToInsert.length} holidays.` });
             }
 
         } catch (err) {
