@@ -150,7 +150,7 @@ const Attendance = () => {
                 .select('id, name, matric_no')
                 .eq('faculty_id', user.faculty_id)
                 .eq('student_group', selectedGroup)
-                .order('name');
+                .order('matric_no');
 
             if (error) throw error;
             setStudents(data || []);

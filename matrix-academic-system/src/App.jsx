@@ -20,6 +20,7 @@ import Settings from './pages/Settings';
 import LecturerDashboard from './pages/LecturerDashboard';
 import MyStudents from './pages/MyStudents';
 import LecturerTimetable from './pages/LecturerTimetable';
+import LecturerReports from './pages/LecturerReports';
 
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -41,6 +42,7 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="lecturer-dashboard" element={<LecturerDashboard />} />
               <Route path="lecturer-timetable" element={<LecturerTimetable />} />
+              <Route path="lecturer-reports" element={<LecturerReports />} />
               <Route path="my-students" element={<MyStudents />} />
               <Route path="students" element={<Students />} />
               <Route path="lecturers" element={<Lecturers />} />

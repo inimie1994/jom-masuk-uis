@@ -99,7 +99,7 @@ const MyStudents = () => {
                 .from('students')
                 .select('id, name, matric_no, email, student_group')
                 .in('student_group', myGroups)
-                .order('name');
+                .order('matric_no');
 
             if (studentsError) throw studentsError;
 
@@ -175,7 +175,7 @@ const MyStudents = () => {
             }
             return acc;
         }, new Map()).values()
-    ).sort((a, b) => a.name.localeCompare(b.name));
+    ).sort((a, b) => a.matric_no.localeCompare(b.matric_no));
 
     return (
         <div className="space-y-6">

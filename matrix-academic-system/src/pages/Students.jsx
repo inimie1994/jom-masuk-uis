@@ -59,7 +59,7 @@ const Students = () => {
                 .from('students')
                 .select('*')
                 .eq('faculty_id', user.faculty_id)
-                .order('name', { ascending: true });
+                .order('matric_no', { ascending: true });
 
             if (error) throw error;
             setStudents(data || []);

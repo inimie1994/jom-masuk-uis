@@ -364,39 +364,62 @@ const Lecturers = () => {
                         ) : workloads.length > 0 ? (
                             <div className="p-4 grid grid-cols-1 gap-4">
                                 {workloads.map((work) => (
-                                    <div key={work.id} className="flex items-center justify-between p-4 border border-gray-100 dark:border-slate-700 rounded-lg bg-gray-50/50 dark:bg-slate-800/50 group">
-                                        <div className="flex items-start space-x-4">
-                                            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg text-indigo-600 dark:text-indigo-400">
-                                                <BookOpen size={20} />
-                                            </div>
-                                            <div>
-                                                <h4 className="font-semibold text-gray-900 dark:text-gray-100">
-                                                    {work.subjects?.code}
-                                                    {work.displayReference && <span className="text-indigo-600 dark:text-indigo-400 ml-1">({work.displayReference})</span>}
-                                                    <span className="text-gray-400 mx-1">-</span>
+                                    <div key={work.id} className="relative bg-white dark:bg-slate-900/40 rounded-2xl border border-gray-100 dark:border-slate-800 p-5 shadow-sm hover:shadow-pastel transition-all group overflow-hidden">
+                                        {/* Background accent */}
+                                        <div className={`absolute top-0 left-0 w-1.5 h-full ${work.type === 'Lecture' ? 'bg-indigo-400' :
+                                            work.type === 'Tutorial' ? 'bg-emerald-400' : 'bg-amber-400'
+                                            }`}></div>
+
+                                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                                            <div className="flex-1">
+                                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                    <span className="text-xs font-black tracking-widest text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded uppercase">
+                                                        {work.subjects?.code}
+                                                    </span>
+                                                    <div className="flex items-center space-x-3 text-[10px] uppercase font-bold tracking-widest text-gray-400">
+                                                        <span className="flex items-center">
+                                                            <div className={`w-2 h-2 rounded-full mr-2 ${work.type === 'Lecture' ? 'bg-blue-400' :
+                                                                work.type === 'Tutorial' ? 'bg-emerald-400' : 'bg-amber-400'
+                                                                }`}></div>
+                                                            {work.type}
+                                                        </span>
+                                                        <span className="flex items-center">
+                                                            <Clock size={12} className="mr-1" />
+                                                            {work.hours} Hr{work.hours > 1 ? 's' : ''}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
                                                     {work.subjects?.name}
                                                 </h4>
-                                                <div className="flex items-center mt-1 space-x-4 text-sm text-gray-500 dark:text-gray-400">
-                                                    <span className="flex items-center">
-                                                        <span className={`w-2 h-2 rounded-full mr-2 ${work.type === 'Lecture' ? 'bg-blue-400' :
-                                                            work.type === 'Tutorial' ? 'bg-green-400' : 'bg-orange-400'
-                                                            }`}></span>
-                                                        {work.type}
-                                                    </span>
-                                                    {/* Removed old student_group badge as it's now in the title */}
-                                                    <span className="flex items-center">
-                                                        <Clock size={14} className="mr-1" />
-                                                        {work.hours} Hour{work.hours > 1 ? 's' : ''}
-                                                    </span>
+
+                                                {/* Groups Section */}
+                                                <div className="flex flex-col gap-1.5">
+                                                    <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Assigned Groups</span>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {(work.displayReference || 'No groups assigned').split(',').map((group, idx) => (
+                                                            <span
+                                                                key={idx}
+                                                                className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm"
+                                                            >
+                                                                {group.trim()}
+                                                            </span>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
+
+                                            <div className="flex sm:flex-col items-center justify-end gap-2">
+                                                <button
+                                                    onClick={() => handleDeleteWorkload(work.id)}
+                                                    className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all border border-transparent hover:border-red-100 dark:hover:border-red-900/30"
+                                                    title="Remove Assignment"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
                                         </div>
-                                        <button
-                                            onClick={() => handleDeleteWorkload(work.id)}
-                                            className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 p-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
                                     </div>
                                 ))}
                                 <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-700 flex justify-end text-sm font-medium text-gray-600 dark:text-gray-300">
