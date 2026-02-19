@@ -216,6 +216,8 @@ const Attendance = () => {
                         s.start_time === slot.start_time
                     );
 
+                    const isCancelled = matchedSession && matchedSession.class_type === 'CANCELLED';
+
                     dates.push({
                         date: dateStr, // YYYY-MM-DD
                         dayName: dayName,
@@ -227,7 +229,8 @@ const Attendance = () => {
                         isHoliday: isHoliday,
                         holidayName: holidayName,
                         sessionId: matchedSession ? matchedSession.id : null,
-                        isVirtual: !matchedSession // detailed flag
+                        isVirtual: !matchedSession,
+                        isCancelled: isCancelled
                     });
                 });
             }
@@ -235,6 +238,10 @@ const Attendance = () => {
 
         // 2. Add Extra Sessions (Postponed/Rescheduled) that are NOT in standard timetable slots
         existingSessions.forEach(session => {
+            // For extra sessions, if they are cancelled, we typically just hide them?
+            // Or if it was a "moved" session that got cancelled? 
+            // Let's just show them as dimmed too if they exist.
+
             // Check if this session is already accounted for in the generated dates
             const exists = dates.find(d =>
                 d.date === session.date &&
@@ -872,8 +879,50 @@ const Attendance = () => {
     };
 
     const handleDeleteSession = async () => {
-        if (!editingColumn?.sessionId) return;
+        if (!editingColumn) return;
 
+        // Scenerio 1: Standard Slot (Cancel it)
+        if (!editingColumn.sessionId) {
+            if (!window.confirm("This is a standard timetable slot. Do you want to CANCEL this class for this specific date? It will be removed from the attendance list.")) {
+                return;
+            }
+
+            setSaving(true);
+            try {
+                // Find timetable entry details
+                const timetableEntry = timetable.find(t => t.id === editingColumn.timetableId);
+                if (!timetableEntry) throw new Error("Source timetable entry not found");
+
+                const { error: insertError } = await supabase
+                    .from('attendance_sessions')
+                    .insert([{
+                        group_names: timetableEntry.group_names || [selectedGroup],
+                        subject_id: selectedSubject,
+                        date: editingColumn.date, // Cancel THIS date
+                        start_time: editingColumn.startTime,
+                        end_time: editingColumn.endTime,
+                        class_type: 'CANCELLED', // Mark as cancelled
+                        room: timetableEntry.room,
+                        lecturer_id: timetableEntry.lecturer_id,
+                        faculty_id: user.faculty_id
+                    }]);
+
+                if (insertError) throw insertError;
+
+                setSuccessMessage("Class cancelled successfully.");
+                setIsEditModalOpen(false);
+                setEditingColumn(null);
+                fetchTimetableAndAttendance();
+            } catch (err) {
+                console.error("Error cancelling session:", err);
+                setError(err.message || "Failed to cancel session.");
+            } finally {
+                setSaving(false);
+            }
+            return;
+        }
+
+        // Scenario 2: Existing Session (Delete it)
         if (!window.confirm("Are you sure you want to delete this session? This action cannot be undone.")) {
             return;
         }
@@ -948,7 +997,7 @@ const Attendance = () => {
             //    If it was real (sessionId!=null), we Update.
 
             if (sessionId) {
-                // Update Existing
+                // Scenario A: Update Existing Session
                 const { error: updateError } = await supabase
                     .from('attendance_sessions')
                     .update({
@@ -958,18 +1007,15 @@ const Attendance = () => {
                     })
                     .eq('id', sessionId);
 
-                if (updateError) {
-                    console.error("Supabase Update Error:", updateError);
-                    throw updateError;
-                }
+                if (updateError) throw updateError;
                 setSuccessMessage("Session updated successfully.");
 
             } else {
-                // Create New (Virtual -> Real)
-                // We need more details from the column/timetable
+                // Scenario B: Edit Standard Timetable Slot (Virtual -> Real)
                 const timetableEntry = timetable.find(t => t.id === editingColumn.timetableId);
                 if (!timetableEntry) throw new Error("Source timetable entry not found");
 
+                // 1. Create the NEW session
                 const { error: insertError } = await supabase
                     .from('attendance_sessions')
                     .insert([{
@@ -984,10 +1030,30 @@ const Attendance = () => {
                         faculty_id: user.faculty_id
                     }]);
 
-                if (insertError) {
-                    console.error("Supabase Insert Error:", insertError);
-                    throw insertError;
+                if (insertError) throw insertError;
+
+                // 2. SMART MOVE: If the date changed, CANCEL the original standard slot
+                if (newDateStr !== editingColumn.date) {
+                    const { error: cancelError } = await supabase
+                        .from('attendance_sessions')
+                        .insert([{
+                            group_names: timetableEntry.group_names || [selectedGroup],
+                            subject_id: selectedSubject,
+                            date: editingColumn.date, // ORIGINAL Date to cancel
+                            start_time: editingColumn.startTime, // ORIGINAL Time
+                            end_time: editingColumn.endTime,
+                            class_type: 'CANCELLED',
+                            room: timetableEntry.room,
+                            lecturer_id: timetableEntry.lecturer_id,
+                            faculty_id: user.faculty_id
+                        }]);
+
+                    if (cancelError) {
+                        console.error("Warning: Failed to cancel original slot during move", cancelError);
+                        // We don't block the main success, just log warning
+                    }
                 }
+
                 setSuccessMessage("Session created successfully.");
             }
 
@@ -1159,8 +1225,13 @@ const Attendance = () => {
                                             <th className="px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider w-16 sticky left-0 bg-slate-50 dark:bg-slate-950 z-10 border-r border-gray-200 dark:border-slate-800">#</th>
                                             <th className="px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider w-48 sticky left-16 bg-slate-50 dark:bg-slate-950 z-10 border-r border-gray-200 dark:border-slate-800">Student Name</th>
                                             {dateColumns.map((col, idx) => (
-                                                <th key={idx} className={`px-2 py-3 text-center min-w-[50px] border-r border-gray-100 dark:border-slate-800/50 ${col.isHoliday ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
-                                                    <div className="flex flex-col items-center" title={col.holidayName}>
+                                                <th key={idx} className={`px-2 py-3 text-center min-w-[50px] border-r border-gray-100 dark:border-slate-800/50 ${col.isHoliday ? 'bg-red-50 dark:bg-red-900/20' : ''} ${col.isCancelled ? 'bg-gray-100 dark:bg-slate-800 opacity-60' : ''}`}>
+                                                    <div className="flex flex-col items-center" title={col.holidayName || (col.isCancelled ? "This class is cancelled" : "")}>
+                                                        {col.isCancelled && (
+                                                            <span className="text-[8px] font-bold text-gray-500 uppercase tracking-tighter mb-0.5">
+                                                                CANCELLED
+                                                            </span>
+                                                        )}
                                                         <span className={`text-xs font-bold ${col.isHoliday ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>{col.displayDate}</span>
                                                         <span className="text-[9px] text-gray-400 uppercase tracking-wider">{col.dayName.slice(0, 3)}</span>
                                                         {col.isHoliday ? (
@@ -1171,7 +1242,7 @@ const Attendance = () => {
                                                                     'bg-orange-100 text-orange-700'
                                                                 }`}>{col.type?.slice(0, 1)}</span>
                                                         )}
-                                                        {!col.isHoliday && (
+                                                        {!col.isHoliday && !col.isCancelled && (
                                                             <div className="flex gap-1 mt-1 justify-center">
                                                                 <button
                                                                     onClick={() => handleMarkAllOnDate(col)}
@@ -1219,24 +1290,28 @@ const Attendance = () => {
                                                 </td>
                                                 {dateColumns.map((col, cIdx) => {
                                                     const key = `${col.date}_${col.startTime}`;
-                                                    const isPresent = attendanceData[student.id]?.[key] === 'Present';
+                                                    const status = attendanceData[student.id]?.[key];
+                                                    const isPresent = status === 'Present';
+                                                    const isBlocked = col.isHoliday || col.isCancelled;
 
                                                     return (
 
-                                                        <td key={cIdx} className={`px-2 py-3 text-center border-r border-gray-50 dark:border-slate-800/50 ${col.isHoliday ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
+                                                        <td key={cIdx} className={`px-2 py-3 text-center border-r border-gray-50 dark:border-slate-800/50 ${col.isHoliday ? 'bg-red-50/50 dark:bg-red-900/10' : ''} ${col.isCancelled ? 'bg-gray-100/30 dark:bg-slate-800/30' : ''}`}>
                                                             {col.isHoliday ? (
                                                                 <div className="w-6 h-6 mx-auto flex items-center justify-center text-red-600 dark:text-red-400 font-bold text-xs">
                                                                     C
                                                                 </div>
                                                             ) : (
                                                                 <button
-                                                                    onClick={() => toggleAttendance(student.id, col)}
+                                                                    onClick={() => !isBlocked && toggleAttendance(student.id, col)}
+                                                                    disabled={isBlocked}
                                                                     className={`
                                                                     w-6 h-6 rounded-md flex items-center justify-center transition-all mx-auto
                                                                     ${isPresent
                                                                             ? 'bg-primary text-white shadow-sm'
                                                                             : 'bg-gray-100 dark:bg-slate-800 text-transparent hover:bg-gray-200 dark:hover:bg-slate-700'
                                                                         }
+                                                                    ${isBlocked ? 'opacity-30 cursor-not-allowed' : ''}
                                                                 `}
                                                                 >
                                                                     <Check size={14} className={isPresent ? 'opacity-100' : 'opacity-0'} />
@@ -1372,21 +1447,32 @@ const Attendance = () => {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 mt-6">
+                            <div className="flex justify-between items-center mt-6">
                                 <button
                                     type="button"
-                                    onClick={() => setIsEditModalOpen(false)}
-                                    className="px-4 py-2 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors font-medium text-sm"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
+                                    onClick={handleDeleteSession}
                                     disabled={saving}
-                                    className="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors font-bold text-sm shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2"
+                                    className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:text-red-400 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-xl transition-colors disabled:opacity-50"
+                                    title={!editingColumn?.sessionId ? "Cancel this standard class for this date" : (editingColumn?.class_type === 'CANCELLED' ? "Restore this class" : "Delete this session")}
                                 >
-                                    {saving ? 'Saving...' : 'Save Changes'}
+                                    {editingColumn?.class_type === 'CANCELLED' ? "Restore Class" : (!editingColumn?.sessionId ? "Cancel Class" : "Delete Session")}
                                 </button>
+                                <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditModalOpen(false)}
+                                        className="px-4 py-2 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors font-medium text-sm"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={saving}
+                                        className="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors font-bold text-sm shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2"
+                                    >
+                                        {saving ? 'Saving...' : 'Save Changes'}
+                                    </button>
+                                </div>
                             </div>
                         </form>
                     </div>
