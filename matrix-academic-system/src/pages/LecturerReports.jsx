@@ -18,7 +18,8 @@ import {
     Pie,
     Cell
 } from 'recharts';
-import { Filter, UserCheck, BookOpen, Calendar, Activity, Printer, FileText } from 'lucide-react';
+import { Filter, UserCheck, BookOpen, Calendar, Activity, Printer, FileText, MessageSquare, Copy, Check, ExternalLink, Loader, Trash2 } from 'lucide-react';
+import PrintableFeedbackReport from '../components/reports/PrintableFeedbackReport';
 
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -49,6 +50,12 @@ const LecturerReports = () => {
     const [subjects, setSubjects] = useState([]);
     const [selectedSubject, setSelectedSubject] = useState('');
 
+    // Feedback States
+    const [feedbackSession, setFeedbackSession] = useState(null);
+    const [feedbackResponses, setFeedbackResponses] = useState([]);
+    const [feedbackLoading, setFeedbackLoading] = useState(false);
+    const [copied, setCopied] = useState(false);
+
     useEffect(() => {
         if (user?.lecturer_id) {
             fetchLecturerSubjects();
@@ -60,6 +67,9 @@ const LecturerReports = () => {
         if (selectedSubject) {
             fetchSubjectData();
             fetchReportData();
+            fetchFeedbackSession(); // Fetch feedback session when subject changes
+        } else {
+            setFeedbackSession(null);
         }
     }, [selectedSubject]);
 
@@ -180,6 +190,129 @@ const LecturerReports = () => {
 
         } catch (error) {
             console.error('Error fetching report data:', error);
+        }
+    };
+
+    const fetchFeedbackSession = async () => {
+        try {
+            setFeedbackLoading(true);
+            const { data, error } = await supabase
+                .from('feedback_sessions')
+                .select('*')
+                .eq('lecturer_id', user.lecturer_id)
+                .eq('subject_id', selectedSubject)
+                .eq('is_active', true)
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "Row not found"
+
+            setFeedbackSession(data);
+
+            if (data) {
+                // Fetch responses for this session to show count
+                const { data: responses, error: resError } = await supabase
+                    .from('feedback_responses')
+                    .select('*')
+                    .eq('session_id', data.id);
+
+                if (resError) throw resError;
+                setFeedbackResponses(responses || []);
+            } else {
+                setFeedbackResponses([]);
+            }
+        } catch (err) {
+            console.error("Error fetching feedback session:", err);
+        } finally {
+            setFeedbackLoading(false);
+        }
+    };
+
+    const handleCreateLink = async () => {
+        try {
+            setFeedbackLoading(true);
+            const { data, error } = await supabase
+                .from('feedback_sessions')
+                .insert([
+                    {
+                        lecturer_id: user.lecturer_id,
+                        subject_id: selectedSubject,
+                        semester_session: user.semester_name || '2025/2026', // Fallback if not in user profile
+                        is_active: true
+                    }
+                ])
+                .select()
+                .single();
+
+            if (error) throw error;
+            setFeedbackSession(data);
+            setFeedbackResponses([]); // Initialized with 0 responses
+        } catch (err) {
+            console.error("Error creating session:", err);
+            alert("Failed to create feedback link.");
+        } finally {
+            setFeedbackLoading(false);
+        }
+    };
+
+    const handleCopyLink = () => {
+        if (!feedbackSession) return;
+        const link = `${window.location.origin}/feedback/${feedbackSession.id}`;
+        navigator.clipboard.writeText(link);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handlePrintFeedback = async () => {
+        if (!feedbackSession) return;
+
+        try {
+            setFeedbackLoading(true);
+            // Fetch responses for this session
+            const { data, error } = await supabase
+                .from('feedback_responses')
+                .select('*')
+                .eq('session_id', feedbackSession.id);
+
+            if (error) throw error;
+            setFeedbackResponses(data || []);
+
+            setPrintMode('feedback');
+            setTimeout(() => {
+                window.print();
+                setTimeout(() => setPrintMode(null), 1000);
+            }, 500);
+
+        } catch (err) {
+            console.error("Error generating feedback report:", err);
+            alert("Failed to generate report.");
+        } finally {
+            setFeedbackLoading(false);
+        }
+    };
+
+    const handleClearResponses = async () => {
+        if (!feedbackSession) return;
+
+        const confirmed = window.confirm("Are you sure you want to clear ALL responses for this subject? This action cannot be undone.");
+        if (!confirmed) return;
+
+        try {
+            setFeedbackLoading(true);
+            const { error } = await supabase
+                .from('feedback_responses')
+                .delete()
+                .eq('session_id', feedbackSession.id);
+
+            if (error) throw error;
+
+            // Re-fetch to update the count and state
+            await fetchFeedbackSession();
+            alert("All responses for this session have been cleared.");
+        } catch (err) {
+            console.error("Error clearing responses:", err);
+            alert("Failed to clear responses.");
+        } finally {
+            setFeedbackLoading(false);
         }
     };
 
@@ -735,6 +868,121 @@ const LecturerReports = () => {
                         Print Report
                     </button>
                 </div>
+
+                {/* Card 3: Feedback Report (New) */}
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 flex flex-col justify-between gap-4 relative overflow-hidden">
+                    {/* Background Pattern */}
+                    <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                        <MessageSquare size={120} />
+                    </div>
+
+                    <div className="flex items-start justify-between relative z-10">
+                        <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl text-purple-600 dark:text-purple-400">
+                            <MessageSquare size={24} />
+                        </div>
+                        {feedbackSession && (
+                            <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full flex items-center">
+                                <span className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></span>
+                                Active
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="relative z-10">
+                        <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-1">Lecturer Feedback</h3>
+                        <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">Student evaluation system</p>
+
+
+                        <div className="mb-4">
+                            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">
+                                Select Subject
+                            </label>
+                            <div className="relative">
+                                <select
+                                    value={selectedSubject || ''}
+                                    onChange={(e) => {
+                                        setSelectedSubject(e.target.value);
+                                        // fetchFeedbackSession will be triggered by useEffect when selectedSubject changes
+                                    }}
+                                    className="w-full bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-purple-500 focus:border-purple-500 block p-2.5 appearance-none"
+                                >
+                                    <option value="" disabled>-- Choose a subject --</option>
+                                    {subjects.map((subject) => (
+                                        <option key={subject.id} value={subject.id}>
+                                            {subject.code} - {subject.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
+                                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+
+                        {!selectedSubject ? (
+                            <div className="bg-gray-50 dark:bg-slate-900/50 rounded-lg p-4 text-center border border-dashed border-gray-200 dark:border-slate-700">
+                                <p className="text-sm text-gray-500">Please select a subject to manage feedback.</p>
+                            </div>
+                        ) : !feedbackSession ? (
+                            <div className="bg-gray-50 dark:bg-slate-900/50 rounded-lg p-3 text-center border border-dashed border-gray-200 dark:border-slate-700">
+                                <p className="text-xs text-gray-500 mb-2">No active session for this subject.</p>
+                                <button
+                                    onClick={handleCreateLink}
+                                    disabled={feedbackLoading}
+                                    className="w-full text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md font-medium transition-colors disabled:opacity-50 flex items-center justify-center"
+                                >
+                                    {feedbackLoading ? <Loader size={12} className="animate-spin inline mr-1" /> : null}
+                                    Create Link
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-2 border border-purple-100 dark:border-purple-800/30">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider">Feedback Link</span>
+                                        <button
+                                            onClick={handleCopyLink}
+                                            className="text-purple-600 hover:text-purple-800 p-1 rounded hover:bg-purple-100 transition-colors"
+                                            title="Copy Link"
+                                        >
+                                            {copied ? <Check size={14} /> : <Copy size={14} />}
+                                        </button>
+                                    </div>
+                                    <div className="text-[10px] text-gray-600 dark:text-gray-400 break-all font-mono bg-white dark:bg-slate-900 p-1.5 rounded border border-gray-100 dark:border-slate-700 overflow-hidden text-ellipsis whitespace-nowrap">
+                                        {`${window.location.origin}/feedback/${feedbackSession.id}`}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between px-2 py-1 bg-white dark:bg-slate-900 rounded border border-gray-100 dark:border-slate-700">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Total Respondents</span>
+                                        <span className="text-xs font-bold text-purple-600 dark:text-purple-400">{feedbackResponses.length}</span>
+                                    </div>
+                                    {feedbackResponses.length > 0 && (
+                                        <button
+                                            onClick={handleClearResponses}
+                                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                                            title="Clear All Responses"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                <button
+                                    onClick={handlePrintFeedback}
+                                    className="w-full flex items-center justify-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                >
+                                    <Printer size={16} className="mr-2" />
+                                    Generate Report
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* Printable Components - Render based on mode */}
@@ -750,6 +998,22 @@ const LecturerReports = () => {
 
             {printMode === 'subject' && (
                 <PrintableReport />
+            )}
+
+            {printMode === 'feedback' && (
+                <div className="bg-white fixed inset-0 z-[9999] p-8 overflow-auto">
+                    <PrintableFeedbackReport
+                        session={{
+                            ...feedbackSession,
+                            lecturers: { name: lecturerName || user.name },
+                            subjects: subjects.find(s => s.id === selectedSubject)
+                        }}
+                        responses={feedbackResponses}
+                        facultyLogo={user.faculty_logo}
+                        totalStudents={totalStudents}
+                        semesterDetails={semesterDetails}
+                    />
+                </div>
             )}
 
             {/* Normal Chart Views - Hidden in Print */}

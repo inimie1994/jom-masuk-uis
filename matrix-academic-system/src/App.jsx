@@ -21,6 +21,7 @@ import LecturerDashboard from './pages/LecturerDashboard';
 import MyStudents from './pages/MyStudents';
 import LecturerTimetable from './pages/LecturerTimetable';
 import LecturerReports from './pages/LecturerReports';
+import StudentFeedbackForm from './pages/StudentFeedbackForm';
 
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -57,6 +58,7 @@ function App() {
               <Route path="settings" element={<Settings />} />
             </Route>
 
+            <Route path="/feedback/:sessionId" element={<StudentFeedbackForm />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </ThemeProvider>
