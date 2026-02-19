@@ -1222,58 +1222,72 @@ const Attendance = () => {
                                 <table className="min-w-full text-sm">
                                     <thead>
                                         <tr className="bg-slate-50 dark:bg-slate-950 border-b border-gray-200 dark:border-slate-800">
-                                            <th className="px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider w-16 sticky left-0 bg-slate-50 dark:bg-slate-950 z-10 border-r border-gray-200 dark:border-slate-800">#</th>
-                                            <th className="px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider w-48 sticky left-16 bg-slate-50 dark:bg-slate-950 z-10 border-r border-gray-200 dark:border-slate-800">Student Name</th>
+                                            <th className="px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider w-16 bg-slate-50 dark:bg-slate-950 border-r border-gray-200 dark:border-slate-800">#</th>
+                                            <th className="px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider w-48 bg-slate-50 dark:bg-slate-950 border-r border-gray-200 dark:border-slate-800">Student Name</th>
                                             {dateColumns.map((col, idx) => (
-                                                <th key={idx} className={`px-2 py-3 text-center min-w-[50px] border-r border-gray-100 dark:border-slate-800/50 ${col.isHoliday ? 'bg-red-50 dark:bg-red-900/20' : ''} ${col.isCancelled ? 'bg-gray-100 dark:bg-slate-800 opacity-60' : ''}`}>
-                                                    <div className="flex flex-col items-center" title={col.holidayName || (col.isCancelled ? "This class is cancelled" : "")}>
+                                                <th key={idx} className={`px-2 py-4 border-r border-gray-100 dark:border-slate-800 transition-all relative group min-w-[70px] ${col.isHoliday ? 'bg-red-50/30' : ''} ${col.isCancelled ? 'bg-gray-100 dark:bg-slate-800 opacity-60' : ''}`}>
+                                                    <div className="flex flex-col items-center gap-1.5">
                                                         {col.isCancelled && (
-                                                            <span className="text-[8px] font-bold text-gray-500 uppercase tracking-tighter mb-0.5">
-                                                                CANCELLED
+                                                            <span className="text-[7px] font-bold text-gray-500 uppercase tracking-tighter">CANCELLED</span>
+                                                        )}
+                                                        {col.isHoliday && (
+                                                            <span className="text-[7px] font-bold text-red-500 uppercase tracking-tighter" title={col.holidayName}>CUTI</span>
+                                                        )}
+
+                                                        {/* Date */}
+                                                        <span className={`text-sm font-bold leading-none ${col.isHoliday ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
+                                                            {col.displayDate}
+                                                        </span>
+
+                                                        {/* Day */}
+                                                        <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider leading-none">
+                                                            {col.dayName.slice(0, 3)}
+                                                        </span>
+
+                                                        {/* Class Type Badge */}
+                                                        <div className="mt-0.5">
+                                                            <span className={`
+                                                                    w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-bold
+                                                                    ${col.type === 'Lecture' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' :
+                                                                    col.type === 'Tutorial' ? 'bg-green-100 text-green-600 dark:bg-green-900/30' :
+                                                                        'bg-purple-100 text-purple-600 dark:bg-purple-900/30'}
+                                                                `}>
+                                                                {col.type?.charAt(0) || 'C'}
                                                             </span>
-                                                        )}
-                                                        <span className={`text-xs font-bold ${col.isHoliday ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>{col.displayDate}</span>
-                                                        <span className="text-[9px] text-gray-400 uppercase tracking-wider">{col.dayName.slice(0, 3)}</span>
-                                                        {col.isHoliday ? (
-                                                            <span className="text-[8px] px-1 rounded mt-0.5 bg-red-100 text-red-700 font-bold max-w-[40px] truncate">{col.holidayName}</span>
-                                                        ) : (
-                                                            <span className={`text-[8px] px-1 rounded mt-0.5 ${col.type === 'Lecture' ? 'bg-blue-100 text-blue-700' :
-                                                                col.type === 'Tutorial' ? 'bg-green-100 text-green-700' :
-                                                                    'bg-orange-100 text-orange-700'
-                                                                }`}>{col.type?.slice(0, 1)}</span>
-                                                        )}
+                                                        </div>
+
+                                                        {/* Bulk Actions */}
                                                         {!col.isHoliday && !col.isCancelled && (
-                                                            <div className="flex gap-1 mt-1 justify-center">
+                                                            <div className="flex gap-2 items-center">
                                                                 <button
                                                                     onClick={() => handleMarkAllOnDate(col)}
-                                                                    title="Mark all present"
-                                                                    className="p-1 rounded-md text-gray-400 hover:text-primary hover:bg-primary/10 transition-all"
+                                                                    className="text-gray-400 hover:text-green-500 transition-colors"
+                                                                    title="Mark All Present"
                                                                 >
-                                                                    <Check size={12} strokeWidth={3} />
+                                                                    <Check size={14} strokeWidth={3} />
                                                                 </button>
                                                                 <button
                                                                     onClick={() => handleUntickAllOnDate(col)}
-                                                                    title="Untick all"
-                                                                    className="p-1 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                                                                    className="text-gray-400 hover:text-red-500 transition-colors"
+                                                                    title="Clear All"
                                                                 >
-                                                                    <X size={12} strokeWidth={3} />
+                                                                    <X size={14} strokeWidth={3} />
                                                                 </button>
                                                             </div>
                                                         )}
-                                                        <div className="flex gap-1 mt-1 justify-center">
-                                                            <button
-                                                                onClick={() => handleEditColumn(col)}
-                                                                title="Edit Session Date/Time"
-                                                                className="p-1 rounded-md text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
-                                                            >
-                                                                <Edit size={12} strokeWidth={3} />
-                                                            </button>
-                                                        </div>
+
+                                                        {/* Edit Button */}
+                                                        <button
+                                                            onClick={() => handleEditColumn(col)}
+                                                            className="text-gray-400 hover:text-primary transition-colors flex justify-center w-full"
+                                                            title="Edit/Move session"
+                                                        >
+                                                            <Edit size={14} strokeWidth={2.5} />
+                                                        </button>
                                                     </div>
                                                 </th>
                                             ))}
-                                            {/* Total Column sticky right */}
-                                            <th className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider w-24 sticky right-0 bg-slate-50 dark:bg-slate-950 z-10 border-l border-gray-200 dark:border-slate-800 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
+                                            <th className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider w-20 bg-slate-50 dark:bg-slate-950 border-l border-gray-200 dark:border-slate-800">
                                                 Total
                                             </th>
                                         </tr>
@@ -1281,40 +1295,38 @@ const Attendance = () => {
                                     <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                                         {students.map((student, idx) => (
                                             <tr key={student.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                                <td className="px-4 py-3 font-mono text-xs text-gray-400 sticky left-0 bg-white dark:bg-slate-900 z-10 border-r border-gray-100 dark:border-slate-800">
+                                                <td className="px-4 py-3 font-mono text-[10px] text-gray-400 bg-white dark:bg-slate-900 border-r border-gray-100 dark:border-slate-800">
                                                     {idx + 1}
                                                 </td>
-                                                <td className="px-4 py-3 font-medium text-gray-900 dark:text-white sticky left-16 bg-white dark:bg-slate-900 z-10 border-r border-gray-100 dark:border-slate-800">
-                                                    <div>{student.name}</div>
-                                                    <div className="text-[10px] text-gray-400">{student.matric_no}</div>
+                                                <td className="px-4 py-3 bg-white dark:bg-slate-900 border-r border-gray-100 dark:border-slate-800 min-w-[180px]">
+                                                    <div className="font-medium text-gray-900 dark:text-white text-xs truncate max-w-[140px]" title={student.name}>{student.name}</div>
+                                                    <div className="text-[10px] text-gray-400 font-mono">{student.matric_no}</div>
                                                 </td>
                                                 {dateColumns.map((col, cIdx) => {
                                                     const key = `${col.date}_${col.startTime}`;
-                                                    const status = attendanceData[student.id]?.[key];
-                                                    const isPresent = status === 'Present';
+                                                    const isPresent = attendanceData[student.id]?.[key] === 'Present';
                                                     const isBlocked = col.isHoliday || col.isCancelled;
 
                                                     return (
-
-                                                        <td key={cIdx} className={`px-2 py-3 text-center border-r border-gray-50 dark:border-slate-800/50 ${col.isHoliday ? 'bg-red-50/50 dark:bg-red-900/10' : ''} ${col.isCancelled ? 'bg-gray-100/30 dark:bg-slate-800/30' : ''}`}>
+                                                        <td key={cIdx} className={`px-2 py-3 text-center border-r border-gray-50 dark:border-slate-800/50 ${col.isHoliday ? 'bg-red-50/20 dark:bg-red-900/5' : ''} ${col.isCancelled ? 'bg-gray-50 dark:bg-slate-900/50' : ''}`}>
                                                             {col.isHoliday ? (
-                                                                <div className="w-6 h-6 mx-auto flex items-center justify-center text-red-600 dark:text-red-400 font-bold text-xs">
-                                                                    C
+                                                                <div className="w-8 h-8 mx-auto flex items-center justify-center text-red-500/40 dark:text-red-400/30 font-bold text-[10px] select-none">
+                                                                    CUTI
                                                                 </div>
                                                             ) : (
                                                                 <button
                                                                     onClick={() => !isBlocked && toggleAttendance(student.id, col)}
                                                                     disabled={isBlocked}
                                                                     className={`
-                                                                    w-6 h-6 rounded-md flex items-center justify-center transition-all mx-auto
-                                                                    ${isPresent
-                                                                            ? 'bg-primary text-white shadow-sm'
-                                                                            : 'bg-gray-100 dark:bg-slate-800 text-transparent hover:bg-gray-200 dark:hover:bg-slate-700'
+                                                                        w-8 h-8 rounded-xl flex items-center justify-center transition-all mx-auto
+                                                                        ${isPresent
+                                                                            ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-100'
+                                                                            : 'bg-gray-100 dark:bg-slate-800 text-transparent hover:scale-105 hover:bg-gray-200 dark:hover:bg-slate-700'
                                                                         }
-                                                                    ${isBlocked ? 'opacity-30 cursor-not-allowed' : ''}
-                                                                `}
+                                                                        ${isBlocked ? 'opacity-20 cursor-not-allowed scale-90' : ''}
+                                                                    `}
                                                                 >
-                                                                    <Check size={14} className={isPresent ? 'opacity-100' : 'opacity-0'} />
+                                                                    <Check size={16} strokeWidth={3} className={isPresent ? 'scale-100' : 'scale-0 transition-transform'} />
                                                                 </button>
                                                             )}
                                                         </td>

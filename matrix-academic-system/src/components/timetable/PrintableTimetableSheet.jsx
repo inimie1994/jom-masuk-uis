@@ -111,6 +111,7 @@ const PrintableTimetableSheet = ({
                             left: 0 !important;
                             top: 0 !important;
                             width: 100% !important;
+                            zoom: 0.85 !important;
                         }
                         .print-cell { border: 1px solid black !important; text-align: center; vertical-align: middle; padding: 2px; }
                         .bg-peach { background-color: #ffdab9 !important; -webkit-print-color-adjust: exact; }
@@ -137,7 +138,7 @@ const PrintableTimetableSheet = ({
 
             {/* Title */}
             <div className="text-center font-bold uppercase text-sm mb-2">
-                JUMLAH JAM KESELURUHAN SEMINGGU (4.0) – {semesterSession}
+                JUMLAH JAM KESELURUHAN SEMINGGU – {semesterSession}
             </div>
 
             {/* Main Table */}
@@ -169,8 +170,10 @@ const PrintableTimetableSheet = ({
                         // Skip rendering Sunday if empty? No, render all 7 days usually. E.g. Isnin-Ahad.
                         // Actually let's assume Monday-Sunday row rendering.
 
+                        const isWeekend = day === 'Saturday' || day === 'Sunday';
+
                         return (
-                            <tr key={day} className="h-16">
+                            <tr key={day} className={isWeekend ? "h-10" : "h-16"}>
                                 <td className="print-cell font-bold">{DAY_MAP[day]}</td>
 
                                 {TIME_SLOTS.map((hour) => {
