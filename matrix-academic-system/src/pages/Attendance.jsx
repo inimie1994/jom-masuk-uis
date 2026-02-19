@@ -12,7 +12,8 @@ import {
     Check,
     X,
     Printer,
-    FileSpreadsheet
+    FileSpreadsheet,
+    Edit
 } from 'lucide-react';
 
 const Attendance = () => {
@@ -46,6 +47,11 @@ const Attendance = () => {
     const [allMonthsData, setAllMonthsData] = useState([]); // Array of { month, dates, attendanceData }
     const [allGroupsData, setAllGroupsData] = useState([]); // Array of { group, students, dates, attendanceData }
     const [isGeneratingPrint, setIsGeneratingPrint] = useState(false);
+
+    // Edit Session State
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingColumn, setEditingColumn] = useState(null);
+    const [editForm, setEditForm] = useState({ date: '', startTime: '', endTime: '' });
 
     // Initial Fetch: Subjects
     useEffect(() => {
@@ -160,11 +166,11 @@ const Attendance = () => {
         }
     };
 
-    // Helper: Generate dates for the month based on timetable days
-    const generateDatesFromTimetable = (monthStr, timetableData, semesterSettings = {}, holidays = []) => {
+    // Helper: Generate dates for the month based on timetable days + existing sessions
+    const generateDatesFromTimetable = (monthStr, timetableData, semesterSettings = {}, holidays = [], existingSessions = []) => {
         const [year, month] = monthStr.split('-').map(Number);
         const daysInMonth = new Date(year, month, 0).getDate();
-        const dates = [];
+        let dates = [];
 
         // Timetable map: { 'Monday': [entries], 'Tuesday': ... }
         const timetableMap = {};
@@ -188,11 +194,12 @@ const Attendance = () => {
         const semesterStart = normalizeDate(semesterSettings.start);
         const semesterEnd = normalizeDate(semesterSettings.end);
 
+        // 1. Generate Standard Timetable Dates
         for (let d = 1; d <= daysInMonth; d++) {
             const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
             const dateObj = new Date(year, month - 1, d);
 
-            // 1. Filter by Semester Dates (if set)
+            // Filter by Semester Dates (if set)
             if (semesterStart && dateObj < semesterStart) continue;
             if (semesterEnd && dateObj > semesterEnd) continue;
 
@@ -203,6 +210,12 @@ const Attendance = () => {
                 const holidayName = holidayMap[dateStr];
 
                 timetableMap[dayName].forEach(slot => {
+                    // Check if there is an existing session that MATCHES this standard slot
+                    const matchedSession = existingSessions.find(s =>
+                        s.date === dateStr &&
+                        s.start_time === slot.start_time
+                    );
+
                     dates.push({
                         date: dateStr, // YYYY-MM-DD
                         dayName: dayName,
@@ -212,11 +225,52 @@ const Attendance = () => {
                         type: slot.class_type,
                         timetableId: slot.id,
                         isHoliday: isHoliday,
-                        holidayName: holidayName
+                        holidayName: holidayName,
+                        sessionId: matchedSession ? matchedSession.id : null,
+                        isVirtual: !matchedSession // detailed flag
                     });
                 });
             }
         }
+
+        // 2. Add Extra Sessions (Postponed/Rescheduled) that are NOT in standard timetable slots
+        existingSessions.forEach(session => {
+            // Check if this session is already accounted for in the generated dates
+            const exists = dates.find(d =>
+                d.date === session.date &&
+                d.startTime === session.start_time
+            );
+
+            if (!exists) {
+                // Convert date string to display format
+                const [y, m, d] = session.date.split('-').map(Number);
+                const dateObj = new Date(y, m - 1, d);
+                const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+
+                const isHoliday = !!holidayMap[session.date];
+                const holidayName = holidayMap[session.date];
+
+                dates.push({
+                    date: session.date,
+                    dayName: dayName,
+                    displayDate: `${d}/${m}`,
+                    startTime: session.start_time,
+                    endTime: session.end_time,
+                    type: session.class_type,
+                    timetableId: null, // No direct timetable link strict
+                    isHoliday: isHoliday,
+                    holidayName: holidayName,
+                    sessionId: session.id,
+                    isExtra: true
+                });
+            }
+        });
+
+        // 3. Filter out "Virtual" slots that have been moved? 
+        // For simple implementation: We keep virtual slots. If they are "moved", the user should ideally see the old one empty and new one filled.
+        // Or if we implemented a dedicated "moved" logic, we would hide the old one.
+        // For now, let's keep all standard slots + any extra sessions found.
+
         return dates.sort((a, b) => new Date(a.date) - new Date(b.date) || a.startTime.localeCompare(b.startTime));
     };
 
@@ -260,15 +314,6 @@ const Attendance = () => {
             if (timetableError) throw timetableError;
             setTimetable(timetableData || []);
 
-            // 3. Generate Columns
-            const columns = generateDatesFromTimetable(selectedMonth, timetableData || [], semesterSettings, holidays);
-            setDateColumns(columns);
-
-            if (columns.length === 0) {
-                setLoading(false);
-                return;
-            }
-
             // 3. Fetch Existing Sessions (to map to columns)
             // We need sessions that match our generated dates + group + subject
             const startOfMonth = `${selectedMonth}-01`;
@@ -276,18 +321,28 @@ const Attendance = () => {
 
             const { data: sessions, error: sessionsError } = await supabase
                 .from('attendance_sessions')
-                .select('id, date, start_time')
+                .select('id, date, start_time, end_time, class_type')
                 .filter('group_names', 'cs', `{${selectedGroup}}`)
                 .eq('subject_id', selectedSubject)
                 .gte('date', startOfMonth)
                 .lte('date', endOfMonth);
 
             if (sessionsError) throw sessionsError;
+            const validSessions = sessions || [];
 
-            // 4. Fetch Records for these sessions
+            // 4. Generate Columns
+            const columns = generateDatesFromTimetable(selectedMonth, timetableData || [], semesterSettings, holidays, validSessions);
+            setDateColumns(columns);
+
+            if (columns.length === 0) {
+                setLoading(false);
+                return;
+            }
+
+            // 5. Fetch Records for these sessions
             let records = [];
-            if (sessions.length > 0) {
-                const sessionIds = sessions.map(s => s.id);
+            if (validSessions.length > 0) {
+                const sessionIds = validSessions.map(s => s.id);
                 const { data: recordsData, error: recordsError } = await supabase
                     .from('attendance_records')
                     .select('session_id, student_id, status')
@@ -306,7 +361,7 @@ const Attendance = () => {
 
             // Pre-fill map with sessions data
             records.forEach(r => {
-                const session = sessions.find(s => s.id === r.session_id);
+                const session = validSessions.find(s => s.id === r.session_id);
                 if (session) {
                     const key = `${session.date}_${session.start_time}`;
                     if (!map[r.student_id]) map[r.student_id] = {};
@@ -806,6 +861,149 @@ const Attendance = () => {
         }
     };
 
+    const handleEditColumn = (col) => {
+        setEditingColumn(col);
+        setEditForm({
+            date: col.date,
+            startTime: col.startTime,
+            endTime: col.endTime
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleDeleteSession = async () => {
+        if (!editingColumn?.sessionId) return;
+
+        if (!window.confirm("Are you sure you want to delete this session? This action cannot be undone.")) {
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const { error: deleteError } = await supabase
+                .from('attendance_sessions')
+                .delete()
+                .eq('id', editingColumn.sessionId);
+
+            if (deleteError) {
+                console.error("Supabase Delete Error:", deleteError);
+                throw deleteError;
+            }
+
+            setSuccessMessage("Session deleted successfully.");
+            setIsEditModalOpen(false);
+            setEditingColumn(null);
+            fetchTimetableAndAttendance(); // Refresh grid
+            setTimeout(() => setSuccessMessage(null), 3000);
+
+        } catch (err) {
+            console.error("Error deleting session:", err);
+            setError(err.message || "Failed to delete session.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleSaveSessionEdit = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            // 1. Validate
+            if (!editForm.date || !editForm.startTime || !editForm.endTime) {
+                alert("Please fill in all fields");
+                setSaving(false);
+                return;
+            }
+
+            // 2. Data Preparation
+            let sessionId = editingColumn.sessionId;
+            const newDateStr = editForm.date;
+
+            // ... (rest of the logic remains the same)
+
+            // Logic:
+            // If sessionId exists -> Update that row.
+            // If sessionId is NULL -> It's a standard timetable slot. 
+            //    If we "change" it, we are essentially creating an exception. 
+            //    We should Create a new session row with the NEW date/time.
+            //    BUT, what happens to the old virtual slot?
+            //    The old virtual slot will still exist in "generateDatesFromTimetable" unless we exclude it?
+            //    Our current logic says: "Check if there is an existing session that MATCHES this standard slot".
+            //    If we create a session with a DIFFERENT date, it won't match. So the old virtual slot stays?
+            //    This is tricky. "Moving" a class usually means the original shouldn't be valid anymore.
+            //    However, without a "cancellation" record, the system thinks the timetable class still implies a slot.
+            //    For now, let's assume "Edit" on a virtual slot just CREATES a new session (extra class) or "moves" it if we have cancellation logic.
+            //    Given the requirement "postpone class", usually you'd want the old one gone.
+            //    To make the old one gone, we'd need a "cancelled_sessions" table or similar.
+            //    OR, we treat `attendance_sessions` as the source of truth for "exceptions". 
+            //    If we want to "move" a standard slot, maybe we need to mark the old one as "Cancelled" (or just ignore).
+            //    Let's handle the simplest case: Just allow creating/updating. The user can manually "Untick All" on the old date if they want to ignore it, or we leave it.
+            //    Actually, if I just change the date of an EXISTING session, it moves.
+            //    If I change the date of a VIRTUAL session, I am creating a NEW session. The old virtual one remains as a standard slot.
+            //    If the user wants to "remove" the old slot, they technically can't delete a virtual slot without data structure changes.
+            //    BUT, often "Postpone" means "Standard Class on Date X is cancelled, New Class on Date Y is created".
+
+            //    Let's stick to: "Edit" -> Create/Update Session. 
+            //    If it was virtual (sessionId=null), we Insert.
+            //    If it was real (sessionId!=null), we Update.
+
+            if (sessionId) {
+                // Update Existing
+                const { error: updateError } = await supabase
+                    .from('attendance_sessions')
+                    .update({
+                        date: newDateStr,
+                        start_time: editForm.startTime,
+                        end_time: editForm.endTime
+                    })
+                    .eq('id', sessionId);
+
+                if (updateError) {
+                    console.error("Supabase Update Error:", updateError);
+                    throw updateError;
+                }
+                setSuccessMessage("Session updated successfully.");
+
+            } else {
+                // Create New (Virtual -> Real)
+                // We need more details from the column/timetable
+                const timetableEntry = timetable.find(t => t.id === editingColumn.timetableId);
+                if (!timetableEntry) throw new Error("Source timetable entry not found");
+
+                const { error: insertError } = await supabase
+                    .from('attendance_sessions')
+                    .insert([{
+                        group_names: timetableEntry.group_names || [selectedGroup],
+                        subject_id: selectedSubject,
+                        date: newDateStr, // New Date
+                        start_time: editForm.startTime, // New Time
+                        end_time: editForm.endTime,
+                        class_type: editingColumn.type,
+                        room: timetableEntry.room,
+                        lecturer_id: timetableEntry.lecturer_id,
+                        faculty_id: user.faculty_id
+                    }]);
+
+                if (insertError) {
+                    console.error("Supabase Insert Error:", insertError);
+                    throw insertError;
+                }
+                setSuccessMessage("Session created successfully.");
+            }
+
+            setIsEditModalOpen(false);
+            setEditingColumn(null);
+            fetchTimetableAndAttendance(); // Refresh grid
+            setTimeout(() => setSuccessMessage(null), 3000);
+
+        } catch (err) {
+            console.error("Error updating session detail:", err);
+            setError(err.message || "Failed to update session.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleExportExcel = () => {
         if (students.length === 0 || dateColumns.length === 0) return;
 
@@ -991,6 +1189,15 @@ const Attendance = () => {
                                                                 </button>
                                                             </div>
                                                         )}
+                                                        <div className="flex gap-1 mt-1 justify-center">
+                                                            <button
+                                                                onClick={() => handleEditColumn(col)}
+                                                                title="Edit Session Date/Time"
+                                                                className="p-1 rounded-md text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                                                            >
+                                                                <Edit size={12} strokeWidth={3} />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </th>
                                             ))}
@@ -1120,6 +1327,71 @@ const Attendance = () => {
                         )}
                     </>
                 )
+            }
+            {/* Edit Session Modal */}
+            {isEditModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100 dark:border-slate-800">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <Edit size={20} className="text-primary" />
+                            Edit Session
+                        </h3>
+
+                        <form onSubmit={handleSaveSessionEdit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+                                <input
+                                    type="date"
+                                    required
+                                    value={editForm.date}
+                                    onChange={e => setEditForm({ ...editForm, date: e.target.value })}
+                                    className="w-full rounded-xl border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Time</label>
+                                    <input
+                                        type="time"
+                                        required
+                                        value={editForm.startTime}
+                                        onChange={e => setEditForm({ ...editForm, startTime: e.target.value })}
+                                        className="w-full rounded-xl border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Time</label>
+                                    <input
+                                        type="time"
+                                        required
+                                        value={editForm.endTime}
+                                        onChange={e => setEditForm({ ...editForm, endTime: e.target.value })}
+                                        className="w-full rounded-xl border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:border-primary focus:ring-primary"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditModalOpen(false)}
+                                    className="px-4 py-2 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors font-medium text-sm"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={saving}
+                                    className="px-4 py-2 rounded-xl bg-primary text-white hover:bg-primary/90 transition-colors font-bold text-sm shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2"
+                                >
+                                    {saving ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )
             }
         </>
     );

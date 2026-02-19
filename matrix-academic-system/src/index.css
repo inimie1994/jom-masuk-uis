@@ -35,8 +35,8 @@
 
 /* Light mode defaults (Pastel based) */
 :root {
-  background-color: #f8fafc;
-  /* Very light azure/off-white */
+  background-color: #f1f5f9;
+  /* Soft slate background for better element contrast */
   color: #1e293b;
 }
 

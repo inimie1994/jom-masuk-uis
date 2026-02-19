@@ -560,7 +560,7 @@ const LecturerTimetable = () => {
                     lecturer={lecturerDetails}
                     timetable={timetable}
                     activities={activities}
-                    semesterSession={lecturerDetails?.departments?.faculties?.semester_name || "SESI I 2024/2025"}
+                    semesterSession={user?.semester_name || lecturerDetails?.departments?.faculties?.semester_name || " - "}
                 />
             )}
 

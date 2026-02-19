@@ -571,7 +571,7 @@ const LecturerReports = () => {
                         <div className="w-48 p-1 font-bold border-r border-black bg-gray-100">SESI PENGAJIAN</div>
                         <div className="p-1 flex-1 border-r border-black">
                             {/* Placeholder or calculated session */}
-                            2025/2026
+                            {user?.semester_name || semesterDetails?.semester_name || " - "}
                         </div>
                         <div className="w-32 p-1 font-bold border-r border-black bg-gray-100">JUMLAH PELAJAR</div>
                         <div className="p-1 flex-1">{totalStudents}</div>
@@ -744,6 +744,7 @@ const LecturerReports = () => {
                     timetable={workloadTimetable}
                     activities={workloadActivities}
                     studentCounts={workloadStudentCounts}
+                    semesterSession={user?.semester_name || semesterDetails?.semester_name}
                 />
             )}
 

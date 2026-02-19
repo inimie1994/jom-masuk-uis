@@ -12,7 +12,7 @@ const DashboardLayout = () => {
     };
 
     return (
-        <div className="flex h-screen bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans transition-colors">
+        <div className="flex h-screen bg-slate-100 dark:bg-slate-950 overflow-hidden font-sans transition-colors">
             {/* Mobile Sidebar Overlay */}
             {mobileSidebarOpen && (
                 <div

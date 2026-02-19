@@ -36,6 +36,15 @@ const Topbar = ({ toggleMobileSidebar }) => {
                 </div>
             </div>
 
+            {user?.semester_name && (
+                <div className="hidden lg:flex items-center px-4 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 rounded-full flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                    <span className="text-[10px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-widest leading-none">
+                        {user.semester_name}
+                    </span>
+                </div>
+            )}
+
             <div className="flex items-center space-x-4">
                 <ThemeToggle />
                 <button className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-full transition-colors relative">

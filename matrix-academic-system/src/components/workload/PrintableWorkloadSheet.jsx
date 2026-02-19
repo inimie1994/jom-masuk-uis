@@ -7,7 +7,7 @@ const PrintableWorkloadSheet = ({
     timetable,
     activities = [],
     studentCounts,
-    semesterSession = "SEMESTER I SESI 2025/2026",
+    semesterSession = "",
     className
 }) => {
     // Helper to calculate hours

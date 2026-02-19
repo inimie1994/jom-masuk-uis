@@ -62,12 +62,13 @@ export const AuthProvider = ({ children }) => {
                     if (profile.faculty_id) {
                         const { data: faculty } = await supabase
                             .from('faculties')
-                            .select('name, logo_url')
+                            .select('name, logo_url, semester_name')
                             .eq('id', profile.faculty_id)
                             .single();
                         if (faculty) {
                             facultyLogo = faculty.logo_url;
                             profile.faculty_name = faculty.name;
+                            profile.semester_name = faculty.semester_name;
                         }
                     }
 

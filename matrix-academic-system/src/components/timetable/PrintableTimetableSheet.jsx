@@ -5,7 +5,7 @@ const PrintableTimetableSheet = ({
     lecturer,
     timetable = [],
     activities = [],
-    semesterSession = "SESI I 2024/2025", // Updated default
+    semesterSession = "", // Updated default
     className
 }) => {
     // Helper to calculate hours

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getGrade } from '../../utils/gradeUtils';
 import { getProgramName } from '../../utils/programUtils';
 
-const StudentMarksPrintTemplate = ({ subject, assessments, students, grades, lecturer }) => {
+const StudentMarksPrintTemplate = ({ subject, assessments, students, grades, lecturer, semesterSession }) => {
     // Chunk students into groups of 15
     const [studentChunks, setStudentChunks] = useState([]);
     const [finalTotalMarks, setFinalTotalMarks] = useState({});
@@ -180,7 +180,7 @@ const StudentMarksPrintTemplate = ({ subject, assessments, students, grades, lec
                                 <div className="grid grid-cols-[140px_10px_1fr]">
                                     <span>SESI/ TAHUN AKADEMIK</span>
                                     <span>:</span>
-                                    <span>2025/2026</span> {/* Dynamic? */}
+                                    <span>{semesterSession || "2025/2026"}</span> {/* Dynamic? */}
                                 </div>
                                 <div className="grid grid-cols-[140px_10px_1fr]">
                                     <span>SEMESTER/ KUMPULAN</span>

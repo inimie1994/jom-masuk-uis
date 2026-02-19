@@ -12,9 +12,12 @@ import {
     BarChart2,
     Save,
     Printer,
-    ArrowLeft
+    ArrowLeft,
+    Download,
+    Upload
 } from 'lucide-react';
 import StudentMarksPrintTemplate from '../components/assessments/StudentMarksPrintTemplate';
+import * as XLSX from 'xlsx';
 
 const Assessments = () => {
     const { user } = useAuth();
@@ -462,6 +465,225 @@ const Assessments = () => {
     };
 
 
+    // --- Excel Functions ---
+    const handleDownloadTemplate = async () => {
+        if (!selectedSubject) return;
+        setLoading(true);
+        try {
+            // 1. Get Students
+            let uniqueStudents = [];
+            let classIds = [];
+            // Reuse logic from handlePrint/startGrading to get students
+            if (user.role === 'lecturer' && user.lecturer_id) {
+                const { data: timetableData } = await supabase
+                    .from('timetable')
+                    .select('group_names')
+                    .eq('lecturer_id', user.lecturer_id)
+                    .eq('subject_id', selectedSubject);
+                const myGroups = [...new Set(timetableData?.flatMap(t => t.group_names || []).filter(Boolean))];
+                if (myGroups.length > 0) {
+                    const { data: studentData } = await supabase
+                        .from('students')
+                        .select('id, name, matric_no, student_group')
+                        .in('student_group', myGroups)
+                        .eq('faculty_id', user.faculty_id);
+                    uniqueStudents = (studentData || []).sort((a, b) => a.matric_no.localeCompare(b.matric_no));
+                }
+            } else {
+                const { data: classesData } = await supabase.from('classes').select('id').eq('subject_id', selectedSubject);
+                classIds = classesData?.map(c => c.id) || [];
+                if (classIds.length > 0) {
+                    const { data: enrollmentsData } = await supabase
+                        .from('enrollments')
+                        .select(`student_id, students (id, name, matric_no, student_group)`)
+                        .in('class_id', classIds);
+                    const uniqueStudentsMap = new Map();
+                    enrollmentsData?.forEach(e => { if (e.students) uniqueStudentsMap.set(e.students.id, e.students); });
+                    uniqueStudents = Array.from(uniqueStudentsMap.values()).sort((a, b) => a.matric_no.localeCompare(b.matric_no));
+                }
+            }
+
+            if (uniqueStudents.length === 0) {
+                alert("No students found.");
+                setLoading(false);
+                return;
+            }
+
+            // 2. Prepare Data for Excel
+            // Headers: No, Name, Matric No, Group, [Assessment Names...]
+            const assessmentHeaders = assessments.map(a => a.name);
+            const headers = ['No', 'Student Name', 'Matric No', 'Student Group', ...assessmentHeaders];
+
+            // 3. Prepare Rows
+            // Fetch existing grades first to pre-fill?
+            // "add 'download excel template'... basically you download a file with a table list of student names... and assessments"
+            // It implies a template to key in data. Pre-filling current grades is helpful.
+            const assessmentIds = assessments.map(a => a.id);
+            let existingGrades = [];
+            if (assessmentIds.length > 0) {
+                const { data: gradesData } = await supabase.from('grades').select('*').in('assessment_id', assessmentIds);
+                existingGrades = gradesData || [];
+            }
+
+            const rows = uniqueStudents.map((student, index) => {
+                const row = {
+                    'No': index + 1,
+                    'Student Name': student.name,
+                    'Matric No': student.matric_no,
+                    'Student Group': student.student_group
+                };
+
+                assessments.forEach(assessment => {
+                    const grade = existingGrades.find(g => g.student_id === student.id && g.assessment_id === assessment.id);
+                    row[assessment.name] = grade ? grade.marks_obtained : '';
+                });
+
+                return row;
+            });
+
+            // 4. Create Workbook
+            const worksheet = XLSX.utils.json_to_sheet(rows, { header: headers });
+
+            // Auto-width for columns
+            const colWidths = headers.map(h => ({ wch: h.length + 5 })); // items not available here easily, naive width
+            // Adjust specific columns
+            colWidths[1] = { wch: 40 }; // Name
+            colWidths[2] = { wch: 15 }; // Matric
+            worksheet['!cols'] = colWidths;
+
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Marks");
+
+            // 5. Download
+            const subjectCode = subjects.find(s => s.id === selectedSubject)?.code || 'Subject';
+            XLSX.writeFile(workbook, `${subjectCode}_Grades_Template.xlsx`);
+
+        } catch (err) {
+            console.error("Error downloading template:", err);
+            setError("Failed to download template.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setLoading(true);
+        try {
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data);
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+            if (jsonData.length === 0) {
+                alert("File appears to be empty.");
+                setLoading(false);
+                return;
+            }
+
+            // Map student matric no to ID for easier lookup
+            // We need to fetch students first to get their IDs based on Matric No
+            // Assuming current 'assessments' state is up to date valid columns
+
+            // 1. Get all students to map Matric No -> ID
+            // Using same fetch logic as download to ensure we match correctly
+            // Or just fetch ALL students in faculty to be safe? 
+            // Better to stick to subject scope for safety.
+            let uniqueStudents = [];
+            // Re-fetch students (simplified duplicate logic for now due to scope)
+            // ... (Copying student fetch logic or extracting it would be better pattern, but executing inline for now)
+            if (user.role === 'lecturer' && user.lecturer_id) {
+                const { data: timetableData } = await supabase
+                    .from('timetable')
+                    .select('group_names')
+                    .eq('lecturer_id', user.lecturer_id)
+                    .eq('subject_id', selectedSubject);
+                const myGroups = [...new Set(timetableData?.flatMap(t => t.group_names || []).filter(Boolean))];
+                if (myGroups.length > 0) {
+                    const { data: studentData } = await supabase
+                        .from('students')
+                        .select('id, matric_no')
+                        .in('student_group', myGroups)
+                        .eq('faculty_id', user.faculty_id);
+                    uniqueStudents = studentData || [];
+                }
+            } else {
+                const { data: classesData } = await supabase.from('classes').select('id').eq('subject_id', selectedSubject);
+                const classIds = classesData?.map(c => c.id) || [];
+                if (classIds.length > 0) {
+                    const { data: enrollmentsData } = await supabase
+                        .from('enrollments')
+                        .select(`student_id, students (id, matric_no)`)
+                        .in('class_id', classIds);
+                    enrollmentsData?.forEach(e => { if (e.students) uniqueStudents.push(e.students); });
+                }
+            }
+
+            const studentMap = {}; // Matric -> ID
+            uniqueStudents.forEach(s => studentMap[s.matric_no] = s.id);
+
+            // 2. Process Rows
+            let updateCount = 0;
+            const upsertData = [];
+
+            jsonData.forEach(row => {
+                const matricNo = row['Matric No'];
+                if (!matricNo) return;
+
+                const studentId = studentMap[matricNo];
+                if (!studentId) return; // Student not found in this subject scope
+
+                // Check each assessment column
+                assessments.forEach(assessment => {
+                    const marks = row[assessment.name];
+                    // Only update if marks are present (0 is valid)
+                    if (marks !== undefined && marks !== '' && marks !== null) {
+                        upsertData.push({
+                            faculty_id: user.faculty_id,
+                            assessment_id: assessment.id,
+                            student_id: studentId,
+                            marks_obtained: parseFloat(marks)
+                        });
+                    }
+                });
+            });
+
+            if (upsertData.length > 0) {
+                const { error } = await supabase
+                    .from('grades')
+                    .upsert(upsertData, { onConflict: 'assessment_id, student_id' });
+
+                if (error) throw error;
+                updateCount = upsertData.length;
+
+                // Audit Log
+                import('../utils/auditLogger').then(({ logAuditAction }) => {
+                    logAuditAction(user, 'GRADE_BULK_UPLOAD', {
+                        subject_id: selectedSubject,
+                        records_updated: updateCount
+                    });
+                });
+
+                setSuccessMessage(`Successfully uploaded marks for ${upsertData.length} records.`);
+                setTimeout(() => setSuccessMessage(null), 5000);
+                // Refresh
+                fetchAssessments(); // Will trigger re-fetch of grades if we were viewing them, but strictly we aren't viewing grades directly on main page
+            } else {
+                setSuccessMessage("No valid marks change detected.");
+            }
+
+        } catch (err) {
+            console.error("Error uploading file:", err);
+            setError("Failed to process Excel file. Please check format.");
+        } finally {
+            setLoading(false);
+            e.target.value = null; // Reset input
+        }
+    };
+
+
     if (isPrinting) {
         return (
             <div className="bg-white min-h-screen">
@@ -486,6 +708,7 @@ const Assessments = () => {
                     students={printData.students}
                     grades={printData.grades}
                     lecturer={printData.lecturer} // Pass correct lecturer
+                    semesterSession={user?.semester_name}
                 />
             </div>
         );
@@ -602,14 +825,38 @@ const Assessments = () => {
                             );
                         })}
                     </div>
-                    <button
-                        onClick={handlePrint}
-                        disabled={loading}
-                        className="flex items-center px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-700 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-700 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
-                    >
-                        <Printer size={16} className="mr-2" />
-                        Print Marks
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="file"
+                            accept=".xlsx, .xls"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                            id="upload-excel"
+                        />
+                        <button
+                            onClick={handleDownloadTemplate}
+                            disabled={loading}
+                            className="flex items-center px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+                        >
+                            <Download size={16} className="mr-2" />
+                            Template
+                        </button>
+                        <label
+                            htmlFor="upload-excel"
+                            className={`flex items-center px-4 py-2 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 rounded-xl hover:bg-green-100 dark:hover:bg-green-900/30 transition-all text-xs font-bold uppercase tracking-widest cursor-pointer ${loading ? 'opacity-50 pointer-events-none' : ''}`}
+                        >
+                            <Upload size={16} className="mr-2" />
+                            Upload
+                        </label>
+                        <button
+                            onClick={handlePrint}
+                            disabled={loading}
+                            className="flex items-center px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-700 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-700 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+                        >
+                            <Printer size={16} className="mr-2" />
+                            Print Marks
+                        </button>
+                    </div>
                 </div>
             )}
 

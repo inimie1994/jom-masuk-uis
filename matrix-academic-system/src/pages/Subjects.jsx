@@ -371,55 +371,82 @@ const Subjects = () => {
                         ))}
                     </div>
                 ) : (
-                    <div className="bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-800">
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-50 dark:divide-slate-800">
-                                <thead className="bg-slate-50 dark:bg-slate-950">
-                                    <tr>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Code</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Dept</th>
-                                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wider">Credits</th>
-                                        <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-50 dark:divide-slate-800">
-                                    {subjects.map((subject, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{subject.code || '-'}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{subject.name || 'Unknown Subject'}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600 dark:text-indigo-400 uppercase">{subject.departments?.code || '-'}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{subject.credits}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <div className="flex justify-end space-x-3">
+                    <div className="space-y-12">
+                        {Object.entries(
+                            subjects.reduce((acc, s) => {
+                                const dept = s.departments?.code || 'Other';
+                                if (!acc[dept]) acc[dept] = [];
+                                acc[dept].push(s);
+                                return acc;
+                            }, {})
+                        ).sort((a, b) => a[0].localeCompare(b[0])).map(([deptCode, deptSubjects]) => (
+                            <div key={deptCode} className="space-y-6">
+                                <div className="flex items-center gap-4">
+                                    <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter flex items-center gap-3">
+                                        <div className="w-2 h-8 bg-primary rounded-full"></div>
+                                        {deptCode}
+                                        <span className="text-gray-400 font-medium text-sm ml-2">({deptSubjects.length} subjects)</span>
+                                    </h2>
+                                    <div className="h-px bg-gray-100 dark:border-slate-800 flex-1"></div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                    {deptSubjects.map((subject) => (
+                                        <div
+                                            key={subject.id}
+                                            className="group bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 transition-all duration-300 relative overflow-hidden"
+                                        >
+                                            {/* Accent background blur */}
+                                            <div className="absolute -right-8 -top-8 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
+
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest rounded-lg border border-indigo-100 dark:border-indigo-900/30">
+                                                    {subject.code}
+                                                </div>
+                                                <div className="flex gap-2">
                                                     <button
                                                         onClick={() => handleEditSubject(subject)}
-                                                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
+                                                        className="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-xl transition-all"
                                                         title="Edit Subject"
                                                     >
                                                         <Edit size={18} />
                                                     </button>
                                                     <button
                                                         onClick={() => handleOpenSyllabus(subject)}
-                                                        className="text-teal-600 hover:text-teal-900 dark:text-teal-400 dark:hover:text-teal-300 transition-colors"
+                                                        className="p-2 text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-all"
                                                         title="Manage Syllabus"
                                                     >
                                                         <BookOpen size={18} />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteSubject(subject.id)}
-                                                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                                                        className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all"
                                                         title="Delete Subject"
                                                     >
                                                         <Trash2 size={18} />
                                                     </button>
                                                 </div>
-                                            </td>
-                                        </tr>
+                                            </div>
+
+                                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 group-hover:text-primary transition-colors">
+                                                {subject.name}
+                                            </h3>
+
+                                            <div className="flex items-center gap-4 text-xs font-bold text-gray-400 uppercase tracking-widest mt-6 pt-4 border-t border-gray-50 dark:border-slate-800">
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-slate-700"></div>
+                                                    {subject.credits} Credits
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-primary/40"></div>
+                                                    {deptCode}
+                                                </div>
+                                            </div>
+                                        </div>
                                     ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 )
             ) : (
