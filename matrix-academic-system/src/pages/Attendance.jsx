@@ -96,7 +96,7 @@ const Attendance = () => {
                 .select('group_names')
                 .eq('subject_id', subjectId);
 
-            if (user.role === 'lecturer' && user.lecturer_id) {
+            if (['lecturer', 'hod', 'hop'].includes(user.role) && user.lecturer_id) {
                 query = query.eq('lecturer_id', user.lecturer_id);
             }
 
@@ -114,7 +114,7 @@ const Attendance = () => {
         try {
             let query;
 
-            if (user.role === 'lecturer' && user.lecturer_id) {
+            if (['lecturer', 'hod', 'hop'].includes(user.role) && user.lecturer_id) {
                 // For lecturers, only show subjects they teach
                 query = supabase
                     .from('timetable')
@@ -1363,7 +1363,7 @@ const Attendance = () => {
                                 dates={dateColumns}
                                 attendanceData={attendanceData}
                                 lecturerName={
-                                    user.role === 'lecturer'
+                                    ['lecturer', 'hod', 'hop'].includes(user.role)
                                         ? user.name
                                         : (timetable.length > 0 && timetable[0].lecturers
                                             ? timetable[0].lecturers.name
@@ -1383,7 +1383,7 @@ const Attendance = () => {
                                         dates={data.dates}
                                         attendanceData={data.attendanceData}
                                         lecturerName={
-                                            user.role === 'lecturer'
+                                            ['lecturer', 'hod', 'hop'].includes(user.role)
                                                 ? user.name
                                                 : (timetable.length > 0 && timetable[0].lecturers
                                                     ? timetable[0].lecturers.name

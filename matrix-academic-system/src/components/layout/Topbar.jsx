@@ -8,7 +8,7 @@ const Topbar = ({ toggleMobileSidebar }) => {
     const navigate = useNavigate();
 
     const handleLogout = async () => {
-        const isLecturer = user?.role === 'lecturer';
+        const isLecturer = ['lecturer', 'hod', 'hop'].includes(user?.role);
         await signOut();
         if (isLecturer) {
             navigate('/lecturer-login');
@@ -18,7 +18,9 @@ const Topbar = ({ toggleMobileSidebar }) => {
     };
 
     const roleLabel = user?.role === 'lecturer' ? 'Lecturer' :
-        (user?.role === 'admin' ? 'Faculty Admin' : 'System User');
+        user?.role === 'hod' ? 'Head of Department' :
+            user?.role === 'hop' ? 'Head of Program' :
+                (user?.role === 'admin' ? 'Faculty Admin' : 'System User');
 
     return (
         <header className="h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-100 dark:border-slate-800 flex items-center justify-between px-6 sticky top-0 z-40 transition-colors">

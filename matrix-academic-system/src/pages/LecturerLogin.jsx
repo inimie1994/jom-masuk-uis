@@ -18,7 +18,7 @@ const LecturerLogin = () => {
     useEffect(() => {
         if (user) {
             console.log('LecturerLogin: User detected, navigating...', user.role);
-            if (user.role === 'lecturer' || user.user_metadata?.role === 'lecturer') {
+            if (['lecturer', 'hod', 'hop'].includes(user.role) || ['lecturer', 'hod', 'hop'].includes(user.user_metadata?.role)) {
                 navigate('/lecturer-dashboard');
             } else if (user.role === 'admin') {
                 navigate('/dashboard');

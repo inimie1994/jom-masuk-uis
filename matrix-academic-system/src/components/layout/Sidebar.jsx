@@ -49,8 +49,20 @@ const Sidebar = ({ isMobile, className = '' }) => {
         { path: '/settings', label: 'Settings', icon: Settings },
     ];
 
-    const navItems = user?.role === 'lecturer' ? lecturerNavItems : adminNavItems;
-    const roleLabel = user?.role === 'lecturer' ? 'Lecturer' : (user?.role === 'admin' ? 'Faculty Admin' : (user ? 'Loading Role...' : 'Guest'));
+    const isLecturerRole = ['lecturer', 'hod', 'hop'].includes(user?.role);
+    const navItems = isLecturerRole ? lecturerNavItems : adminNavItems;
+
+    const getRoleLabel = () => {
+        if (!user) return 'Guest';
+        switch (user.role) {
+            case 'admin': return 'Faculty Admin';
+            case 'hod': return 'Head of Department';
+            case 'hop': return 'Head of Program';
+            case 'lecturer': return 'Lecturer';
+            default: return 'Loading Role...';
+        }
+    };
+    const roleLabel = getRoleLabel();
 
     const toggleSidebar = () => {
         setCollapsed(!collapsed);

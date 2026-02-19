@@ -75,8 +75,9 @@ const Assessments = () => {
                 .eq('faculty_id', user.faculty_id)
                 .order('code');
 
-            // If lecturer, only show subjects they teach
-            if (user.role === 'lecturer' && user.lecturer_id) {
+            // If lecturer/HOD/HOP, only show subjects they teach
+            const isStaff = ['lecturer', 'hod', 'hop'].includes(user.role);
+            if (isStaff && user.lecturer_id) {
                 // Find subjects linked to this lecturer via timetable
                 // We now prioritize timetable as the source of truth
                 const { data: timetableData, error: timetableError } = await supabase
@@ -210,7 +211,7 @@ const Assessments = () => {
             let uniqueStudents = [];
             let classIds = [];
 
-            if (user.role === 'lecturer' && user.lecturer_id) {
+            if (['lecturer', 'hod', 'hop'].includes(user.role) && user.lecturer_id) {
                 // For lecturers, find groups from timetable
                 const { data: timetableData, error: timetableError } = await supabase
                     .from('timetable')
@@ -335,7 +336,7 @@ const Assessments = () => {
             let uniqueStudents = [];
             let classIds = [];
 
-            if (user.role === 'lecturer' && user.lecturer_id) {
+            if (['lecturer', 'hod', 'hop'].includes(user.role) && user.lecturer_id) {
                 // Find groups from timetable
                 const { data: timetableData, error: timetableError } = await supabase
                     .from('timetable')
@@ -474,7 +475,7 @@ const Assessments = () => {
             let uniqueStudents = [];
             let classIds = [];
             // Reuse logic from handlePrint/startGrading to get students
-            if (user.role === 'lecturer' && user.lecturer_id) {
+            if (['lecturer', 'hod', 'hop'].includes(user.role) && user.lecturer_id) {
                 const { data: timetableData } = await supabase
                     .from('timetable')
                     .select('group_names')
@@ -594,7 +595,7 @@ const Assessments = () => {
             let uniqueStudents = [];
             // Re-fetch students (simplified duplicate logic for now due to scope)
             // ... (Copying student fetch logic or extracting it would be better pattern, but executing inline for now)
-            if (user.role === 'lecturer' && user.lecturer_id) {
+            if (['lecturer', 'hod', 'hop'].includes(user.role) && user.lecturer_id) {
                 const { data: timetableData } = await supabase
                     .from('timetable')
                     .select('group_names')

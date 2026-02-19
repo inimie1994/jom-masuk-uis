@@ -10,7 +10,7 @@ const Login = () => {
 
     useEffect(() => {
         if (user) {
-            if (user.role === 'lecturer') {
+            if (['lecturer', 'hod', 'hop'].includes(user.role)) {
                 navigate('/lecturer-dashboard');
             } else {
                 navigate('/dashboard');

@@ -5,6 +5,7 @@ import PageHeader from '../components/common/PageHeader';
 import Modal from '../components/common/Modal';
 import PrintableWorkloadSheet from '../components/workload/PrintableWorkloadSheet';
 import { Plus, Trash2, Clock, BookOpen, ChevronRight, Briefcase, Eye, Key, Mail, Lock, User, Printer } from 'lucide-react';
+import { PROGRAMS } from '../utils/programUtils';
 
 const Lecturers = () => {
     const { user } = useAuth();
@@ -27,6 +28,8 @@ const Lecturers = () => {
         username: '',
         password: '',
         department_id: '',
+        role: 'lecturer',
+        program_code: ''
     });
 
     const [workloadForm, setWorkloadForm] = useState({
@@ -182,8 +185,44 @@ const Lecturers = () => {
             if (functionError) throw functionError;
             if (data?.error) throw new Error(data.error);
 
+            // POST-CREATION UPDATE:
+            // The edge function only creates the basic user/lecturer.
+            // We need to now apply the Role and (if HOP) Program Code.
+            if (lecturerForm.role && lecturerForm.role !== 'lecturer') {
+                const newUsername = lecturerForm.username;
+
+                // 1. Find the newly created lecturer to get their ID (and link to user)
+                const { data: newLecturer, error: fetchError } = await supabase
+                    .from('lecturers')
+                    .select('id, faculty_id') // We can't select user_id directly if it's not FK-linked explicitly enough or RLS blocks? 
+                    // Actually, let's assume username is unique enough or we just trust the timing.
+                    .eq('username', newUsername)
+                    .single();
+
+                if (newLecturer) {
+                    // Update Lecturers Table
+                    await supabase
+                        .from('lecturers')
+                        .update({
+                            role: lecturerForm.role,
+                            program_code: lecturerForm.role === 'hop' ? lecturerForm.program_code : null
+                        })
+                        .eq('id', newLecturer.id);
+
+                    // Update Users Table (Need to find the user linked to this lecturer)
+                    // Since we don't have user_id on lecturer table easily accessible or modifiable here maybe?
+                    // Actually 20240215_add_user_roles.sql added `lecturer_id` to users table.
+
+                    // So we update user where lecturer_id = newLecturer.id
+                    await supabase
+                        .from('users')
+                        .update({ role: lecturerForm.role })
+                        .eq('lecturer_id', newLecturer.id);
+                }
+            }
+
             setIsAddLecturerModalOpen(false);
-            setLecturerForm({ name: '', username: '', password: '', department_id: '' });
+            setLecturerForm({ name: '', username: '', password: '', department_id: '', role: 'lecturer', program_code: '' });
             fetchLecturers();
 
             // Log success to console for verification
@@ -604,20 +643,55 @@ const Lecturers = () => {
                             Stored temporarily for admin view.
                         </p>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
-                        <select
-                            required
-                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
-                            value={lecturerForm.department_id}
-                            onChange={(e) => setLecturerForm({ ...lecturerForm, department_id: e.target.value })}
-                        >
-                            <option value="">Select Department...</option>
-                            {departments.map(dept => (
-                                <option key={dept.id} value={dept.id}>{dept.code} - {dept.name}</option>
-                            ))}
-                        </select>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
+                            <select
+                                required
+                                className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                value={lecturerForm.role || 'lecturer'}
+                                onChange={(e) => setLecturerForm({ ...lecturerForm, role: e.target.value, program_code: e.target.value === 'hop' ? lecturerForm.program_code : '' })}
+                            >
+                                <option value="lecturer">Lecturer</option>
+                                <option value="hod">Head of Department (HOD)</option>
+                                <option value="hop">Head of Program (HOP)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
+                            <select
+                                required
+                                className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                value={lecturerForm.department_id}
+                                onChange={(e) => setLecturerForm({ ...lecturerForm, department_id: e.target.value })}
+                            >
+                                <option value="">Select Department...</option>
+                                {departments.map(dept => (
+                                    <option key={dept.id} value={dept.id}>{dept.code} - {dept.name}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
+
+                    {/* HOP Program Selection */}
+                    {lecturerForm.role === 'hop' && (
+                        <div className="animate-in fade-in slide-in-from-top-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Program</label>
+                            <select
+                                required
+                                className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                value={lecturerForm.program_code}
+                                onChange={(e) => setLecturerForm({ ...lecturerForm, program_code: e.target.value })}
+                            >
+                                <option value="">Select Program...</option>
+                                {Object.entries(PROGRAMS).map(([code, name]) => (
+                                    <option key={code} value={code}>{code} - {name}</option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-[10px] text-gray-500">Required for Head of Program role.</p>
+                        </div>
+                    )}
 
                     <div className="flex justify-end space-x-3 pt-4">
                         <button type="button" onClick={() => setIsAddLecturerModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 transition-colors">Cancel</button>

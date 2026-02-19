@@ -318,8 +318,8 @@ const Subjects = () => {
     return (
         <div>
             <PageHeader
-                title={user?.role === 'lecturer' ? "My Classes" : "Subjects"}
-                description={user?.role === 'lecturer' ? "List of classes assigned to you for this semester." : null}
+                title={['lecturer', 'hod', 'hop'].includes(user?.role) ? "My Classes" : "Subjects"}
+                description={['lecturer', 'hod', 'hop'].includes(user?.role) ? "List of classes assigned to you for this semester." : null}
                 actionLabel={user?.role === 'admin' ? "Add Subject" : null}
                 onAction={user?.role === 'admin' ? (() => setIsModalOpen(true)) : null}
             />
@@ -335,7 +335,7 @@ const Subjects = () => {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
             ) : subjects.length > 0 ? (
-                user?.role === 'lecturer' ? (
+                ['lecturer', 'hod', 'hop'].includes(user?.role) ? (
                     <div className="space-y-4">
                         {subjects.map((subject, idx) => (
                             <div key={idx} className="bg-white dark:bg-slate-900 shadow-sm rounded-2xl border border-gray-100 dark:border-slate-800 p-6 hover:shadow-md transition-shadow">
