@@ -258,6 +258,24 @@ const Assessments = () => {
                 }
             }
 
+            // 2. Fetch Lecturer Name specifically for this subject
+            let currentLecturer = user;
+            const { data: timetableLecturers, error: lecturerError } = await supabase
+                .from('timetable')
+                .select(`
+                    lecturer_id,
+                    lecturers (id, name, full_name)
+                `)
+                .eq('subject_id', selectedSubject)
+                .limit(1);
+
+            if (!lecturerError && timetableLecturers?.length > 0 && timetableLecturers[0].lecturers) {
+                currentLecturer = {
+                    ...user,
+                    ...timetableLecturers[0].lecturers
+                };
+            }
+
             // 3. Get All Grades for this subject (all assessments)
             // fetch grades where assessment_id is in current 'assessments' list
             const assessmentIds = assessments.map(a => a.id);
@@ -276,7 +294,8 @@ const Assessments = () => {
             console.log("Print Data prepared:", {
                 classIds,
                 studentCount: uniqueStudents.length,
-                gradeCount: allGrades.length
+                gradeCount: allGrades.length,
+                lecturerFound: !!timetableLecturers?.[0]
             });
 
             if (uniqueStudents.length === 0) {
@@ -285,7 +304,11 @@ const Assessments = () => {
                 return;
             }
 
-            setPrintData({ students: uniqueStudents, grades: allGrades });
+            setPrintData({
+                students: uniqueStudents,
+                grades: allGrades,
+                lecturer: currentLecturer
+            });
             setIsPrinting(true);
 
         } catch (err) {
@@ -462,7 +485,7 @@ const Assessments = () => {
                     assessments={assessments} // Pass all assessments, sorted by date in fetchAssessments
                     students={printData.students}
                     grades={printData.grades}
-                    lecturer={user} // Pass current user as lecturer
+                    lecturer={printData.lecturer} // Pass correct lecturer
                 />
             </div>
         );

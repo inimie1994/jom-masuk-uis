@@ -44,6 +44,7 @@ const Attendance = () => {
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
     const [printMode, setPrintMode] = useState('single'); // 'single' | 'all'
     const [allMonthsData, setAllMonthsData] = useState([]); // Array of { month, dates, attendanceData }
+    const [allGroupsData, setAllGroupsData] = useState([]); // Array of { group, students, dates, attendanceData }
     const [isGeneratingPrint, setIsGeneratingPrint] = useState(false);
 
     // Initial Fetch: Subjects
@@ -434,12 +435,16 @@ const Attendance = () => {
     };
 
     const handlePrint = async (mode = 'single') => {
+        if (selectedGroup === 'ALL' && mode === 'single') {
+            mode = 'all-groups';
+        }
+
         setPrintMode(mode);
         setIsPrintModalOpen(false);
 
         if (mode === 'single') {
             setTimeout(() => window.print(), 100);
-        } else {
+        } else if (mode === 'all') {
             // Generate data for all months
             setIsGeneratingPrint(true);
             try {
@@ -531,6 +536,102 @@ const Attendance = () => {
             } catch (err) {
                 console.error("Error generating print report:", err);
                 setError("Failed to generate print report.");
+            } finally {
+                setIsGeneratingPrint(false);
+            }
+        } else if (mode === 'all-groups') {
+            setIsGeneratingPrint(true);
+            try {
+                // 1. Semester Dates & Holidays
+                let start, end;
+                if (user?.faculty_id) {
+                    const { data: facultyData } = await supabase
+                        .from('faculties')
+                        .select('semester_start_date, semester_end_date')
+                        .eq('id', user.faculty_id)
+                        .single();
+                    if (facultyData) {
+                        start = new Date(facultyData.semester_start_date);
+                        end = new Date(facultyData.semester_end_date);
+                    }
+                }
+                const { data: holidays } = await supabase
+                    .from('holidays')
+                    .select('name, date')
+                    .eq('faculty_id', user.faculty_id);
+
+                const semesterSettings = start && end ? { start: start.toISOString(), end: end.toISOString() } : {};
+
+                // 2. Fetch all students in faculty to filter per group later
+                const { data: allStudents } = await supabase
+                    .from('students')
+                    .select('id, name, matric_no, student_group')
+                    .eq('faculty_id', user.faculty_id)
+                    .in('student_group', groups);
+
+                // 3. Process each group
+                const groupsData = [];
+                for (const groupName of groups) {
+                    // Timetable for this specific group + subject
+                    const { data: groupTimetable } = await supabase
+                        .from('timetable')
+                        .select('*, lecturers(name)')
+                        .filter('group_names', 'cs', `{${groupName}}`)
+                        .eq('subject_id', selectedSubject);
+
+                    if (!groupTimetable || groupTimetable.length === 0) continue;
+
+                    const dates = generateDatesFromTimetable(selectedMonth, groupTimetable, semesterSettings, holidays || []);
+                    if (dates.length === 0) continue;
+
+                    const groupStudents = allStudents?.filter(s => s.student_group === groupName) || [];
+                    if (groupStudents.length === 0) continue;
+
+                    // Attendance Sessions
+                    const startOfMonth = `${selectedMonth}-01`;
+                    const endOfMonth = new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1], 0).toISOString().split('T')[0];
+
+                    const { data: sessions } = await supabase
+                        .from('attendance_sessions')
+                        .select('id, date, start_time')
+                        .filter('group_names', 'cs', `{${groupName}}`)
+                        .eq('subject_id', selectedSubject)
+                        .gte('date', startOfMonth)
+                        .lte('date', endOfMonth);
+
+                    const map = {};
+                    if (sessions && sessions.length > 0) {
+                        const sessionIds = sessions.map(s => s.id);
+                        const { data: records } = await supabase
+                            .from('attendance_records')
+                            .select('session_id, student_id, status')
+                            .in('session_id', sessionIds);
+
+                        records?.forEach(r => {
+                            const session = sessions.find(s => s.id === r.session_id);
+                            if (session) {
+                                const key = `${session.date}_${session.start_time}`;
+                                if (!map[r.student_id]) map[r.student_id] = {};
+                                map[r.student_id][key] = r.status;
+                            }
+                        });
+                    }
+
+                    groupsData.push({
+                        group: groupName,
+                        students: groupStudents,
+                        dates: dates,
+                        attendanceData: map,
+                        lecturerName: groupTimetable[0]?.lecturers?.name || user.name
+                    });
+                }
+
+                setAllGroupsData(groupsData);
+                setTimeout(() => window.print(), 1000);
+
+            } catch (err) {
+                console.error("Error generating all groups report:", err);
+                setError("Failed to generate all groups report.");
             } finally {
                 setIsGeneratingPrint(false);
             }
@@ -773,6 +874,7 @@ const Attendance = () => {
                                 className="rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border w-64 transition-all disabled:opacity-50"
                             >
                                 <option value="">Select Group...</option>
+                                <option value="ALL">ALL</option>
                                 {groups.map(g => (
                                     <option key={g} value={g}>{g}</option>
                                 ))}
@@ -975,7 +1077,7 @@ const Attendance = () => {
                                 }
                                 logoUrl={user?.faculty_logo}
                             />
-                        ) : (
+                        ) : printMode === 'all' ? (
                             <div className="print:block hidden">
                                 {allMonthsData.map((data, idx) => (
                                     <PrintableAttendanceSheet
@@ -993,6 +1095,23 @@ const Attendance = () => {
                                                     ? timetable[0].lecturers.name
                                                     : "__________________________")
                                         }
+                                        logoUrl={user?.faculty_logo}
+                                        className="print:break-after-page"
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="print:block hidden">
+                                {allGroupsData.map((data, idx) => (
+                                    <PrintableAttendanceSheet
+                                        key={idx}
+                                        month={selectedMonth}
+                                        group={data.group}
+                                        subject={subjects.find(s => s.id === selectedSubject)}
+                                        students={data.students}
+                                        dates={data.dates}
+                                        attendanceData={data.attendanceData}
+                                        lecturerName={data.lecturerName}
                                         logoUrl={user?.faculty_logo}
                                         className="print:break-after-page"
                                     />

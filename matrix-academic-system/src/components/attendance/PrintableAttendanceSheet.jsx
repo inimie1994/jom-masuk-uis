@@ -192,7 +192,7 @@ const PrintableAttendanceSheet = ({
                         {/* Holiday Notes */}
                         {dates.filter(d => d.isHoliday).length > 0 && (
                             <div className="mb-2 text-[8px]">
-                                <span className="font-bold underline italic">*NOTA:</span>
+                                <span className="font-bold underline italic">*CUTI:</span>
                                 <ul className="list-none p-0 inline-flex flex-wrap gap-x-4 ml-2">
                                     {[...new Map(dates.filter(d => d.isHoliday).map(d => [d.date, d])).values()]
                                         .sort((a, b) => a.date.localeCompare(b.date))
