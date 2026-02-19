@@ -452,7 +452,13 @@ const Lecturers = () => {
                                                             {lecturer.departments.code}
                                                         </span>
                                                     )}
-                                                    {lecturer.email && <span className="text-xs text-gray-400">{lecturer.email}</span>}
+                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${lecturer.role === 'hod' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
+                                                        lecturer.role === 'hop' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' :
+                                                            'bg-gray-50 dark:bg-slate-700/50 text-gray-500 dark:text-gray-400'
+                                                        }`}>
+                                                        {lecturer.role === 'hod' ? 'HOD' : lecturer.role === 'hop' ? 'HOP' : 'Lecturer'}
+                                                    </span>
+                                                    {lecturer.email && <span className="text-xs text-gray-400 truncate max-w-[150px]">{lecturer.email}</span>}
                                                 </div>
                                             </div>
                                             <ChevronRight size={16} className={`opacity-0 group-hover:opacity-100 transition-opacity ${selectedLecturer?.id === lecturer.id ? 'opacity-100 text-indigo-600' : 'text-gray-400'}`} />
@@ -505,8 +511,20 @@ const Lecturers = () => {
                 {/* Right Column: Workload Details */}
                 <div className="md:col-span-7 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 flex flex-col overflow-hidden">
                     <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900">
-                        <h3 className="font-semibold text-gray-700 dark:text-gray-200">
-                            {selectedLecturer ? `Workload: ${selectedLecturer.name}` : 'Select a lecturer to manage workload'}
+                        <h3 className="font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                            {selectedLecturer ? (
+                                <>
+                                    Workload: {selectedLecturer.name}
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border ${selectedLecturer.role === 'hod' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
+                                            selectedLecturer.role === 'hop' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800' :
+                                                'bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-slate-600'
+                                        }`}>
+                                        {selectedLecturer.role === 'hod' ? 'Head of Department' :
+                                            selectedLecturer.role === 'hop' ? `Head of Program (${selectedLecturer.program_code || ''})` :
+                                                'Lecturer'}
+                                    </span>
+                                </>
+                            ) : 'Select a lecturer to manage workload'}
                         </h3>
                         {selectedLecturer && (
                             <button
