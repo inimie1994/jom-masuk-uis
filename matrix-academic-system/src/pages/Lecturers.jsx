@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
 import Modal from '../components/common/Modal';
 import PrintableWorkloadSheet from '../components/workload/PrintableWorkloadSheet';
-import { Plus, Trash2, Clock, BookOpen, ChevronRight, Briefcase, Eye, Key, Mail, Lock, User, Printer } from 'lucide-react';
+import { Plus, Trash2, Clock, BookOpen, ChevronRight, Briefcase, Eye, Key, Mail, Lock, User, Printer, Pencil } from 'lucide-react';
 import { PROGRAMS } from '../utils/programUtils';
 
 const Lecturers = () => {
@@ -19,6 +19,7 @@ const Lecturers = () => {
 
     // Modal States
     const [isAddLecturerModalOpen, setIsAddLecturerModalOpen] = useState(false);
+    const [isEditLecturerModalOpen, setIsEditLecturerModalOpen] = useState(false);
     const [isWorkloadModalOpen, setIsWorkloadModalOpen] = useState(false);
     const [isViewCredentialsModalOpen, setIsViewCredentialsModalOpen] = useState(false);
 
@@ -27,6 +28,15 @@ const Lecturers = () => {
         name: '',
         username: '',
         password: '',
+        department_id: '',
+        role: 'lecturer',
+        program_code: ''
+    });
+
+    const [editLecturerForm, setEditLecturerForm] = useState({
+        id: '',
+        name: '',
+        username: '',
         department_id: '',
         role: 'lecturer',
         program_code: ''
@@ -230,6 +240,55 @@ const Lecturers = () => {
         } catch (err) {
             console.error('Error adding lecturer:', err);
             setError(err.message || 'Failed to add lecturer. Please check if the username already exists.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEditLecturer = (lecturer) => {
+        setEditLecturerForm({
+            id: lecturer.id,
+            name: lecturer.name,
+            username: lecturer.username,
+            department_id: lecturer.department_id || '',
+            role: lecturer.role || 'lecturer',
+            program_code: lecturer.program_code || ''
+        });
+        setIsEditLecturerModalOpen(true);
+    };
+
+    const handleUpdateLecturer = async (e) => {
+        e.preventDefault();
+        setError(null);
+
+        try {
+            setLoading(true);
+            const { error } = await supabase
+                .from('lecturers')
+                .update({
+                    name: editLecturerForm.name,
+                    department_id: editLecturerForm.department_id,
+                    role: editLecturerForm.role,
+                    program_code: editLecturerForm.role === 'hop' ? editLecturerForm.program_code : null
+                })
+                .eq('id', editLecturerForm.id);
+
+            if (error) throw error;
+
+            // If role changed, update user role as well if applicable
+            await supabase
+                .from('users')
+                .update({ role: editLecturerForm.role })
+                .eq('lecturer_id', editLecturerForm.id);
+
+            setSuccess('Lecturer updated successfully.');
+            setTimeout(() => setSuccess(null), 3000);
+
+            setIsEditLecturerModalOpen(false);
+            fetchLecturers();
+        } catch (err) {
+            console.error('Error updating lecturer:', err);
+            setError(err.message || 'Failed to update lecturer.');
         } finally {
             setLoading(false);
         }
@@ -452,12 +511,6 @@ const Lecturers = () => {
                                                             {lecturer.departments.code}
                                                         </span>
                                                     )}
-                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${lecturer.role === 'hod' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
-                                                        lecturer.role === 'hop' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' :
-                                                            'bg-gray-50 dark:bg-slate-700/50 text-gray-500 dark:text-gray-400'
-                                                        }`}>
-                                                        {lecturer.role === 'hod' ? 'HOD' : lecturer.role === 'hop' ? 'HOP' : 'Lecturer'}
-                                                    </span>
                                                     {lecturer.email && <span className="text-xs text-gray-400 truncate max-w-[150px]">{lecturer.email}</span>}
                                                 </div>
                                             </div>
@@ -465,11 +518,11 @@ const Lecturers = () => {
                                         </button>
                                         <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
-                                                onClick={() => handlePrintWorkload(lecturer)}
+                                                onClick={() => handleEditLecturer(lecturer)}
                                                 className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                title="Print Workload"
+                                                title="Edit Lecturer Details"
                                             >
-                                                <Printer size={18} />
+                                                <Pencil size={18} />
                                             </button>
                                             <button
                                                 onClick={() => {
@@ -516,8 +569,8 @@ const Lecturers = () => {
                                 <>
                                     Workload: {selectedLecturer.name}
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase border ${selectedLecturer.role === 'hod' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
-                                            selectedLecturer.role === 'hop' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800' :
-                                                'bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-slate-600'
+                                        selectedLecturer.role === 'hop' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800' :
+                                            'bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-slate-600'
                                         }`}>
                                         {selectedLecturer.role === 'hod' ? 'Head of Department' :
                                             selectedLecturer.role === 'hop' ? `Head of Program (${selectedLecturer.program_code || ''})` :
@@ -715,6 +768,88 @@ const Lecturers = () => {
                         <button type="button" onClick={() => setIsAddLecturerModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 transition-colors">Cancel</button>
                         <button type="submit" disabled={loading} className="px-4 py-2 text-sm font-bold uppercase tracking-wider text-white bg-primary hover:opacity-90 rounded-xl shadow-sm shadow-indigo-200 dark:shadow-none transition-all disabled:opacity-50">
                             {loading ? 'Creating...' : 'Create Lecturer'}
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Edit Lecturer Modal */}
+            <Modal isOpen={isEditLecturerModalOpen} onClose={() => setIsEditLecturerModalOpen(false)} title="Edit Lecturer Details">
+                <form onSubmit={handleUpdateLecturer} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</label>
+                        <input
+                            type="text"
+                            required
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                            value={editLecturerForm.name}
+                            onChange={(e) => setEditLecturerForm({ ...editLecturerForm, name: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Username</label>
+                        <input
+                            type="text"
+                            disabled
+                            className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm sm:text-sm bg-gray-100 dark:bg-slate-900 text-gray-500 cursor-not-allowed px-3 py-2 border transition-all"
+                            value={editLecturerForm.username}
+                        />
+                        <p className="mt-1 text-[10px] text-gray-400 italic">Username cannot be changed.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
+                            <select
+                                required
+                                className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                value={editLecturerForm.role || 'lecturer'}
+                                onChange={(e) => setEditLecturerForm({ ...editLecturerForm, role: e.target.value, program_code: e.target.value === 'hop' ? editLecturerForm.program_code : '' })}
+                            >
+                                <option value="lecturer">Lecturer</option>
+                                <option value="hod">Head of Department (HOD)</option>
+                                <option value="hop">Head of Program (HOP)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Department</label>
+                            <select
+                                required
+                                className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                value={editLecturerForm.department_id}
+                                onChange={(e) => setEditLecturerForm({ ...editLecturerForm, department_id: e.target.value })}
+                            >
+                                <option value="">Select Department...</option>
+                                {departments.map(dept => (
+                                    <option key={dept.id} value={dept.id}>{dept.code} - {dept.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* HOP Program Selection */}
+                    {editLecturerForm.role === 'hop' && (
+                        <div className="animate-in fade-in slide-in-from-top-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Program</label>
+                            <select
+                                required
+                                className="mt-1 block w-full rounded-xl border-gray-200 dark:border-slate-700 shadow-sm focus:border-primary focus:ring-primary sm:text-sm dark:bg-slate-800 dark:text-white px-3 py-2 border transition-all"
+                                value={editLecturerForm.program_code}
+                                onChange={(e) => setEditLecturerForm({ ...editLecturerForm, program_code: e.target.value })}
+                            >
+                                <option value="">Select Program...</option>
+                                {Object.entries(PROGRAMS).map(([code, name]) => (
+                                    <option key={code} value={code}>{code} - {name}</option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-[10px] text-gray-500">Required for Head of Program role.</p>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end space-x-3 pt-4">
+                        <button type="button" onClick={() => setIsEditLecturerModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 transition-colors">Cancel</button>
+                        <button type="submit" disabled={loading} className="px-4 py-2 text-sm font-bold uppercase tracking-wider text-white bg-primary hover:opacity-90 rounded-xl shadow-sm shadow-indigo-200 dark:shadow-none transition-all disabled:opacity-50">
+                            {loading ? 'Updating...' : 'Save Changes'}
                         </button>
                     </div>
                 </form>
