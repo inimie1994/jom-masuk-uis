@@ -219,21 +219,21 @@ const PrintableWorkloadSheet = ({
             {/* Total Hours Summary Table (Removed) */}
 
             {/* Signatures */}
-            <div className="grid grid-cols-[350px_1fr] border border-black text-[10px] mb-6">
+            {/* Signatures */}
+            <div className="flex flex-col text-[10px] mb-6">
                 {/* Left Box: Signature & Date */}
-                <div className="border-r border-black relative h-32">
-                    <div className="p-1 font-bold">TANDA TANGAN:</div>
-                    {/* Signature Area */}
-
-                    <div className="absolute bottom-1 left-1 right-1">
-                        <div className="font-bold border border-black px-2 py-0.5 inline-block w-full bg-white">
-                            <span className="text-red-600">TARIKH: {new Date().toLocaleDateString('en-GB').replace(/\//g, '.')}</span>
-                        </div>
+                <div className="mb-0">
+                    <div className="border border-black border-b-0 w-[350px] h-24 p-1 relative">
+                        <div className="font-bold">TANDA TANGAN:</div>
+                    </div>
+                    <div className="border border-black w-[350px] h-8 flex items-center px-1 bg-white">
+                        <span className="font-bold mr-2">TARIKH:</span>
+                        <span className="text-red-600 font-bold">{new Date().toLocaleDateString('en-GB').replace(/\//g, '.')}</span>
                     </div>
                 </div>
 
-                {/* Right Box: Appovals */}
-                <div className="flex flex-col h-32">
+                {/* Approvals Section */}
+                <div className="w-full border border-black mt-0">
                     <div className="bg-black text-white font-bold grid grid-cols-2 text-center items-center h-8">
                         <div className="border-r border-white h-full flex items-center justify-center text-[9px] leading-tight px-1">
                             DIPERAKUKAN OLEH KETUA JABATAN / TIMBALAN DEKAN AKADEMIK
@@ -242,7 +242,7 @@ const PrintableWorkloadSheet = ({
                             DISAHKAN OLEH TIMBALAN DEKAN AKADEMIK / DEKAN
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 flex-1">
+                    <div className="grid grid-cols-2 h-24">
                         <div className="border-r border-black p-1 relative">
                             <div className="font-bold">TANDA TANGAN</div>
                         </div>

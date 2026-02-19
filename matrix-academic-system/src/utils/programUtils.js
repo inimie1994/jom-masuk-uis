@@ -8,6 +8,12 @@ export const PROGRAMS = {
     'FA06': 'ASASI BAHASA INGGERIS'
 };
 
+export const DEPARTMENT_PROGRAM_MAP = {
+    'JPI': ['FA01'],
+    'JPIN': ['FA02', 'FA03', 'FA05'],
+    'JB': ['FA04', 'FA06']
+};
+
 /**
  * Extracts the program name from a student group string (e.g., "FA01 2A").
  * @param {string} groupString 
@@ -17,4 +23,8 @@ export const getProgramName = (groupString) => {
     if (!groupString) return 'N/A';
     const code = groupString.split(' ')[0];
     return PROGRAMS[code] || groupString;
+};
+
+export const getProgramsForDepartment = (deptCode) => {
+    return DEPARTMENT_PROGRAM_MAP[deptCode] || [];
 };
