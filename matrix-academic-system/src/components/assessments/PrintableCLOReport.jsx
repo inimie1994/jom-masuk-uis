@@ -24,6 +24,7 @@ const PrintableCLOReport = ({
     semester = '',
     program = '',
     facultyName = 'UNIVERSITI ISLAM SELANGOR',
+    facultyLogo = '', // Logo path
 }) => {
     const sortedStudents = [...students].sort((a, b) =>
         (a.matric_no || '').localeCompare(b.matric_no || '')
@@ -129,34 +130,62 @@ const PrintableCLOReport = ({
             `}</style>
 
             {/* HEADER */}
-            <div style={{ textAlign: 'center', marginBottom: '6px' }}>
-                <div style={{ fontSize: '10pt', fontWeight: 'bold', letterSpacing: '1px' }}>{facultyName}</div>
-                <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>ANALISA PENCAPAIAN SETIAP CLO &amp; PLO PELAJAR</div>
+            <div className="mb-2">
+                <div className="border border-black flex items-stretch">
+                    {/* Logo Section */}
+                    <div className="w-20 p-1 border-r border-black flex items-center justify-center">
+                        {facultyLogo ? (
+                            <img src={facultyLogo} alt="Logo" className="h-10 object-contain" />
+                        ) : (
+                            <div className="text-center font-bold text-[6pt]">LOGO</div>
+                        )}
+                    </div>
+
+                    {/* Title Section */}
+                    <div className="flex-1 flex flex-col justify-center py-1">
+                        <div style={{ fontSize: '9pt', fontWeight: 'bold', textAlign: 'center' }}>
+                            {facultyName.toUpperCase()}
+                        </div>
+                        <div style={{ fontSize: '8pt', fontWeight: 'bold', textAlign: 'center' }}>
+                            ANALISA PENCAPAIAN SETIAP CLO &amp; PLO PELAJAR
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            {/* Meta Info */}
-            <table className="no-border" style={{ width: '100%', marginBottom: '6px', fontSize: '7.5pt' }}>
-                <tbody>
-                    <tr>
-                        <td style={{ width: '15%', fontWeight: 'bold' }}>NAMA TENAGA PENGAJAR</td>
-                        <td style={{ width: '35%' }}>: {lecturerName}</td>
-                        <td style={{ width: '22%', fontWeight: 'bold', textAlign: 'right' }}>SESI / TAHUN AKADEMIK</td>
-                        <td style={{ width: '28%' }}>: {semesterSession}</td>
-                    </tr>
-                    <tr>
-                        <td style={{ fontWeight: 'bold' }}>KOD / KURSUS</td>
-                        <td>: {subjectCode} - {subjectName}</td>
-                        <td style={{ fontWeight: 'bold', textAlign: 'right' }}>SEMESTER / KUMPULAN</td>
-                        <td>: {semester}</td>
-                    </tr>
-                    <tr>
-                        <td style={{ fontWeight: 'bold' }}>PROGRAM</td>
-                        <td>: {program}</td>
-                        <td style={{ fontWeight: 'bold', textAlign: 'right' }}>JUMLAH PELAJAR</td>
-                        <td>: {sortedStudents.length} orang</td>
-                    </tr>
-                </tbody>
-            </table>
+            {/* Meta Info Rows */}
+            <div className="mb-2" style={{ fontSize: '7.5pt' }}>
+                <div className="flex justify-between leading-tight">
+                    <div className="flex">
+                        <span className="font-bold w-36">TENAGA PENGAJAR</span>
+                        <span className="font-bold">: {lecturerName.toUpperCase()}</span>
+                    </div>
+                    <div className="flex min-w-[320px]">
+                        <span className="font-bold">SESI / TAHUN AKADEMIK : </span>
+                        <span>{semesterSession.toUpperCase()}</span>
+                    </div>
+                </div>
+                <div className="flex justify-between leading-tight">
+                    <div className="flex">
+                        <span className="font-bold w-36">KOD / KURSUS</span>
+                        <span className="font-bold">: {subjectCode.toUpperCase()} - {subjectName.toUpperCase()}</span>
+                    </div>
+                    <div className="flex min-w-[320px]">
+                        <span className="font-bold">SEMESTER / KUMPULAN : </span>
+                        <span>{semester.toUpperCase()}</span>
+                    </div>
+                </div>
+                <div className="flex justify-between leading-tight">
+                    <div className="flex">
+                        <span className="font-bold w-36">PROGRAM</span>
+                        <span>: {program.toUpperCase()}</span>
+                    </div>
+                    <div className="flex min-w-[320px]">
+                        <span className="font-bold">JUMLAH PELAJAR : </span>
+                        <span className="font-bold">{sortedStudents.length} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; orang</span>
+                    </div>
+                </div>
+            </div>
 
             {/* MAIN TABLE */}
             <table>

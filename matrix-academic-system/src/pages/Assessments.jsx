@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import StudentMarksPrintTemplate from '../components/assessments/StudentMarksPrintTemplate';
 import PrintableCLOReport from '../components/assessments/PrintableCLOReport';
+import { getProgramName } from '../utils/programUtils';
 import * as XLSX from 'xlsx';
 
 const Assessments = () => {
@@ -369,15 +370,30 @@ const Assessments = () => {
                 }
             }
 
-            // Fetch lecturer name
+            // Fetch lecturer name - Prioritize assigned lecturer for the subject
             let currentLecturer = user;
             const { data: timetableLecturers } = await supabase
                 .from('timetable')
                 .select('lecturer_id, lecturers (id, name, full_name)')
                 .eq('subject_id', selectedSubject)
                 .limit(1);
+
             if (timetableLecturers?.[0]?.lecturers) {
                 currentLecturer = { ...user, ...timetableLecturers[0].lecturers };
+            } else {
+                // Fallback to workload table if timetable is empty
+                const { data: workloadLecturers } = await supabase
+                    .from('workload')
+                    .select('lecturer_id, lecturers (id, name, full_name)')
+                    .eq('subject_id', selectedSubject)
+                    .limit(1);
+
+                if (workloadLecturers?.[0]?.lecturers) {
+                    currentLecturer = { ...user, ...workloadLecturers[0].lecturers };
+                } else if (!['lecturer', 'hod', 'hop'].includes(user.role)) {
+                    // For pure admins or others, if no lecturer assigned, show fallback
+                    currentLecturer = { ...user, name: '-', full_name: '-' };
+                }
             }
 
             // Fetch all grades for this subject's assessments
@@ -397,11 +413,27 @@ const Assessments = () => {
                 return;
             }
 
+            // Derive program from students or user
+            let resolvedProgram = '';
+            if (uniqueStudents.length > 0) {
+                const firstStudentGroup = uniqueStudents[0].student_group;
+                if (firstStudentGroup) {
+                    const code = firstStudentGroup.split(' ')[0];
+                    const { PROGRAMS } = await import('../utils/programUtils');
+                    const name = PROGRAMS[code];
+                    resolvedProgram = name ? `${code} - ${name}` : firstStudentGroup;
+                }
+            }
+            if (!resolvedProgram) {
+                resolvedProgram = user?.department || user?.department_code || '';
+            }
+
             setCloPrintData({
                 students: uniqueStudents,
                 grades: allGrades,
                 lecturer: currentLecturer,
-                groups: groupLabel
+                groups: groupLabel,
+                program: resolvedProgram
             });
             setIsPrintingCLO(true);
         } catch (err) {
@@ -801,8 +833,9 @@ const Assessments = () => {
                     lecturer={cloPrintData.lecturer}
                     semesterSession={user?.semester_name || ''}
                     semester={cloPrintData.groups}
-                    program={user?.department || ''}
+                    program={cloPrintData.program || user?.department || ''}
                     facultyName={user?.faculty_name || 'UNIVERSITI ISLAM SELANGOR'}
+                    facultyLogo={user?.faculty_logo}
                 />
             </div>
         );
