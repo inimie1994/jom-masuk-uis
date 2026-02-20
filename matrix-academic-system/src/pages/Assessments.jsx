@@ -356,7 +356,7 @@ const Assessments = () => {
                         .eq('faculty_id', user.faculty_id);
 
                     if (studentError) throw studentError;
-                    uniqueStudents = (studentData || []).sort((a, b) => a.name.localeCompare(b.name));
+                    uniqueStudents = (studentData || []).sort((a, b) => a.matric_no.localeCompare(b.matric_no));
                 }
             } else {
                 // Admin logic: get students via classes
@@ -383,7 +383,7 @@ const Assessments = () => {
                     enrollmentsData.forEach(e => {
                         if (e.students) uniqueStudentsMap.set(e.students.id, e.students);
                     });
-                    uniqueStudents = Array.from(uniqueStudentsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+                    uniqueStudents = Array.from(uniqueStudentsMap.values()).sort((a, b) => a.matric_no.localeCompare(b.matric_no));
                 }
             }
 

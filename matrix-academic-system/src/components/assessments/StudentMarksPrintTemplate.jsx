@@ -11,9 +11,9 @@ const StudentMarksPrintTemplate = ({ subject, assessments, students, grades, lec
     const STUDENTS_PER_PAGE = 15;
 
     useEffect(() => {
-        // Sort students by name if they exist
+        // Sort students by matric_no if they exist
         const sortedStudents = students && students.length > 0
-            ? [...students].sort((a, b) => a.name.localeCompare(b.name))
+            ? [...students].sort((a, b) => a.matric_no.localeCompare(b.matric_no))
             : [];
 
         if (sortedStudents.length === 0) {

@@ -22,6 +22,7 @@ import MyStudents from './pages/MyStudents';
 import LecturerTimetable from './pages/LecturerTimetable';
 import LecturerReports from './pages/LecturerReports';
 import StudentFeedbackForm from './pages/StudentFeedbackForm';
+import MyTeam from './pages/MyTeam';
 
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -45,6 +46,7 @@ function App() {
               <Route path="lecturer-timetable" element={<LecturerTimetable />} />
               <Route path="lecturer-reports" element={<LecturerReports />} />
               <Route path="my-students" element={<MyStudents />} />
+              <Route path="my-team" element={<MyTeam />} />
               <Route path="students" element={<Students />} />
               <Route path="lecturers" element={<Lecturers />} />
               <Route path="subjects" element={<Subjects />} />

@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom';
 
 import HodHopStudents from '../components/dashboard/HodHopStudents';
 import HodHopSubjects from '../components/dashboard/HodHopSubjects';
+import HodHopTeam from '../components/dashboard/HodHopTeam';
 
 const LecturerDashboard = () => {
     const { user } = useAuth();
@@ -145,10 +146,10 @@ const LecturerDashboard = () => {
             </header>
 
             {isHodOrHop && (
-                <div className="flex space-x-1 bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl mb-6 w-fit">
+                <div className="flex space-x-1 bg-slate-100 dark:bg-slate-800/50 p-1 rounded-xl mb-6 w-fit overflow-x-auto">
                     <button
                         onClick={() => setActiveTab('overview')}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'overview'
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'overview'
                             ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm'
                             : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                             }`}
@@ -157,7 +158,7 @@ const LecturerDashboard = () => {
                     </button>
                     <button
                         onClick={() => setActiveTab('students')}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'students'
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'students'
                             ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm'
                             : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                             }`}
@@ -166,7 +167,7 @@ const LecturerDashboard = () => {
                     </button>
                     <button
                         onClick={() => setActiveTab('subjects')}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'subjects'
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'subjects'
                             ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm'
                             : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                             }`}

@@ -218,6 +218,14 @@ const Attendance = () => {
 
                     const isCancelled = matchedSession && matchedSession.class_type === 'CANCELLED';
 
+                    // Calculate Week Number
+                    let weekNum = null;
+                    if (semesterStart) {
+                        const diffTime = dateObj.getTime() - semesterStart.getTime();
+                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                        weekNum = Math.floor(diffDays / 7) + 1;
+                    }
+
                     dates.push({
                         date: dateStr, // YYYY-MM-DD
                         dayName: dayName,
@@ -230,7 +238,8 @@ const Attendance = () => {
                         holidayName: holidayName,
                         sessionId: matchedSession ? matchedSession.id : null,
                         isVirtual: !matchedSession,
-                        isCancelled: isCancelled
+                        isCancelled: isCancelled,
+                        weekNum: weekNum
                     });
                 });
             }
@@ -238,10 +247,7 @@ const Attendance = () => {
 
         // 2. Add Extra Sessions (Postponed/Rescheduled) that are NOT in standard timetable slots
         existingSessions.forEach(session => {
-            // For extra sessions, if they are cancelled, we typically just hide them?
-            // Or if it was a "moved" session that got cancelled? 
-            // Let's just show them as dimmed too if they exist.
-
+            // ... (rest of logic)
             // Check if this session is already accounted for in the generated dates
             const exists = dates.find(d =>
                 d.date === session.date &&
@@ -257,6 +263,14 @@ const Attendance = () => {
                 const isHoliday = !!holidayMap[session.date];
                 const holidayName = holidayMap[session.date];
 
+                // Calculate Week Number for extra session
+                let weekNum = null;
+                if (semesterStart) {
+                    const diffTime = dateObj.getTime() - semesterStart.getTime();
+                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    weekNum = Math.floor(diffDays / 7) + 1;
+                }
+
                 dates.push({
                     date: session.date,
                     dayName: dayName,
@@ -268,7 +282,8 @@ const Attendance = () => {
                     isHoliday: isHoliday,
                     holidayName: holidayName,
                     sessionId: session.id,
-                    isExtra: true
+                    isExtra: true,
+                    weekNum: weekNum
                 });
             }
         });
@@ -312,11 +327,17 @@ const Attendance = () => {
             }
 
             // 2. Fetch Timetable for this Group + Subject
-            const { data: timetableData, error: timetableError } = await supabase
+            let query = supabase
                 .from('timetable')
                 .select('*, lecturers(name)')
                 .filter('group_names', 'cs', `{${selectedGroup}}`)
                 .eq('subject_id', selectedSubject);
+
+            if (['lecturer', 'hod', 'hop'].includes(user.role) && user.lecturer_id) {
+                query = query.eq('lecturer_id', user.lecturer_id);
+            }
+
+            const { data: timetableData, error: timetableError } = await query;
 
             if (timetableError) throw timetableError;
             setTimetable(timetableData || []);
@@ -701,46 +722,49 @@ const Attendance = () => {
     };
 
     const handleClearAll = async () => {
-        if (!window.confirm("Are you sure you want to clear ALL attendance records for this month? This action cannot be undone.")) return;
+        if (!window.confirm("Are you sure you want to clear ALL attendance data for this subject? This will delete all records and manually created sessions across ALL months. This action cannot be undone.")) return;
 
         setLoading(true);
         try {
-            const startOfMonth = `${selectedMonth}-01`;
-            const endOfMonth = new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1], 0).toISOString().split('T')[0];
-
-            // 1. Find relevant sessions
+            // 1. Find relevant sessions (Across ALL months for this Subject + Group)
             const { data: sessions, error: sessionsError } = await supabase
                 .from('attendance_sessions')
                 .select('id')
                 .filter('group_names', 'cs', `{${selectedGroup}}`)
-                .eq('subject_id', selectedSubject)
-                .gte('date', startOfMonth)
-                .lte('date', endOfMonth);
+                .eq('subject_id', selectedSubject);
 
             if (sessionsError) throw sessionsError;
 
             if (sessions.length > 0) {
                 const sessionIds = sessions.map(s => s.id);
 
-                // 2. Delete records
-                const { error: deleteError } = await supabase
+                // 2. Delete SESSIONS (Records will be deleted via CASCADE if configured, otherwise we should delete records first to be safe, but usually logic implies session deletion cleans up)
+                // To be safe manually delete records first, then sessions
+                const { error: deleteRecordsError } = await supabase
                     .from('attendance_records')
                     .delete()
                     .in('session_id', sessionIds);
 
-                if (deleteError) throw deleteError;
+                if (deleteRecordsError) throw deleteRecordsError;
 
-                setSuccessMessage("Attendance records cleared successfully.");
+                const { error: deleteSessionsError } = await supabase
+                    .from('attendance_sessions')
+                    .delete()
+                    .in('id', sessionIds);
+
+                if (deleteSessionsError) throw deleteSessionsError;
+
+                setSuccessMessage("All attendance data cleared successfully.");
                 fetchTimetableAndAttendance(); // Refresh
                 setTimeout(() => setSuccessMessage(null), 3000);
             } else {
-                setSuccessMessage("No records found to clear.");
+                setSuccessMessage("No data found to clear.");
                 setTimeout(() => setSuccessMessage(null), 3000);
             }
 
         } catch (err) {
-            console.error("Error clearing records:", err);
-            setError("Failed to clear records.");
+            console.error("Error clearing data:", err);
+            setError("Failed to clear data.");
         } finally {
             setLoading(false);
         }
@@ -1244,16 +1268,21 @@ const Attendance = () => {
                                                             {col.dayName.slice(0, 3)}
                                                         </span>
 
-                                                        {/* Class Type Badge */}
-                                                        <div className="mt-0.5">
+                                                        {/* Class Type Badge with Week Number */}
+                                                        <div className="mt-0.5 flex items-center gap-1">
                                                             <span className={`
-                                                                    w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-bold
+                                                                    w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold
                                                                     ${col.type === 'Lecture' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30' :
-                                                                    col.type === 'Tutorial' ? 'bg-green-100 text-green-600 dark:bg-green-900/30' :
+                                                                    col.type === 'Tutorial' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30' :
                                                                         'bg-purple-100 text-purple-600 dark:bg-purple-900/30'}
                                                                 `}>
                                                                 {col.type?.charAt(0) || 'C'}
                                                             </span>
+                                                            {col.weekNum && (
+                                                                <span className="bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded text-[8px] font-black border border-gray-200 dark:border-slate-700">
+                                                                    W{col.weekNum}
+                                                                </span>
+                                                            )}
                                                         </div>
 
                                                         {/* Bulk Actions */}

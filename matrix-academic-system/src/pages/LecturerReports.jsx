@@ -18,8 +18,9 @@ import {
     Pie,
     Cell
 } from 'recharts';
-import { Filter, UserCheck, BookOpen, Calendar, Activity, Printer, FileText, MessageSquare, Copy, Check, ExternalLink, Loader, Trash2 } from 'lucide-react';
+import { Filter, UserCheck, BookOpen, Calendar, Activity, Printer, FileText, MessageSquare, Copy, Check, ExternalLink, Loader, Trash2, FileSpreadsheet } from 'lucide-react';
 import PrintableFeedbackReport from '../components/reports/PrintableFeedbackReport';
+import { generateLecturerFeedbackExcel } from '../utils/excelGenerator';
 
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
@@ -262,7 +263,7 @@ const LecturerReports = () => {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handlePrintFeedback = async () => {
+    const handleGenerateFeedback = async () => {
         if (!feedbackSession) return;
 
         try {
@@ -277,11 +278,6 @@ const LecturerReports = () => {
             setFeedbackResponses(data || []);
 
             setPrintMode('feedback');
-            setTimeout(() => {
-                window.print();
-                setTimeout(() => setPrintMode(null), 1000);
-            }, 500);
-
         } catch (err) {
             console.error("Error generating feedback report:", err);
             alert("Failed to generate report.");
@@ -290,29 +286,55 @@ const LecturerReports = () => {
         }
     };
 
-    const handleClearResponses = async () => {
+    const handleResetSession = async () => {
         if (!feedbackSession) return;
 
-        const confirmed = window.confirm("Are you sure you want to clear ALL responses for this subject? This action cannot be undone.");
+        const confirmed = window.confirm("Are you sure you want to RESET this session? This will clear ALL responses and delete the current feedback link. This action cannot be undone.");
         if (!confirmed) return;
 
         try {
             setFeedbackLoading(true);
-            const { error } = await supabase
+
+            // 1. Delete all responses for this session
+            const { error: resError } = await supabase
                 .from('feedback_responses')
                 .delete()
                 .eq('session_id', feedbackSession.id);
 
-            if (error) throw error;
+            if (resError) throw resError;
 
-            // Re-fetch to update the count and state
-            await fetchFeedbackSession();
-            alert("All responses for this session have been cleared.");
+            // 2. Delete the session itself
+            const { error: sessionError } = await supabase
+                .from('feedback_sessions')
+                .delete()
+                .eq('id', feedbackSession.id);
+
+            if (sessionError) throw sessionError;
+
+            // 3. Clear local state
+            setFeedbackSession(null);
+            setFeedbackResponses([]);
+
+            alert("Session and responses have been cleared. You can now create a new link.");
         } catch (err) {
-            console.error("Error clearing responses:", err);
-            alert("Failed to clear responses.");
+            console.error("Error resetting session:", err);
+            alert("Failed to reset session.");
         } finally {
             setFeedbackLoading(false);
+        }
+    };
+
+    const handleExportExcel = async () => {
+        if (!feedbackSession || feedbackResponses.length === 0) {
+            alert("No feedback data to export.");
+            return;
+        }
+
+        try {
+            await generateLecturerFeedbackExcel(feedbackSession, feedbackResponses, totalStudents, semesterDetails);
+        } catch (error) {
+            console.error("Export failed:", error);
+            alert("Failed to export Excel report.");
         }
     };
 
@@ -564,31 +586,33 @@ const LecturerReports = () => {
         };
 
         const getSessionForWeek = (weekNum, type) => {
-            if (!semesterDetails?.semester_start_date) return null;
+            if (!semesterDetails?.semester_start_date) return [];
             const weekStart = new Date(semesterDetails.semester_start_date);
             weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7); // Start of week
             const weekEnd = new Date(weekStart);
             weekEnd.setDate(weekEnd.getDate() + 6); // End of week
 
-            // 1. Try to find actual attendance session
-            const session = allSessions.find(s => {
+            // 1. Find ALL actual attendance sessions for this week
+            const sessions = allSessions.filter(s => {
                 const d = new Date(s.date);
                 return d >= weekStart && d <= weekEnd &&
                     (s.class_type === type || (!s.class_type && type === 'Lecture'));
             });
 
-            if (session) {
-                const d = new Date(session.date);
-                const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
+            if (sessions.length > 0) {
+                return sessions.map(session => {
+                    const d = new Date(session.date);
+                    const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
 
-                const isHoliday = holidayData.some(h => {
-                    const hDate = new Date(h.date);
-                    const sDate = new Date(session.date);
-                    return hDate.toISOString().split('T')[0] === sDate.toISOString().split('T')[0];
+                    const isHoliday = holidayData.some(h => {
+                        const hDate = new Date(h.date);
+                        const sDate = new Date(session.date);
+                        return hDate.toISOString().split('T')[0] === sDate.toISOString().split('T')[0];
+                    });
+
+                    const timeStr = isHoliday ? '[CUTI]' : `${session.start_time?.slice(0, 5) || ''}-${session.end_time?.slice(0, 5) || ''}`;
+                    return { date: dateStr, time: timeStr, isHoliday, fullDate: session.date };
                 });
-
-                const timeStr = isHoliday ? '[CUTI]' : `${session.start_time?.slice(0, 5) || ''}-${session.end_time?.slice(0, 5) || ''}`;
-                return { date: dateStr, time: timeStr, isHoliday, fullDate: session.date };
             }
 
             // 2. Fallback: If no session, check if a class was scheduled on a holiday
@@ -612,17 +636,17 @@ const LecturerReports = () => {
                     });
 
                     if (isHoliday) {
-                        return {
+                        return [{
                             date: `${originalDate.getDate()}/${originalDate.getMonth() + 1}`,
                             time: '[CUTI]',
                             isHoliday: true,
                             fullDate: originalDate.toISOString()
-                        };
+                        }];
                     }
                 }
             }
 
-            return null;
+            return [];
         };
 
         return (
@@ -726,9 +750,9 @@ const LecturerReports = () => {
                         </tr>
                         <tr className="bg-amber-100">
                             <th className="border border-black p-1 w-14">TARIKH</th>
-                            <th className="border border-black p-1 w-14">MASA</th>
+                            <th className="border border-black p-1 w-16">MASA</th>
                             <th className="border border-black p-1 w-14">TARIKH</th>
-                            <th className="border border-black p-1 w-14">MASA</th>
+                            <th className="border border-black p-1 w-16">MASA</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -741,23 +765,52 @@ const LecturerReports = () => {
                                 <tr key={week} className="text-center">
                                     <td className="border border-black p-1 font-bold">M{week}</td>
 
-                                    <td className="border border-black p-1">{lecture?.date || '-'}</td>
-                                    <td className="border border-black p-1">{lecture?.time || '-'}</td>
+                                    <td className="border border-black p-1 align-top">
+                                        {lecture.length > 0 ? lecture.map((l, i) => (
+                                            <div key={i} className={i > 0 ? "border-t border-gray-300 mt-1 pt-1" : ""}>
+                                                {l.date}
+                                            </div>
+                                        )) : '-'}
+                                    </td>
+                                    <td className="border border-black p-1 align-top text-[9px]">
+                                        {lecture.length > 0 ? lecture.map((l, i) => (
+                                            <div key={i} className={`whitespace-nowrap ${i > 0 ? "border-t border-gray-300 mt-1 pt-1" : ""}`}>
+                                                {l.time}
+                                            </div>
+                                        )) : '-'}
+                                    </td>
 
-                                    <td className="border border-black p-1">{tutorial?.date || '-'}</td>
-                                    <td className="border border-black p-1">{tutorial?.time || '-'}</td>
+                                    <td className="border border-black p-1 align-top">
+                                        {tutorial.length > 0 ? tutorial.map((t, i) => (
+                                            <div key={i} className={i > 0 ? "border-t border-gray-300 mt-1 pt-1" : ""}>
+                                                {t.date}
+                                            </div>
+                                        )) : '-'}
+                                    </td>
+                                    <td className="border border-black p-1 align-top text-[9px]">
+                                        {tutorial.length > 0 ? tutorial.map((t, i) => (
+                                            <div key={i} className={`whitespace-nowrap ${i > 0 ? "border-t border-gray-300 mt-1 pt-1" : ""}`}>
+                                                {t.time}
+                                            </div>
+                                        )) : '-'}
+                                    </td>
 
-                                    <td className="border border-black p-1 text-left uppercase">
+                                    <td className="border border-black p-1 text-left uppercase align-top">
                                         {topic?.topic || ''}
                                     </td>
 
-                                    <td className="border border-black p-1">Kuliah / Tutorial</td>
-                                    <td className="border border-black p-1 underline">Bersemuka</td>
-                                    <td className="border border-black p-1 text-left">
-                                        {lecture?.isHoliday || tutorial?.isHoliday ? 'CUTI AM' : (lecture || tutorial ? 'Pelajar memahami tajuk' : '')}
+                                    <td className="border border-black p-1 align-top">Kuliah / Tutorial</td>
+                                    <td className="border border-black p-1 underline align-top">Bersemuka</td>
+                                    <td className="border border-black p-1 text-left align-top">
+                                        {lecture.some(l => l.isHoliday) || tutorial.some(t => t.isHoliday) ? 'CUTI AM' : (lecture.length > 0 || tutorial.length > 0 ? 'Pelajar memahami tajuk' : '')}
                                     </td>
-                                    <td className="border border-black p-1">
-                                        {(lecture?.fullDate && new Date(lecture.fullDate) < new Date()) || (tutorial?.fullDate && new Date(tutorial.fullDate) < new Date()) ? 'Selesai' : ''}
+                                    <td className="border border-black p-1 align-top">
+                                        {
+                                            (lecture.some(l => l.fullDate && new Date(l.fullDate) < new Date())) ||
+                                                (tutorial.some(t => t.fullDate && new Date(t.fullDate) < new Date()))
+                                                ? 'Selesai'
+                                                : ''
+                                        }
                                     </td>
                                 </tr>
                             );
@@ -876,21 +929,36 @@ const LecturerReports = () => {
                         <MessageSquare size={120} />
                     </div>
 
-                    <div className="flex items-start justify-between relative z-10">
-                        <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl text-purple-600 dark:text-purple-400">
-                            <MessageSquare size={24} />
+                    <div className="flex items-center justify-between mb-4 relative z-10">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-xl text-purple-600 dark:text-purple-400">
+                                <MessageSquare size={24} />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-gray-900 dark:text-white text-lg leading-tight">Lecturer Feedback</h3>
+                                <p className="text-sm text-gray-500 dark:text-slate-400">Student evaluation system</p>
+                            </div>
                         </div>
                         {feedbackSession && (
-                            <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full flex items-center">
+                            <span className="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full flex items-center shrink-0">
                                 <span className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></span>
                                 Active
                             </span>
                         )}
                     </div>
 
+                    {feedbackSession && (
+                        <div className="mb-6 bg-purple-50/50 dark:bg-purple-900/10 rounded-2xl p-6 text-center border border-purple-100 dark:border-purple-800/30 relative z-10 transition-all hover:shadow-sm">
+                            <div className="text-4xl font-black text-purple-600 dark:text-purple-400 mb-1 leading-none tracking-tight">
+                                {feedbackResponses.length}
+                            </div>
+                            <div className="text-[10px] uppercase font-bold text-purple-400 dark:text-purple-500 tracking-[0.2em]">
+                                Total Respondents
+                            </div>
+                        </div>
+                    )}
+
                     <div className="relative z-10">
-                        <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-1">Lecturer Feedback</h3>
-                        <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">Student evaluation system</p>
 
 
                         <div className="mb-4">
@@ -956,29 +1024,34 @@ const LecturerReports = () => {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-between px-2 py-1 bg-white dark:bg-slate-900 rounded border border-gray-100 dark:border-slate-700">
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Total Respondents</span>
-                                        <span className="text-xs font-bold text-purple-600 dark:text-purple-400">{feedbackResponses.length}</span>
-                                    </div>
-                                    {feedbackResponses.length > 0 && (
-                                        <button
-                                            onClick={handleClearResponses}
-                                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                                            title="Clear All Responses"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    )}
-                                </div>
+                                {feedbackSession && (
+                                    <button
+                                        onClick={handleResetSession}
+                                        disabled={feedbackLoading}
+                                        className="w-full flex items-center justify-center gap-2 py-2 border border-red-200 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg text-xs font-bold transition-all uppercase tracking-wider mb-2"
+                                    >
+                                        {feedbackLoading ? <Loader size={12} className="animate-spin" /> : <Trash2 size={14} />}
+                                        Reset Session & Clear Responses
+                                    </button>
+                                )}
 
-                                <button
-                                    onClick={handlePrintFeedback}
-                                    className="w-full flex items-center justify-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
-                                >
-                                    <Printer size={16} className="mr-2" />
-                                    Generate Report
-                                </button>
+                                <div className="space-y-2">
+                                    <button
+                                        onClick={handleExportExcel}
+                                        className="w-full flex items-center justify-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                        title="Export to Excel"
+                                    >
+                                        <FileSpreadsheet size={16} className="mr-2" />
+                                        Export Excel
+                                    </button>
+                                    <button
+                                        onClick={handleGenerateFeedback}
+                                        className="w-full flex items-center justify-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                    >
+                                        <Printer size={16} className="mr-2" />
+                                        Generate Report
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1001,7 +1074,51 @@ const LecturerReports = () => {
             )}
 
             {printMode === 'feedback' && (
-                <div className="bg-white fixed inset-0 z-[9999] p-8 overflow-auto">
+                <div className="bg-white fixed inset-0 z-[9999] p-8 overflow-auto print:static print:inset-auto print:p-0 print:overflow-visible print:bg-white print:h-auto print:w-auto feedback-print-container">
+                    <style dangerouslySetInnerHTML={{
+                        __html: `
+                        @media print {
+                            body * { visibility: hidden !important; }
+                            .feedback-print-container, .feedback-print-container * { visibility: visible !important; }
+                            .feedback-print-container {
+                                position: absolute !important;
+                                left: 0 !important;
+                                top: 0 !important;
+                                width: 100% !important;
+                                padding: 0 !important;
+                                margin: 0 !important;
+                                overflow: visible !important;
+                                height: auto !important;
+                            }
+                            html, body, #root { 
+                                height: auto !important; 
+                                overflow: visible !important; 
+                            }
+                        }
+                    ` }} />
+                    {/* Action Bar - Hidden in Print */}
+                    <div className="print:hidden sticky top-0 left-0 right-0 bg-white/80 backdrop-blur-md border-b border-gray-100 p-4 mb-8 flex justify-between items-center z-[10000]">
+                        <div className="flex items-center gap-2">
+                            <FileText size={20} className="text-purple-600" />
+                            <span className="font-bold text-gray-900">Feedback Report Preview</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={() => window.print()}
+                                className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-all font-medium shadow-sm"
+                            >
+                                <Printer size={18} />
+                                Print PDF
+                            </button>
+                            <button
+                                onClick={() => setPrintMode(null)}
+                                className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-all font-medium"
+                            >
+                                Close Preview
+                            </button>
+                        </div>
+                    </div>
+
                     <PrintableFeedbackReport
                         session={{
                             ...feedbackSession,

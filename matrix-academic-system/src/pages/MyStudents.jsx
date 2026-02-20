@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
-import { Search, LayoutGrid, List, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, LayoutGrid, List, ChevronDown, ChevronRight, Eye } from 'lucide-react';
+import StudentDetailsModal from '../components/student/StudentDetailsModal';
 
 const MyStudents = () => {
     const { user } = useAuth();
@@ -11,6 +12,8 @@ const MyStudents = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [viewMode, setViewMode] = useState('group'); // 'group' or 'all'
     const [expandedGroups, setExpandedGroups] = useState(new Set());
+    const [selectedStudent, setSelectedStudent] = useState(null);
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
     const toggleGroup = (groupKey) => {
         setExpandedGroups(prev => {
@@ -231,7 +234,7 @@ const MyStudents = () => {
                             ) : (
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subjects</th>
                             )}
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20 text-center">View</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
@@ -271,7 +274,18 @@ const MyStudents = () => {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.group}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.email}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedStudent(student);
+                                                            setIsDetailsOpen(true);
+                                                        }}
+                                                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 border border-transparent"
+                                                        title="View Profile"
+                                                    >
+                                                        <Eye size={18} />
+                                                    </button>
+                                                </td>
                                             </tr>
                                         ))}
                                     </div>
@@ -293,13 +307,30 @@ const MyStudents = () => {
                                             ))}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.email}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
+                                        <button
+                                            onClick={() => {
+                                                setSelectedStudent(student);
+                                                setIsDetailsOpen(true);
+                                            }}
+                                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 border border-transparent"
+                                            title="View Profile"
+                                        >
+                                            <Eye size={18} />
+                                        </button>
+                                    </td>
                                 </tr>
                             ))
                         )}
                     </tbody>
                 </table>
             </div>
+
+            <StudentDetailsModal
+                isOpen={isDetailsOpen}
+                onClose={() => setIsDetailsOpen(false)}
+                student={selectedStudent}
+            />
         </div>
     );
 };

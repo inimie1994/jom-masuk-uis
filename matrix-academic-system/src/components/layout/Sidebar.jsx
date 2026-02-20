@@ -46,6 +46,7 @@ const Sidebar = ({ isMobile, className = '' }) => {
         { path: '/attendance', label: 'Mark Attendance', icon: CalendarCheck },
         { path: '/assessments', label: 'Assessments', icon: FileText },
         { path: '/lecturer-reports', label: 'Reports', icon: PieChart },
+        ...(user?.role === 'hod' || user?.role === 'hop' ? [{ path: '/my-team', label: 'My Team', icon: Users }] : []),
         { path: '/settings', label: 'Settings', icon: Settings },
     ];
 
