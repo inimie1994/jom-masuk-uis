@@ -17,6 +17,7 @@ import {
     Upload
 } from 'lucide-react';
 import StudentMarksPrintTemplate from '../components/assessments/StudentMarksPrintTemplate';
+import PrintableCLOReport from '../components/assessments/PrintableCLOReport';
 import * as XLSX from 'xlsx';
 
 const Assessments = () => {
@@ -52,6 +53,10 @@ const Assessments = () => {
     // Print State
     const [isPrinting, setIsPrinting] = useState(false);
     const [printData, setPrintData] = useState({ students: [], grades: [] });
+
+    // CLO Report Print State
+    const [isPrintingCLO, setIsPrintingCLO] = useState(false);
+    const [cloPrintData, setCloPrintData] = useState({ students: [], grades: [], lecturer: null, groups: '' });
 
     useEffect(() => {
         if (user?.faculty_id) {
@@ -318,6 +323,90 @@ const Assessments = () => {
         } catch (err) {
             console.error("Error preparing print data:", err);
             setError("Failed to prepare print data.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handlePrintCLO = async () => {
+        if (!selectedSubject) return;
+        setLoading(true);
+        try {
+            let uniqueStudents = [];
+            let groupLabel = '';
+
+            if (['lecturer', 'hod', 'hop'].includes(user.role) && user.lecturer_id) {
+                const { data: timetableData, error: timetableError } = await supabase
+                    .from('timetable')
+                    .select('group_names')
+                    .eq('lecturer_id', user.lecturer_id)
+                    .eq('subject_id', selectedSubject);
+                if (timetableError) throw timetableError;
+                const myGroups = [...new Set(timetableData?.flatMap(t => t.group_names || []).filter(Boolean))];
+                groupLabel = myGroups.join(', ');
+                if (myGroups.length > 0) {
+                    const { data: studentData, error: studentError } = await supabase
+                        .from('students')
+                        .select('id, name, matric_no, student_group')
+                        .in('student_group', myGroups)
+                        .eq('faculty_id', user.faculty_id);
+                    if (studentError) throw studentError;
+                    uniqueStudents = (studentData || []).sort((a, b) => a.matric_no.localeCompare(b.matric_no));
+                }
+            } else {
+                const { data: classesData } = await supabase.from('classes').select('id').eq('subject_id', selectedSubject);
+                const classIds = (classesData || []).map(c => c.id);
+                if (classIds.length > 0) {
+                    const { data: enrollmentsData } = await supabase
+                        .from('enrollments')
+                        .select('student_id, students (id, name, matric_no, student_group)')
+                        .in('class_id', classIds);
+                    const map = new Map();
+                    (enrollmentsData || []).forEach(e => { if (e.students) map.set(e.students.id, e.students); });
+                    uniqueStudents = Array.from(map.values()).sort((a, b) => a.matric_no.localeCompare(b.matric_no));
+                    const groups = [...new Set(uniqueStudents.map(s => s.student_group).filter(Boolean))];
+                    groupLabel = groups.join(', ');
+                }
+            }
+
+            // Fetch lecturer name
+            let currentLecturer = user;
+            const { data: timetableLecturers } = await supabase
+                .from('timetable')
+                .select('lecturer_id, lecturers (id, name, full_name)')
+                .eq('subject_id', selectedSubject)
+                .limit(1);
+            if (timetableLecturers?.[0]?.lecturers) {
+                currentLecturer = { ...user, ...timetableLecturers[0].lecturers };
+            }
+
+            // Fetch all grades for this subject's assessments
+            const assessmentIds = assessments.map(a => a.id);
+            let allGrades = [];
+            if (assessmentIds.length > 0) {
+                const { data: gradesData, error: gradesError } = await supabase
+                    .from('grades')
+                    .select('*')
+                    .in('assessment_id', assessmentIds);
+                if (gradesError) throw gradesError;
+                allGrades = gradesData || [];
+            }
+
+            if (uniqueStudents.length === 0) {
+                alert('No students found for this subject.');
+                return;
+            }
+
+            setCloPrintData({
+                students: uniqueStudents,
+                grades: allGrades,
+                lecturer: currentLecturer,
+                groups: groupLabel
+            });
+            setIsPrintingCLO(true);
+        } catch (err) {
+            console.error('Error preparing CLO report data:', err);
+            setError('Failed to prepare CLO report data.');
         } finally {
             setLoading(false);
         }
@@ -685,6 +774,40 @@ const Assessments = () => {
     };
 
 
+    if (isPrintingCLO) {
+        const subjectObj = subjects.find(s => s.id === selectedSubject);
+        return (
+            <div className="bg-white min-h-screen">
+                <div className="bg-gray-100 p-4 flex justify-between items-center print:hidden sticky top-0 z-50">
+                    <button
+                        onClick={() => setIsPrintingCLO(false)}
+                        className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 text-sm font-bold uppercase"
+                    >
+                        <ArrowLeft size={16} className="mr-2" /> Back
+                    </button>
+                    <div className="font-bold text-lg">CLO Report Preview — {subjectObj?.code}</div>
+                    <button
+                        onClick={() => window.print()}
+                        className="flex items-center px-4 py-2 bg-primary text-white rounded shadow-sm hover:bg-primary/90 text-sm font-bold uppercase"
+                    >
+                        <Printer size={16} className="mr-2" /> Print
+                    </button>
+                </div>
+                <PrintableCLOReport
+                    subject={subjectObj}
+                    assessments={assessments}
+                    students={cloPrintData.students}
+                    grades={cloPrintData.grades}
+                    lecturer={cloPrintData.lecturer}
+                    semesterSession={user?.semester_name || ''}
+                    semester={cloPrintData.groups}
+                    program={user?.department || ''}
+                    facultyName={user?.faculty_name || 'UNIVERSITI ISLAM SELANGOR'}
+                />
+            </div>
+        );
+    }
+
     if (isPrinting) {
         return (
             <div className="bg-white min-h-screen">
@@ -705,10 +828,10 @@ const Assessments = () => {
                 </div>
                 <StudentMarksPrintTemplate
                     subject={subjects.find(s => s.id === selectedSubject)}
-                    assessments={assessments} // Pass all assessments, sorted by date in fetchAssessments
+                    assessments={assessments}
                     students={printData.students}
                     grades={printData.grades}
-                    lecturer={printData.lecturer} // Pass correct lecturer
+                    lecturer={printData.lecturer}
                     semesterSession={user?.semester_name}
                 />
             </div>
@@ -856,6 +979,14 @@ const Assessments = () => {
                         >
                             <Printer size={16} className="mr-2" />
                             Print Marks
+                        </button>
+                        <button
+                            onClick={handlePrintCLO}
+                            disabled={loading}
+                            className="flex items-center px-4 py-2 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+                        >
+                            <FileText size={16} className="mr-2" />
+                            CLO Report
                         </button>
                     </div>
                 </div>
