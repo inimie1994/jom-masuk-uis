@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
-import { Search, LayoutGrid, List, ChevronDown, ChevronRight, Eye } from 'lucide-react';
+import { Search, LayoutGrid, List, ChevronDown, ChevronRight, Eye, Layers } from 'lucide-react';
 import StudentDetailsModal from '../components/student/StudentDetailsModal';
 
 const MyStudents = () => {
@@ -159,11 +159,24 @@ const MyStudents = () => {
 
     // Grouping for 'Group View'
     const groupedStudents = filteredStudents.reduce((acc, student) => {
-        const key = `${student.subject_code} - ${student.group}`;
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(student);
+        const key = student.group;
+        if (!acc[key]) acc[key] = new Map();
+
+        if (!acc[key].has(student.matric_no)) {
+            acc[key].set(student.matric_no, {
+                ...student,
+                all_subjects: new Set([student.subject_code])
+            });
+        } else {
+            acc[key].get(student.matric_no).all_subjects.add(student.subject_code);
+        }
         return acc;
     }, {});
+
+    // Convert map to array for rendering group elements
+    Object.keys(groupedStudents).forEach(key => {
+        groupedStudents[key] = Array.from(groupedStudents[key].values()).sort((a, b) => a.matric_no.localeCompare(b.matric_no));
+    });
 
     // Unique students for 'All View'
     const allUniqueStudents = Array.from(
@@ -179,6 +192,52 @@ const MyStudents = () => {
             return acc;
         }, new Map()).values()
     ).sort((a, b) => a.matric_no.localeCompare(b.matric_no));
+
+    const StudentTable = ({ data, showGroup = false }) => (
+        <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-100 dark:divide-slate-800">
+                <thead className="bg-slate-50 dark:bg-slate-950">
+                    <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider">Name</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider">Matric No</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider">Subjects</th>
+                        {showGroup && <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider">Group</th>}
+                        <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-400 dark:text-slate-500 uppercase tracking-wider w-20">View</th>
+                    </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-50 dark:divide-slate-800">
+                    {data.map((student, idx) => (
+                        <tr key={student.id || idx} className="hover:bg-pastel-indigo dark:hover:bg-indigo-900/10 transition-colors group">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{student.name}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400 font-mono italic tracking-tighter">{student.matric_no}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex flex-wrap gap-1">
+                                    {Array.from(student.all_subjects || []).map(sub => (
+                                        <span key={sub} className="px-2 inline-flex text-[10px] leading-4 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                            {sub}
+                                        </span>
+                                    ))}
+                                </div>
+                            </td>
+                            {showGroup && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">{student.group}</td>}
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <button
+                                    onClick={() => {
+                                        setSelectedStudent(student);
+                                        setIsDetailsOpen(true);
+                                    }}
+                                    className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors p-1 rounded-lg hover:bg-white dark:hover:bg-slate-800 shadow-sm border border-transparent hover:border-indigo-100 dark:hover:border-indigo-900"
+                                    title="View Profile"
+                                >
+                                    <Eye size={18} />
+                                </button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
 
     return (
         <div className="space-y-6">
@@ -220,111 +279,58 @@ const MyStudents = () => {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                    <thead className="bg-gray-50 dark:bg-slate-900">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Matric No</th>
-                            {viewMode === 'group' ? (
-                                <>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subject</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Group</th>
-                                </>
-                            ) : (
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subjects</th>
-                            )}
-                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20 text-center">View</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-                        {loading ? (
-                            <tr>
-                                <td colSpan="5" className="px-6 py-4 text-center text-gray-500 italic">Loading students...</td>
-                            </tr>
-                        ) : filteredStudents.length === 0 ? (
-                            <tr>
-                                <td colSpan="5" className="px-6 py-4 text-center text-gray-500 italic">No students found.</td>
-                            </tr>
-                        ) : viewMode === 'group' ? (
-                            Object.entries(groupedStudents).map(([groupKey, studentsInGroup]) => {
-                                const isExpanded = expandedGroups.has(groupKey);
-                                return (
-                                    <div key={groupKey} className="contents">
-                                        <tr
-                                            className="bg-slate-50 dark:bg-slate-900/50 cursor-pointer hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors"
-                                            onClick={() => toggleGroup(groupKey)}
-                                        >
-                                            <td colSpan="5" className="px-6 py-2.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider bg-indigo-50/30 dark:bg-indigo-900/10">
-                                                <div className="flex items-center">
-                                                    {isExpanded ? <ChevronDown size={14} className="mr-2" /> : <ChevronRight size={14} className="mr-2" />}
-                                                    {groupKey} ({studentsInGroup.length} Students)
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        {isExpanded && studentsInGroup.map((student, idx) => (
-                                            <tr key={`${groupKey}-${idx}`} className="hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors animate-in fade-in slide-in-from-top-1 duration-200">
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{student.name}</div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.matric_no}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                                        {student.subject_code}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.group}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedStudent(student);
-                                                            setIsDetailsOpen(true);
-                                                        }}
-                                                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 border border-transparent"
-                                                        title="View Profile"
-                                                    >
-                                                        <Eye size={18} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </div>
-                                );
-                            })
-                        ) : (
-                            allUniqueStudents.map((student, idx) => (
-                                <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm font-medium text-gray-900 dark:text-white">{student.name}</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.matric_no}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex flex-wrap gap-1">
-                                            {Array.from(student.all_subjects).map(sub => (
-                                                <span key={sub} className="px-2 inline-flex text-[10px] leading-4 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                                    {sub}
-                                                </span>
-                                            ))}
+            {loading ? (
+                <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+            ) : filteredStudents.length === 0 ? (
+                <div className="bg-white dark:bg-slate-800 shadow-sm rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 p-12 text-center text-gray-500 italic">
+                    No students found.
+                </div>
+            ) : viewMode === 'all' ? (
+                <div className="bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-800 mb-6">
+                    <StudentTable data={allUniqueStudents} showGroup={true} />
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {Object.entries(groupedStudents).map(([groupKey, studentsInGroup]) => {
+                        const isExpanded = expandedGroups.has(groupKey);
+                        return (
+                            <div key={groupKey} className="bg-white dark:bg-slate-900 shadow-sm rounded-2xl overflow-hidden border border-gray-100 dark:border-slate-800 transition-all">
+                                <button
+                                    onClick={() => toggleGroup(groupKey)}
+                                    className="w-full text-left px-5 py-4 focus:outline-none hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center justify-between"
+                                >
+                                    <div className="flex items-center">
+                                        <div className={`p-2 rounded-lg mr-3 transition-colors ${isExpanded ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                                            <Layers size={18} />
                                         </div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
-                                        <button
-                                            onClick={() => {
-                                                setSelectedStudent(student);
-                                                setIsDetailsOpen(true);
-                                            }}
-                                            className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 border border-transparent"
-                                            title="View Profile"
-                                        >
-                                            <Eye size={18} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                                        <div>
+                                            <h3 className="text-sm sm:text-lg font-bold text-gray-900 dark:text-white flex items-center">
+                                                {groupKey}
+                                                <span className="ml-2 sm:ml-3 text-[9px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-slate-700 px-1.5 sm:px-2.5 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap">
+                                                    {studentsInGroup.length} Students
+                                                </span>
+                                            </h3>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+                                            <ChevronDown size={20} className="text-gray-400" />
+                                        </div>
+                                    </div>
+                                </button>
+
+                                {isExpanded && (
+                                    <div className="border-t border-gray-50 dark:border-slate-800 animate-in fade-in slide-in-from-top-1 duration-200">
+                                        <StudentTable data={studentsInGroup} />
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             <StudentDetailsModal
                 isOpen={isDetailsOpen}
