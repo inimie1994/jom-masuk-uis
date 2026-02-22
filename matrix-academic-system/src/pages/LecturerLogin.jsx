@@ -135,6 +135,15 @@ const LecturerLogin = () => {
                             </button>
                         </div>
                     </form>
+
+                    <div className="mt-6 text-center">
+                        <button
+                            onClick={() => navigate('/login')}
+                            className="text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                        >
+                            Are you an administrator? Sign in here
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

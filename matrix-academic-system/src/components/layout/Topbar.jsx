@@ -4,14 +4,16 @@ import { LogOut, Bell, Search, Menu } from 'lucide-react';
 import ThemeToggle from '../ThemeToggle';
 
 const Topbar = ({ toggleMobileSidebar }) => {
-    const { user, signOut } = useAuth();
+    const { user, signOut, activeFaculty, exitFaculty } = useAuth();
     const navigate = useNavigate();
 
     const handleLogout = async () => {
-        const isLecturer = ['lecturer', 'hod', 'hop'].includes(user?.role);
+        const role = user?.role;
         await signOut();
-        if (isLecturer) {
+        if (['lecturer', 'hod', 'hop'].includes(role)) {
             navigate('/lecturer-login');
+        } else if (role === 'superadmin') {
+            navigate('/matrix-system-management');
         } else {
             navigate('/login');
         }
@@ -20,7 +22,9 @@ const Topbar = ({ toggleMobileSidebar }) => {
     const roleLabel = user?.role === 'lecturer' ? 'Lecturer' :
         user?.role === 'hod' ? 'Head of Department' :
             user?.role === 'hop' ? 'Head of Program' :
-                (user?.role === 'admin' ? 'Faculty Admin' : 'System User');
+                (user?.role === 'admin' ? 'Faculty Admin' :
+                    (user?.role === 'superadmin' ? (activeFaculty ? 'Admin (Impersonating)' : 'Super Administrator') : 'System User')
+                );
 
     return (
         <header className="h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-100 dark:border-slate-800 flex items-center justify-between px-6 sticky top-0 z-40 transition-colors">
@@ -45,6 +49,15 @@ const Topbar = ({ toggleMobileSidebar }) => {
                         {user.semester_name}
                     </span>
                 </div>
+            )}
+
+            {activeFaculty && (
+                <button onClick={() => {
+                    exitFaculty();
+                    navigate('/admin/faculties');
+                }} className="hidden md:flex ml-4 items-center px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-medium rounded-md hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors border border-red-200 dark:border-red-800">
+                    Exit {activeFaculty.name}
+                </button>
             )}
 
             <div className="flex items-center space-x-4">

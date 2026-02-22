@@ -7,6 +7,11 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [activeFaculty, setActiveFaculty] = useState(() => {
+        // Retrieve initial state from session storage if available
+        const saved = sessionStorage.getItem('activeFaculty');
+        return saved ? JSON.parse(saved) : null;
+    });
 
     useEffect(() => {
         console.log('AuthContext: Initializing...');
@@ -147,7 +152,7 @@ export const AuthProvider = ({ children }) => {
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: 'http://localhost:5173',
+                    redirectTo: window.location.origin,
                 },
             });
             if (error) throw error;
@@ -158,13 +163,28 @@ export const AuthProvider = ({ children }) => {
                 const { error } = await supabase.auth.signOut();
                 if (error) throw error;
                 setUser(null);
+                setActiveFaculty(null);
+                sessionStorage.removeItem('activeFaculty');
             } catch (error) {
                 console.error('AuthContext: Error during signOut:', error);
-                // Even if Supabase fails, we should clear the local state
                 setUser(null);
+                setActiveFaculty(null);
+                sessionStorage.removeItem('activeFaculty');
             }
         },
-        user,
+        enterFaculty: (faculty) => {
+            setActiveFaculty(faculty);
+            sessionStorage.setItem('activeFaculty', JSON.stringify(faculty));
+        },
+        exitFaculty: () => {
+            setActiveFaculty(null);
+            sessionStorage.removeItem('activeFaculty');
+        },
+        activeFaculty,
+        user: (user && user.role === 'superadmin' && activeFaculty)
+            ? { ...user, faculty_id: activeFaculty.id, faculty_name: activeFaculty.name, faculty_logo: activeFaculty.logo_url }
+            : user,
+        realUser: user,
     };
 
     if (loading) {

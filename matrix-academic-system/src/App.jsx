@@ -23,6 +23,8 @@ import LecturerTimetable from './pages/LecturerTimetable';
 import LecturerReports from './pages/LecturerReports';
 import StudentFeedbackForm from './pages/StudentFeedbackForm';
 import MyTeam from './pages/MyTeam';
+import SuperadminFaculties from './pages/SuperadminFaculties';
+import SuperadminLogin from './pages/SuperadminLogin';
 
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -33,6 +35,7 @@ function App() {
         <ThemeProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/matrix-system-management" element={<SuperadminLogin />} />
             <Route path="/lecturer-login" element={<LecturerLogin />} />
 
             <Route path="/" element={
@@ -58,6 +61,7 @@ function App() {
               <Route path="reports" element={<Reports />} />
               <Route path="audit-logs" element={<AuditLogs />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="admin/faculties" element={<SuperadminFaculties />} />
             </Route>
 
             <Route path="/feedback/:sessionId" element={<StudentFeedbackForm />} />

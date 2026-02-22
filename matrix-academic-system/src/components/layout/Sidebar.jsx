@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import {
     LayoutDashboard,
     Users,
+    Building2,
     GraduationCap,
     BookOpen,
     CalendarDays,
@@ -20,7 +21,7 @@ import {
 } from 'lucide-react';
 
 const Sidebar = ({ isMobile, className = '' }) => {
-    const { user } = useAuth();
+    const { user, realUser, activeFaculty } = useAuth();
     const [collapsed, setCollapsed] = useState(false);
 
     const adminNavItems = [
@@ -51,10 +52,17 @@ const Sidebar = ({ isMobile, className = '' }) => {
     ];
 
     const isLecturerRole = ['lecturer', 'hod', 'hop'].includes(user?.role);
-    const navItems = isLecturerRole ? lecturerNavItems : adminNavItems;
+    const isSuperadminRoot = realUser?.role === 'superadmin' && !activeFaculty;
+
+    const superadminNavItems = [
+        { path: '/admin/faculties', label: 'Platform Management', icon: Building2 },
+    ];
+
+    const navItems = isSuperadminRoot ? superadminNavItems : (isLecturerRole ? lecturerNavItems : adminNavItems);
 
     const getRoleLabel = () => {
         if (!user) return 'Guest';
+        if (realUser?.role === 'superadmin') return activeFaculty ? 'Admin (Impersonating)' : 'Super Administrator';
         switch (user.role) {
             case 'admin': return 'Faculty Admin';
             case 'hod': return 'Head of Department';
