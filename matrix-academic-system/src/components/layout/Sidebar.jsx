@@ -81,7 +81,7 @@ const Sidebar = ({ isMobile, className = '' }) => {
         <aside
             className={`
                 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 transition-all duration-300 flex flex-col z-50
-                ${isMobile ? 'fixed inset-y-0 left-0 w-64' : (collapsed ? 'w-20' : 'w-64')}
+                ${isMobile ? 'fixed inset-y-0 left-0 w-64' : `hidden lg:flex ${collapsed ? 'w-20' : 'w-64'}`}
                 ${isMobile && collapsed ? '-translate-x-full' : ''}
                 ${className}
             `}
