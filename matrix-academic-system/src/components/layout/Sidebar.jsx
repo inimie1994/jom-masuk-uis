@@ -29,7 +29,6 @@ const Sidebar = ({ isMobile, className = '' }) => {
         { path: '/students', label: 'Students', icon: Users },
         { path: '/lecturers', label: 'Lecturers', icon: GraduationCap },
         { path: '/subjects', label: 'Subjects', icon: BookOpen },
-        { path: '/classes', label: 'Classes', icon: School },
         { path: '/enrollment', label: 'Enrollment', icon: ClipboardList },
         { path: '/timetable', label: 'Timetable', icon: CalendarDays },
         { path: '/attendance', label: 'Attendance', icon: CalendarCheck },

@@ -14,7 +14,8 @@ import {
     Printer,
     ArrowLeft,
     Download,
-    Upload
+    Upload,
+    MoreVertical
 } from 'lucide-react';
 import StudentMarksPrintTemplate from '../components/assessments/StudentMarksPrintTemplate';
 import PrintableCLOReport from '../components/assessments/PrintableCLOReport';
@@ -54,6 +55,9 @@ const Assessments = () => {
     // Print State
     const [isPrinting, setIsPrinting] = useState(false);
     const [printData, setPrintData] = useState({ students: [], grades: [] });
+
+    // Action Menu State (Mobile)
+    const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
 
     // CLO Report Print State
     const [isPrintingCLO, setIsPrintingCLO] = useState(false);
@@ -982,45 +986,61 @@ const Assessments = () => {
                             );
                         })}
                     </div>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="file"
-                            accept=".xlsx, .xls"
-                            onChange={handleFileUpload}
-                            className="hidden"
-                            id="upload-excel"
-                        />
+                    <div className="relative">
+                        {/* Mobile Toggle Button */}
                         <button
-                            onClick={handleDownloadTemplate}
-                            disabled={loading}
-                            className="flex items-center px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+                            onClick={() => setIsActionMenuOpen(!isActionMenuOpen)}
+                            className="md:hidden flex items-center p-2 bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-700 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-all"
                         >
-                            <Download size={16} className="mr-2" />
-                            Template
+                            <MoreVertical size={20} />
                         </button>
-                        <label
-                            htmlFor="upload-excel"
-                            className={`flex items-center px-4 py-2 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 rounded-xl hover:bg-green-100 dark:hover:bg-green-900/30 transition-all text-xs font-bold uppercase tracking-widest cursor-pointer ${loading ? 'opacity-50 pointer-events-none' : ''}`}
-                        >
-                            <Upload size={16} className="mr-2" />
-                            Upload
-                        </label>
-                        <button
-                            onClick={handlePrint}
-                            disabled={loading}
-                            className="flex items-center px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-700 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-700 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
-                        >
-                            <Printer size={16} className="mr-2" />
-                            Print Marks
-                        </button>
-                        <button
-                            onClick={handlePrintCLO}
-                            disabled={loading}
-                            className="flex items-center px-4 py-2 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
-                        >
-                            <FileText size={16} className="mr-2" />
-                            CLO Report
-                        </button>
+
+                        {/* Action Buttons Container */}
+                        <div className={`
+                            absolute right-0 top-full mt-2 p-2 bg-white dark:bg-slate-800 md:bg-transparent border border-gray-100 dark:border-slate-700 md:border-none rounded-xl shadow-xl md:shadow-none z-50 flex-col gap-2 min-w-[160px]
+                            ${isActionMenuOpen ? 'flex' : 'hidden'}
+                            md:relative md:top-auto md:right-auto md:mt-0 md:p-0 md:flex md:flex-row md:items-center md:min-w-0
+                        `}>
+                            <input
+                                type="file"
+                                accept=".xlsx, .xls"
+                                onChange={handleFileUpload}
+                                className="hidden"
+                                id="upload-excel"
+                            />
+                            <button
+                                onClick={() => { handleDownloadTemplate(); setIsActionMenuOpen(false); }}
+                                disabled={loading}
+                                className="flex w-full md:w-auto items-center px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+                            >
+                                <Download size={16} className="mr-2" />
+                                Template
+                            </button>
+                            <label
+                                htmlFor="upload-excel"
+                                className={`flex w-full md:w-auto items-center px-4 py-2 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 rounded-xl hover:bg-green-100 dark:hover:bg-green-900/30 transition-all text-xs font-bold uppercase tracking-widest cursor-pointer ${loading ? 'opacity-50 pointer-events-none' : ''}`}
+                                onClick={() => setIsActionMenuOpen(false)}
+                            >
+                                <Upload size={16} className="mr-2" />
+                                Upload
+                            </label>
+                            <button
+                                onClick={() => { handlePrint(); setIsActionMenuOpen(false); }}
+                                disabled={loading}
+                                className="flex w-full md:w-auto items-center px-4 py-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-slate-600 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-600 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+                            >
+                                <Printer size={16} className="mr-2" />
+                                Print Marks
+                            </button>
+                            <button
+                                onClick={() => { handlePrintCLO(); setIsActionMenuOpen(false); }}
+                                disabled={loading}
+                                className="flex w-full md:w-auto items-center px-4 py-2 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
+                            >
+                                <FileText size={16} className="mr-2" />
+                                CLO Report
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
