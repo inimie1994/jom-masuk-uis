@@ -867,7 +867,7 @@ const LecturerReports = () => {
             {/* Report Selection Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 transition-all print:hidden">
                 {/* Card 1: Workload Report (General) */}
-                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center justify-between gap-4">
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center space-x-4">
                         <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-xl text-green-600 dark:text-green-400">
                             <FileText size={24} />
@@ -879,7 +879,7 @@ const LecturerReports = () => {
                     </div>
                     <button
                         onClick={handlePrintWorkload}
-                        className="flex items-center justify-center px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 whitespace-nowrap"
+                        className="flex w-full md:w-auto items-center justify-center px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-medium transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 whitespace-nowrap"
                         title="Print Workload"
                     >
                         <Printer size={18} className="mr-2" />
@@ -888,7 +888,7 @@ const LecturerReports = () => {
                 </div>
 
                 {/* Card 2: Subject Report (Specific) */}
-                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 flex items-center justify-between gap-4">
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center space-x-4 flex-1">
                         <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl text-indigo-600 dark:text-indigo-400">
                             <BookOpen size={24} />
@@ -914,7 +914,7 @@ const LecturerReports = () => {
                                 setTimeout(() => setPrintMode(null), 1000);
                             }, 500);
                         }}
-                        className="flex items-center justify-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 whitespace-nowrap"
+                        className="flex w-full md:w-auto items-center justify-center px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 whitespace-nowrap"
                         title="Print Class Report"
                     >
                         <Printer size={18} className="mr-2" />
