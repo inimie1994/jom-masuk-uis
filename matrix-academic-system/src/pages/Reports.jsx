@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
+import LecturerReports from './LecturerReports';
 import {
     BarChart,
     Bar,
@@ -25,6 +26,13 @@ const Reports = () => {
     const { user } = useAuth();
     const [loading, setLoading] = useState(true);
 
+    // Tabs state
+    const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'lecturer'
+
+    // Lecturer Tab States
+    const [lecturers, setLecturers] = useState([]);
+    const [selectedLecturer, setSelectedLecturer] = useState('');
+
     // Data States
     const [enrollmentData, setEnrollmentData] = useState([]);
     const [attendanceData, setAttendanceData] = useState([]);
@@ -37,6 +45,7 @@ const Reports = () => {
     useEffect(() => {
         if (user?.faculty_id) {
             fetchAllData();
+            fetchLecturers();
         }
     }, [user?.faculty_id]);
 
@@ -54,6 +63,18 @@ const Reports = () => {
             fetchSubjects()
         ]);
         setLoading(false);
+    };
+
+    const fetchLecturers = async () => {
+        const { data } = await supabase
+            .from('lecturers')
+            .select('id, name')
+            .eq('faculty_id', user.faculty_id)
+            .order('name');
+        setLecturers(data || []);
+        if (data && data.length > 0) {
+            setSelectedLecturer(data[0].id);
+        }
     };
 
     const fetchSubjects = async () => {
@@ -191,90 +212,133 @@ const Reports = () => {
 
     return (
         <div className="space-y-6">
-            <PageHeader title="Reports & Analytics" />
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <PageHeader title="Reports & Analytics" />
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Enrollment Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Student Enrollment per Subject</h3>
-                    <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={enrollmentData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                                <Tooltip
-                                    contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
-                                    itemStyle={{ color: '#fff' }}
-                                    cursor={{ fill: 'transparent' }}
-                                />
-                                <Bar dataKey="students" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={40} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                {/* Tabs */}
+                <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg mt-4 sm:mt-0">
+                    <button
+                        onClick={() => setActiveTab('overview')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'overview' ? 'bg-white dark:bg-slate-700 shadow text-indigo-600 dark:text-indigo-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}`}
+                    >
+                        Faculty Overview
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('lecturer')}
+                        className={`px-4 py-2 text-sm font-medium rounded-md ${activeTab === 'lecturer' ? 'bg-white dark:bg-slate-700 shadow text-indigo-600 dark:text-indigo-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'}`}
+                    >
+                        Lecturer Reports
+                    </button>
                 </div>
+            </div>
 
-                {/* Attendance Chart */}
-                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Attendance Trends</h3>
-                    <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={attendanceData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                <XAxis dataKey="date" stroke="#9ca3af" fontSize={10} tickLine={false} axisLine={false} angle={-15} textAnchor="end" height={60} />
-                                <YAxis domain={[0, 100]} stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                                <Tooltip
-                                    contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
-                                    itemStyle={{ color: '#fff' }}
-                                />
-                                <Line type="monotone" dataKey="rate" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} activeDot={{ r: 6 }} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* Grades Chart */}
-                <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 sm:mb-0">Grade Distribution</h3>
-
-                        <div className="flex items-center space-x-2">
-                            <Filter size={16} className="text-gray-400" />
-                            <select
-                                value={selectedSubjectForGrades}
-                                onChange={(e) => setSelectedSubjectForGrades(e.target.value)}
-                                className="block w-48 rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-1.5 border"
-                            >
-                                {subjects.map(s => (
-                                    <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
-                                ))}
-                            </select>
+            {activeTab === 'overview' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Enrollment Chart */}
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Student Enrollment per Subject</h3>
+                        <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={enrollmentData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                    <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
+                                        itemStyle={{ color: '#fff' }}
+                                        cursor={{ fill: 'transparent' }}
+                                    />
+                                    <Bar dataKey="students" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={40} />
+                                </BarChart>
+                            </ResponsiveContainer>
                         </div>
                     </div>
 
-                    <div className="h-80 flex justify-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={gradeData}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                    outerRadius={100}
-                                    fill="#8884d8"
-                                    dataKey="value"
+                    {/* Attendance Chart */}
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Attendance Trends</h3>
+                        <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={attendanceData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                    <XAxis dataKey="date" stroke="#9ca3af" fontSize={10} tickLine={false} axisLine={false} angle={-15} textAnchor="end" height={60} />
+                                    <YAxis domain={[0, 100]} stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '8px', color: '#fff' }}
+                                        itemStyle={{ color: '#fff' }}
+                                    />
+                                    <Line type="monotone" dataKey="rate" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} activeDot={{ r: 6 }} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Grades Chart */}
+                    <div className="col-span-1 lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 sm:mb-0">Grade Distribution</h3>
+
+                            <div className="flex items-center space-x-2">
+                                <Filter size={16} className="text-gray-400" />
+                                <select
+                                    value={selectedSubjectForGrades}
+                                    onChange={(e) => setSelectedSubjectForGrades(e.target.value)}
+                                    className="block w-48 rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-1.5 border"
                                 >
-                                    {gradeData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    {subjects.map(s => (
+                                        <option key={s.id} value={s.id}>{s.code} - {s.name}</option>
                                     ))}
-                                </Pie>
-                                <Tooltip />
-                            </PieChart>
-                        </ResponsiveContainer>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="h-80 flex justify-center">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={gradeData}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                        outerRadius={100}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                    >
+                                        {gradeData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
                 </div>
-            </div>
+            ) : (
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+                    <div className="flex items-center space-x-4 mb-6">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Select Lecturer:</label>
+                        <select
+                            value={selectedLecturer}
+                            onChange={(e) => setSelectedLecturer(e.target.value)}
+                            className="block w-64 rounded-md border-gray-300 dark:border-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-slate-700 dark:text-white px-3 py-2 border"
+                        >
+                            {lecturers.map(l => (
+                                <option key={l.id} value={l.id}>{l.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {selectedLecturer ? (
+                        <div className="mt-4 pt-4">
+                            <LecturerReports adminViewLecturerId={selectedLecturer} />
+                        </div>
+                    ) : (
+                        <p className="text-gray-500 text-sm">Please select a lecturer to view their reports.</p>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

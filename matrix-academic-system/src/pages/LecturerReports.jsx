@@ -24,8 +24,9 @@ import { generateLecturerFeedbackExcel } from '../utils/excelGenerator';
 
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-const LecturerReports = () => {
+const LecturerReports = ({ adminViewLecturerId = null }) => {
     const { user } = useAuth();
+    const effectiveLecturerId = adminViewLecturerId || user?.lecturer_id;
     const [loading, setLoading] = useState(true);
 
     // Print State
@@ -58,11 +59,11 @@ const LecturerReports = () => {
     const [copied, setCopied] = useState(false);
 
     useEffect(() => {
-        if (user?.lecturer_id) {
+        if (effectiveLecturerId) {
             fetchLecturerSubjects();
             fetchSemesterDetails();
         }
-    }, [user?.lecturer_id]);
+    }, [effectiveLecturerId]);
 
     useEffect(() => {
         if (selectedSubject) {
@@ -84,7 +85,7 @@ const LecturerReports = () => {
                     subject_id,
                     subjects (id, code, name)
                 `)
-                .eq('lecturer_id', user.lecturer_id);
+                .eq('lecturer_id', effectiveLecturerId);
 
             if (error) throw error;
 
@@ -110,13 +111,15 @@ const LecturerReports = () => {
         }
     };
 
-    const fetchSemesterDetails = async () => {
+    const fetchSemesterDetails = async (facultyId) => {
         try {
-            if (!user?.faculty_id) return;
+            const targetFacultyId = facultyId || user?.faculty_id;
+            if (!targetFacultyId) return;
+
             const { data, error } = await supabase
                 .from('faculties')
-                .select('semester_start_date, semester_end_date')
-                .eq('id', user.faculty_id)
+                .select('semester_start_date, semester_end_date, semester_name')
+                .eq('id', targetFacultyId)
                 .single();
 
             if (error) throw error;
@@ -156,37 +159,42 @@ const LecturerReports = () => {
             const { data: sessions } = await supabase
                 .from('attendance_sessions')
                 .select('*')
-                .eq('lecturer_id', user.lecturer_id)
+                .eq('lecturer_id', effectiveLecturerId)
                 .eq('subject_id', selectedSubject)
                 .order('date', { ascending: true })
                 .order('start_time', { ascending: true });
 
             setAllSessions(sessions || []);
 
-            // 3. Fetch Holidays
-            const { data: holidays } = await supabase
-                .from('holidays')
-                .select('*')
-                .eq('faculty_id', user.faculty_id);
-
-            setHolidayData(holidays || []);
-
-            // 4. Fetch Lecturer Name
+            // 3. Fetch Lecturer Details & Name
             const { data: lectData } = await supabase
                 .from('lecturers')
-                .select('name')
-                .eq('id', user.lecturer_id)
+                .select('name, faculty_id')
+                .eq('id', effectiveLecturerId)
                 .single();
 
-            if (lectData) setLecturerName(lectData.name);
+            if (lectData) {
+                setLecturerName(lectData.name);
+                // Fetch semester and holidays for THIS faculty
+                fetchSemesterDetails(lectData.faculty_id);
 
-            // 5. Fetch Timetable Rules
-            const { data: tTable } = await supabase
+                const { data: holidays, error: holError } = await supabase
+                    .from('holidays')
+                    .select('*')
+                    .eq('faculty_id', lectData.faculty_id);
+                console.log('[DEBUG] Lecturer faculty_id:', lectData.faculty_id);
+                console.log('[DEBUG] Holidays fetched:', holidays, 'Error:', holError);
+                setHolidayData(holidays || []);
+            }
+
+            // 4. Fetch Timetable Rules
+            const { data: tTable, error: ttError } = await supabase
                 .from('timetable')
                 .select('*')
-                .eq('lecturer_id', user.lecturer_id)
+                .eq('lecturer_id', effectiveLecturerId)
                 .eq('subject_id', selectedSubject);
 
+            console.log('[DEBUG] Timetable rules fetched:', tTable, 'Error:', ttError);
             setTimetableRules(tTable || []);
 
         } catch (error) {
@@ -200,7 +208,7 @@ const LecturerReports = () => {
             const { data, error } = await supabase
                 .from('feedback_sessions')
                 .select('*')
-                .eq('lecturer_id', user.lecturer_id)
+                .eq('lecturer_id', effectiveLecturerId)
                 .eq('subject_id', selectedSubject)
                 .eq('is_active', true)
                 .single();
@@ -235,7 +243,7 @@ const LecturerReports = () => {
                 .from('feedback_sessions')
                 .insert([
                     {
-                        lecturer_id: user.lecturer_id,
+                        lecturer_id: effectiveLecturerId,
                         subject_id: selectedSubject,
                         semester_session: user.semester_name || '2025/2026', // Fallback if not in user profile
                         is_active: true
@@ -344,7 +352,7 @@ const LecturerReports = () => {
             const { data: lecturerData, error: lecturerError } = await supabase
                 .from('lecturers')
                 .select('*, departments(code, name)')
-                .eq('id', user.lecturer_id)
+                .eq('id', effectiveLecturerId)
                 .single();
 
             if (lecturerError) throw lecturerError;
@@ -358,7 +366,7 @@ const LecturerReports = () => {
                     subjects (id, code, name),
                     lecturers (name)
                 `)
-                .eq('lecturer_id', user.lecturer_id)
+                .eq('lecturer_id', effectiveLecturerId)
                 .order('day'); // Basic ordering, will sort more in component
 
             if (timetableError) throw timetableError;
@@ -367,7 +375,7 @@ const LecturerReports = () => {
             const { data: activitiesData, error: activitiesError } = await supabase
                 .from('lecturer_activities')
                 .select('*')
-                .eq('lecturer_id', user.lecturer_id)
+                .eq('lecturer_id', effectiveLecturerId)
                 .order('day');
 
             if (activitiesError) throw activitiesError;
@@ -424,7 +432,7 @@ const LecturerReports = () => {
             const { data: timetableData } = await supabase
                 .from('timetable')
                 .select('group_names')
-                .eq('lecturer_id', user.lecturer_id)
+                .eq('lecturer_id', effectiveLecturerId)
                 .eq('subject_id', selectedSubject);
 
             const myGroups = [...new Set(timetableData?.flatMap(t => Array.isArray(t.group_names) ? t.group_names : [t.group_names]))].filter(Boolean);
@@ -470,7 +478,7 @@ const LecturerReports = () => {
                     date,
                     attendance_records(status)
                 `)
-                .eq('lecturer_id', user.lecturer_id)
+                .eq('lecturer_id', effectiveLecturerId)
                 .eq('subject_id', selectedSubject)
                 .order('date', { ascending: true })
                 .limit(20);
@@ -502,7 +510,7 @@ const LecturerReports = () => {
             const { data: timetableData } = await supabase
                 .from('timetable')
                 .select('group_names')
-                .eq('lecturer_id', user.lecturer_id)
+                .eq('lecturer_id', effectiveLecturerId)
                 .eq('subject_id', selectedSubject);
 
             const myGroups = [...new Set(timetableData?.flatMap(t => Array.isArray(t.group_names) ? t.group_names : [t.group_names]))].filter(Boolean);
@@ -576,6 +584,15 @@ const LecturerReports = () => {
         const subject = subjects.find(s => s.id === selectedSubject);
         const weeks = Array.from({ length: 14 }, (_, i) => i + 1);
 
+        // Debug: log state at render time
+        console.log('[DEBUG] PrintableReport rendered:',
+            'semesterDetails:', semesterDetails,
+            'holidayData count:', holidayData.length,
+            'timetableRules count:', timetableRules.length,
+            'allSessions count:', allSessions.length,
+            'holidays:', holidayData
+        );
+
         const getWeekDateRange = (weekNum) => {
             if (!semesterDetails?.semester_start_date) return { start: '-', end: '-' };
             const start = new Date(semesterDetails.semester_start_date);
@@ -585,65 +602,114 @@ const LecturerReports = () => {
             return `${start.toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric' })} - ${end.toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric' })}`;
         };
 
+        // Helper: format a Date object as YYYY-MM-DD using LOCAL time (not UTC)
+        const toLocalDateStr = (date) => {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        };
+
+        // Pre-build a Set of holiday date strings for O(1) lookup
+        const holidayDateSet = new Set(
+            holidayData.map(h => {
+                // h.date is stored as YYYY-MM-DD string - use it directly
+                // but parse it safely via UTC to keep the date string accurate
+                const parts = String(h.date).split('T')[0]; // strip any time component
+                return parts;
+            })
+        );
+
         const getSessionForWeek = (weekNum, type) => {
             if (!semesterDetails?.semester_start_date) return [];
+
+            // Build week boundaries using local date arithmetic
             const weekStart = new Date(semesterDetails.semester_start_date);
-            weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7); // Start of week
+            weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7);
             const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekEnd.getDate() + 6); // End of week
+            weekEnd.setDate(weekEnd.getDate() + 6);
+
+            const weekStartStr = toLocalDateStr(weekStart);
+            const weekEndStr = toLocalDateStr(weekEnd);
 
             // 1. Find ALL actual attendance sessions for this week
             const sessions = allSessions.filter(s => {
-                const d = new Date(s.date);
-                return d >= weekStart && d <= weekEnd &&
-                    (s.class_type === type || (!s.class_type && type === 'Lecture'));
+                // s.date is a YYYY-MM-DD string; compare as strings directly
+                const sDateStr = String(s.date).split('T')[0];
+                const typeMatch = s.class_type === type || (!s.class_type && type === 'Lecture');
+                return sDateStr >= weekStartStr && sDateStr <= weekEndStr && typeMatch;
             });
 
             if (sessions.length > 0) {
                 return sessions.map(session => {
-                    const d = new Date(session.date);
-                    const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
+                    const sDateStr = String(session.date).split('T')[0];
+                    const isHoliday = holidayDateSet.has(sDateStr);
 
-                    const isHoliday = holidayData.some(h => {
-                        const hDate = new Date(h.date);
-                        const sDate = new Date(session.date);
-                        return hDate.toISOString().split('T')[0] === sDate.toISOString().split('T')[0];
-                    });
+                    // Parse date parts directly from the string to avoid timezone issues
+                    const [, mm, dd] = sDateStr.split('-');
+                    const dateStr = `${parseInt(dd)}/${parseInt(mm)}`;
 
-                    const timeStr = isHoliday ? '[CUTI]' : `${session.start_time?.slice(0, 5) || ''}-${session.end_time?.slice(0, 5) || ''}`;
+                    const timeStr = isHoliday
+                        ? 'CUTI'
+                        : `${session.start_time?.slice(0, 5) || ''}-${session.end_time?.slice(0, 5) || ''}`;
                     return { date: dateStr, time: timeStr, isHoliday, fullDate: session.date };
                 });
             }
 
-            // 2. Fallback: If no session, check if a class was scheduled on a holiday
-            const rule = timetableRules.find(r => r.class_type === type || (type === 'Lecture' && !r.class_type));
-            if (rule) {
-                const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                const targetDayIndex = DAYS.indexOf(rule.day_of_week);
+            // 2. Fallback: No session recorded. Check if a holiday falls on a scheduled class day.
+            const holidayDatesForWeek = [];
 
-                if (targetDayIndex !== -1) {
-                    // Calculate the date for that day in this specific week
+            // Strategy A: Use timetable rules to pinpoint the exact class day
+            // Broaden the filter: include rules for this type, OR rules with no class_type (treat as Lecture)
+            const rules = timetableRules.filter(r =>
+                r.class_type === type ||
+                (type === 'Lecture' && !r.class_type) ||
+                (type === 'Tutorial' && r.class_type === 'Tutorial')
+            );
+
+            if (rules.length > 0) {
+                const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                rules.forEach(rule => {
+                    const targetDayIndex = DAYS.findIndex(d => d.toLowerCase() === rule.day_of_week?.toLowerCase());
+                    if (targetDayIndex === -1) return;
+
                     const startDayIndex = weekStart.getDay();
                     const diff = (targetDayIndex - startDayIndex + 7) % 7;
-                    const originalDate = new Date(weekStart);
-                    originalDate.setDate(originalDate.getDate() + diff);
+                    const classDate = new Date(weekStart);
+                    classDate.setDate(classDate.getDate() + diff);
 
-                    // Check if this calculated date is a holiday (using localized YYYY-MM-DD for consistency)
-                    const dateStrKey = originalDate.toLocaleDateString('en-CA'); // en-CA gives YYYY-MM-DD
-                    const isHoliday = holidayData.some(h => {
-                        const hDateStr = new Date(h.date).toLocaleDateString('en-CA');
-                        return hDateStr === dateStrKey;
-                    });
-
-                    if (isHoliday) {
-                        return [{
-                            date: `${originalDate.getDate()}/${originalDate.getMonth() + 1}`,
-                            time: '[CUTI]',
+                    const classDateStr = toLocalDateStr(classDate); // Use LOCAL time
+                    if (holidayDateSet.has(classDateStr)) {
+                        const [, mm, dd] = classDateStr.split('-');
+                        holidayDatesForWeek.push({
+                            date: `${parseInt(dd)}/${parseInt(mm)}`,
+                            time: 'CUTI',
                             isHoliday: true,
-                            fullDate: originalDate.toISOString()
-                        }];
+                            fullDate: classDateStr
+                        });
                     }
+                });
+            } else {
+                // Strategy B: No timetable rules at all.
+                // Check if ANY holiday falls within this week (Lecture column only to avoid duplicates).
+                if (type === 'Lecture') {
+                    holidayData.forEach(h => {
+                        const hDateStr = String(h.date).split('T')[0]; // raw YYYY-MM-DD
+                        if (hDateStr >= weekStartStr && hDateStr <= weekEndStr) {
+                            const [, mm, dd] = hDateStr.split('-');
+                            holidayDatesForWeek.push({
+                                date: `${parseInt(dd)}/${parseInt(mm)}`,
+                                time: 'CUTI',
+                                isHoliday: true,
+                                fullDate: hDateStr
+                            });
+                        }
+                    });
                 }
+            }
+
+            if (holidayDatesForWeek.length > 0) {
+                return holidayDatesForWeek;
             }
 
             return [];
