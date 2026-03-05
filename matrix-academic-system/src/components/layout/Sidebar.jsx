@@ -17,7 +17,8 @@ import {
     Settings,
     ChevronLeft,
     ChevronRight,
-    School
+    School,
+    CalendarRange
 } from 'lucide-react';
 
 const Sidebar = ({ isMobile, className = '' }) => {
@@ -36,6 +37,7 @@ const Sidebar = ({ isMobile, className = '' }) => {
         { path: '/reports', label: 'Reports', icon: PieChart },
         { path: '/audit-logs', label: 'Audit Logs', icon: Activity },
         { path: '/settings', label: 'Settings', icon: Settings },
+        { path: '/unjuran-maker', label: 'Unjuran Maker', icon: CalendarRange },
     ];
 
     const lecturerNavItems = [
@@ -47,6 +49,7 @@ const Sidebar = ({ isMobile, className = '' }) => {
         { path: '/assessments', label: 'Assessments', icon: FileText },
         { path: '/lecturer-reports', label: 'Reports', icon: PieChart },
         ...(user?.role === 'hod' || user?.role === 'hop' ? [{ path: '/my-team', label: 'My Team', icon: Users }] : []),
+        ...(user?.role === 'hod' || user?.role === 'hop' ? [{ path: '/unjuran-maker', label: 'Unjuran Maker', icon: CalendarRange }] : []),
         { path: '/settings', label: 'Settings', icon: Settings },
     ];
 

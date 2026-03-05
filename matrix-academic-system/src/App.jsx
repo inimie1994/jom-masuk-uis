@@ -25,6 +25,7 @@ import StudentFeedbackForm from './pages/StudentFeedbackForm';
 import MyTeam from './pages/MyTeam';
 import SuperadminFaculties from './pages/SuperadminFaculties';
 import SuperadminLogin from './pages/SuperadminLogin';
+import UnjuranMaker from './pages/UnjuranMaker';
 
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -50,6 +51,7 @@ function App() {
               <Route path="lecturer-reports" element={<LecturerReports />} />
               <Route path="my-students" element={<MyStudents />} />
               <Route path="my-team" element={<MyTeam />} />
+              <Route path="unjuran-maker" element={<UnjuranMaker />} />
               <Route path="students" element={<Students />} />
               <Route path="lecturers" element={<Lecturers />} />
               <Route path="subjects" element={<Subjects />} />
