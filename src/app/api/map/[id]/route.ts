@@ -46,3 +46,32 @@ export async function GET(
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
+
+export async function POST(
+    request: Request,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const mapId = (await params).id;
+        const body = await request.json();
+
+        if (!body.grid_data) {
+            return NextResponse.json({ error: 'Missing grid_data in request' }, { status: 400 });
+        }
+
+        const { error } = await supabase
+            .from('campus_maps')
+            .update({ grid_data: body.grid_data })
+            .eq('map_id', mapId);
+
+        if (error) {
+            console.error('Error updating map:', error);
+            return NextResponse.json({ error: 'Failed to save map data' }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('API Error:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
