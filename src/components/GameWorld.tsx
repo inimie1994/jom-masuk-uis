@@ -22,6 +22,7 @@ export default function GameWorld() {
     const containerRef = useRef<HTMLDivElement>(null);
     const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
     const [zoomOption, setZoomOption] = useState<'close' | 'medium' | 'far'>('medium');
+    const [isCameraExpanded, setIsCameraExpanded] = useState(false);
 
     // Dynamic Map State
     const [mapName, setMapName] = useState<string>("Loading...");
@@ -117,7 +118,7 @@ export default function GameWorld() {
         }
     };
 
-    const { position, direction, isMoving, moveIfValid } = usePlayerMovement({ x: 29, y: 35 }, gridData, tilesData, handleInteraction);
+    const { position, direction, isMoving, moveIfValid, interact } = usePlayerMovement({ x: 29, y: 35 }, gridData, tilesData, handleInteraction);
 
     const currentFrame = useCharacterAnimation(direction, isMoving);
 
@@ -267,34 +268,43 @@ export default function GameWorld() {
                     {mapName}
                 </div>
 
-                {/* Control Row: Admin & Zoom */}
-                <div className="flex items-center gap-1 pointer-events-auto bg-black/60 backdrop-blur-md rounded-2xl p-1.5 border border-white/20 shadow-2xl">
+                {/* Control Column: Admin & Zoom */}
+                <div className="flex flex-col items-end gap-2 pointer-events-none">
                     <button
                         onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => { e.stopPropagation(); setIsAdminMode(!isAdminMode); }}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-sm transition-all active:scale-95 ${isAdminMode ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)]' : 'hover:bg-white/10 text-white/80'}`}
+                        className={`pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-2xl font-bold text-sm transition-all active:scale-95 shadow-2xl border ${isAdminMode ? 'bg-red-500 text-white border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)]' : 'bg-black/60 border-white/20 hover:bg-black/80 text-white/80'}`}
                         title="Admin Editor Mode"
                     >
                         <div className={`w-2 h-2 rounded-full ${isAdminMode ? 'bg-white animate-pulse' : 'bg-red-500'}`} />
                         Admin
                     </button>
 
-                    <div className="w-[1px] h-6 bg-white/20 mx-1" />
-
-                    {/* Camera Icon */}
-                    <div className="flex items-center justify-center w-8 text-neutral-400">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    </div>
-
-                    {(['close', 'medium', 'far'] as const).map(option => (
+                    {/* Camera Controls */}
+                    <div className="pointer-events-auto flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-2xl p-1.5 border border-white/20 shadow-2xl overflow-hidden transition-all duration-300">
+                        {/* Camera Toggle Icon */}
                         <button
-                            key={option}
-                            onClick={() => setZoomOption(option)}
-                            className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold capitalize transition-all active:scale-95 ${zoomOption === option ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' : 'hover:bg-white/10 text-neutral-400'}`}
+                            onClick={(e) => { e.stopPropagation(); setIsCameraExpanded(!isCameraExpanded); }}
+                            className={`flex items-center justify-center w-9 h-9 sm:w-8 sm:h-8 rounded-xl transition-colors ${isCameraExpanded ? 'bg-white/20 text-white' : 'hover:bg-white/10 text-neutral-400'}`}
                         >
-                            {option}
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                         </button>
-                    ))}
+
+                        {isCameraExpanded && (
+                            <div className="flex items-center gap-1 animate-in slide-in-from-right-4 fade-in duration-200">
+                                <div className="w-[1px] h-6 bg-white/20 mx-1" />
+                                {(['close', 'medium', 'far'] as const).map(option => (
+                                    <button
+                                        key={option}
+                                        onClick={() => setZoomOption(option)}
+                                        className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold capitalize transition-all active:scale-95 ${zoomOption === option ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' : 'hover:bg-white/10 text-neutral-400'}`}
+                                    >
+                                        {option}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Admin Panel Overlay */}
@@ -414,7 +424,7 @@ export default function GameWorld() {
             </div>
 
             {/* Mobile Controls */}
-            <MobileControls onMove={handleMobileMove} />
+            <MobileControls onMove={handleMobileMove} onInteract={interact} />
 
             <FacultyModal
                 isOpen={modalData.isOpen}

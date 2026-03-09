@@ -57,6 +57,30 @@ export const usePlayerMovement = (
         setTimeout(() => setIsMoving(false), 200);
     }, [grid, tiles, onInteraction]);
 
+    const interact = useCallback(() => {
+        if (!grid || grid.length === 0 || !tiles) return;
+
+        let dx = 0;
+        let dy = 0;
+        if (direction === 'UP') dy = -1;
+        else if (direction === 'DOWN') dy = 1;
+        else if (direction === 'LEFT') dx = -1;
+        else if (direction === 'RIGHT') dx = 1;
+
+        const targetX = position.x + dx;
+        const targetY = position.y + dy;
+
+        if (targetY >= 0 && targetY < grid.length && targetX >= 0 && targetX < grid[0].length) {
+            const tileId = grid[targetY][targetX];
+            const tileDef = tiles[tileId];
+
+            // Allow interaction with triggers or specific interactable tiles in front of the player
+            if (tileDef && tileDef.is_trigger && onInteraction) {
+                onInteraction(targetX, targetY, tileDef);
+            }
+        }
+    }, [position, direction, grid, tiles, onInteraction]);
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             switch (e.key) {
@@ -80,6 +104,9 @@ export const usePlayerMovement = (
                 case 'D':
                     moveIfValid(1, 0);
                     break;
+                case ' ': // Spacebar
+                    interact();
+                    break;
                 default:
                     break;
             }
@@ -89,5 +116,5 @@ export const usePlayerMovement = (
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [moveIfValid]);
 
-    return { position, direction, isMoving, moveIfValid };
+    return { position, direction, isMoving, moveIfValid, interact };
 };
