@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { usePlayerMovement } from '@/hooks/usePlayerMovement';
-import { useCharacterAnimation } from '@/hooks/useCharacterAnimation';
+import { useCharacterAnimation, defaultAnimationMap, femaleAnimationMap } from '@/hooks/useCharacterAnimation';
 import FacultyModal from './FacultyModal';
 import MobileControls from './MobileControls';
 import { supabase } from '@/lib/supabase';
@@ -18,7 +18,11 @@ type TileDefinition = {
     metadata: any;
 };
 
-export default function GameWorld() {
+interface GameWorldProps {
+    gender: 'male' | 'female';
+}
+
+export default function GameWorld({ gender }: GameWorldProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
     const [zoomOption, setZoomOption] = useState<'close' | 'medium' | 'far'>('medium');
@@ -120,7 +124,11 @@ export default function GameWorld() {
 
     const { position, direction, isMoving, moveIfValid, interact } = usePlayerMovement({ x: 29, y: 35 }, gridData, tilesData, handleInteraction);
 
-    const currentFrame = useCharacterAnimation(direction, isMoving);
+    const currentFrame = useCharacterAnimation(
+        direction,
+        isMoving,
+        gender === 'female' ? femaleAnimationMap : defaultAnimationMap
+    );
 
     const handleMobileMove = (dir: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT') => {
         switch (dir) {
@@ -416,7 +424,7 @@ export default function GameWorld() {
                     }}
                 >
                     <img
-                        src={`/characters/male/character-${currentFrame}.png`}
+                        src={`/characters/${gender}/character-${currentFrame}.png`}
                         alt="Player character"
                         className="w-full h-full object-contain drop-shadow-lg"
                     />

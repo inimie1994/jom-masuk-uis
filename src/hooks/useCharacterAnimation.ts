@@ -18,6 +18,14 @@ export const defaultAnimationMap: CharacterAnimationMap = {
     UP: { idle: [5], walk: [5, 6] }
 };
 
+// Specialized map for the 10-frame female character
+export const femaleAnimationMap: CharacterAnimationMap = {
+    DOWN: { idle: [2], walk: [0, 1] },
+    LEFT: { idle: [7], walk: [8, 9] },
+    RIGHT: { idle: [6], walk: [11, 10] },
+    UP: { idle: [5], walk: [4, 5] }
+};
+
 export function useCharacterAnimation(
     direction: Direction,
     isMoving: boolean,

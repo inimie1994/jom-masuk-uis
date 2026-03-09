@@ -1,9 +1,11 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import GameWorld from '@/components/GameWorld';
+import RegistrationModal, { PlayerData } from '@/components/RegistrationModal';
 
 export default function Home() {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(true);
+  const [playerData, setPlayerData] = useState<PlayerData | null>(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -20,10 +22,11 @@ export default function Home() {
 
   return (
     <div className="min-h-screen w-screen bg-[#050505] text-white selection:bg-blue-500/30 font-sans overflow-hidden fixed inset-0">
+      {!playerData && <RegistrationModal onSubmit={setPlayerData} />}
 
       {/* FULLSCREEN GAME MAP */}
       <div className="absolute inset-0 z-0">
-        <GameWorld />
+        {playerData && <GameWorld gender={playerData.gender} />}
       </div>
 
       {/* TOP LEFT FLOATING UI: Player Details & Status */}
@@ -33,7 +36,7 @@ export default function Home() {
         <div className={`pointer-events-auto px-4 py-3 md:p-5 rounded-3xl bg-black/60 backdrop-blur-md border border-white/10 shadow-[0_30px_60px_rgba(0,0,0,0.5)] relative overflow-hidden transition-all duration-300 ${isDetailsExpanded ? 'max-h-[500px]' : 'max-h-[44px] md:max-h-[500px]'}`}>
 
           <div className="flex justify-between items-center relative z-20">
-            <h2 className="text-[10px] font-bold text-blue-400 tracking-[0.2em] uppercase line-clamp-1 mt-0.5">STUDENT_ID: 39420</h2>
+            <h2 className="text-[10px] font-bold text-blue-400 tracking-[0.2em] uppercase line-clamp-1 mt-0.5">IC_NO: {playerData?.icNo || 'UNKNOWN'}</h2>
             <button
               onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
               className="md:hidden w-6 h-6 flex flex-shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white pointer-events-auto transition-colors z-30 ml-2"
@@ -50,7 +53,7 @@ export default function Home() {
               </div>
             </div>
 
-            <h3 className="text-xl font-bold text-white mb-4 drop-shadow-md">Future Leader</h3>
+            <h3 className="text-xl font-bold text-white mb-4 drop-shadow-md">{playerData?.fullName || 'Future Leader'}</h3>
 
             <div className="space-y-3">
               <div className="space-y-1.5">
