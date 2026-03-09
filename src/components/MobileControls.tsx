@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 
 type Direction = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 
@@ -10,6 +10,39 @@ interface MobileControlsProps {
 }
 
 export default function MobileControls({ onMove, onInteract }: MobileControlsProps) {
+    const moveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    const startMoving = useCallback((dir: Direction) => {
+        // Initial move immediately
+        onMove(dir);
+
+        // Clear existing interval to prevent duplicates
+        if (moveIntervalRef.current) {
+            clearInterval(moveIntervalRef.current);
+        }
+
+        // Set continuous movement interval
+        moveIntervalRef.current = setInterval(() => {
+            onMove(dir);
+        }, 150);
+    }, [onMove]);
+
+    const stopMoving = useCallback(() => {
+        if (moveIntervalRef.current) {
+            clearInterval(moveIntervalRef.current);
+            moveIntervalRef.current = null;
+        }
+    }, []);
+
+    // Cleanup interval on unmount
+    useEffect(() => {
+        return () => {
+            if (moveIntervalRef.current) {
+                clearInterval(moveIntervalRef.current);
+            }
+        };
+    }, []);
+
     return (
         <div className="absolute inset-0 pointer-events-none z-50 md:hidden">
             {/* Interact Button (Bottom Left) */}
@@ -31,7 +64,10 @@ export default function MobileControls({ onMove, onInteract }: MobileControlsPro
                 <div className="grid grid-cols-3 grid-rows-3 w-[150px] h-[150px] gap-0 opacity-80 backdrop-blur-sm drop-shadow-2xl">
                     <div />
                     <button
-                        onPointerDown={(e) => { e.preventDefault(); onMove('UP'); }}
+                        onPointerDown={(e) => { e.preventDefault(); startMoving('UP'); }}
+                        onPointerUp={stopMoving}
+                        onPointerLeave={stopMoving}
+                        onPointerCancel={stopMoving}
                         className="bg-[#2A2A2A] border-t-[3px] border-x-[3px] border-[#444] rounded-t-xl flex items-center justify-center active:bg-neutral-600 transition-colors shadow-[inset_0_4px_4px_rgba(255,255,255,0.1)]"
                     >
                         <svg className="w-5 h-5 text-neutral-300" viewBox="0 0 24 24"><polygon points="12,6 4,16 20,16" fill="currentColor" /></svg>
@@ -39,7 +75,10 @@ export default function MobileControls({ onMove, onInteract }: MobileControlsPro
                     <div />
 
                     <button
-                        onPointerDown={(e) => { e.preventDefault(); onMove('LEFT'); }}
+                        onPointerDown={(e) => { e.preventDefault(); startMoving('LEFT'); }}
+                        onPointerUp={stopMoving}
+                        onPointerLeave={stopMoving}
+                        onPointerCancel={stopMoving}
                         className="bg-[#2A2A2A] border-l-[3px] border-y-[3px] border-[#444] rounded-l-xl flex items-center justify-center active:bg-neutral-600 transition-colors shadow-[inset_4px_0_4px_rgba(255,255,255,0.1)]"
                     >
                         <svg className="w-5 h-5 text-neutral-300" viewBox="0 0 24 24"><polygon points="6,12 16,4 16,20" fill="currentColor" /></svg>
@@ -50,7 +89,10 @@ export default function MobileControls({ onMove, onInteract }: MobileControlsPro
                     </div>
 
                     <button
-                        onPointerDown={(e) => { e.preventDefault(); onMove('RIGHT'); }}
+                        onPointerDown={(e) => { e.preventDefault(); startMoving('RIGHT'); }}
+                        onPointerUp={stopMoving}
+                        onPointerLeave={stopMoving}
+                        onPointerCancel={stopMoving}
                         className="bg-[#2A2A2A] border-r-[3px] border-y-[3px] border-[#444] rounded-r-xl flex items-center justify-center active:bg-neutral-600 transition-colors shadow-[inset_-4px_0_4px_rgba(255,255,255,0.1)]"
                     >
                         <svg className="w-5 h-5 text-neutral-300" viewBox="0 0 24 24"><polygon points="18,12 8,20 8,4" fill="currentColor" /></svg>
@@ -58,7 +100,10 @@ export default function MobileControls({ onMove, onInteract }: MobileControlsPro
 
                     <div />
                     <button
-                        onPointerDown={(e) => { e.preventDefault(); onMove('DOWN'); }}
+                        onPointerDown={(e) => { e.preventDefault(); startMoving('DOWN'); }}
+                        onPointerUp={stopMoving}
+                        onPointerLeave={stopMoving}
+                        onPointerCancel={stopMoving}
                         className="bg-[#2A2A2A] border-b-[3px] border-x-[3px] border-[#444] rounded-b-xl flex items-center justify-center active:bg-neutral-600 transition-colors shadow-[inset_0_-4px_4px_rgba(255,255,255,0.1)]"
                     >
                         <svg className="w-5 h-5 text-neutral-300" viewBox="0 0 24 24"><polygon points="12,18 20,8 4,8" fill="currentColor" /></svg>
