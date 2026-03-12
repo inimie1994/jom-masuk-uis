@@ -2,10 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import GameWorld from '@/components/GameWorld';
 import RegistrationModal, { PlayerData } from '@/components/RegistrationModal';
+import IntroPage from '@/components/IntroPage';
 
 export default function Home() {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(true);
   const [playerData, setPlayerData] = useState<PlayerData | null>(null);
+  const [showIntro, setShowIntro] = useState(true);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -22,7 +24,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen w-screen bg-[#050505] text-white selection:bg-blue-500/30 font-sans overflow-hidden fixed inset-0">
-      {!playerData && <RegistrationModal onSubmit={setPlayerData} />}
+      {showIntro && <IntroPage onStart={() => setShowIntro(false)} />}
+      {!showIntro && !playerData && <RegistrationModal onSubmit={setPlayerData} onClose={() => setShowIntro(true)} />}
 
       {/* FULLSCREEN GAME MAP */}
       <div className="absolute inset-0 z-0">

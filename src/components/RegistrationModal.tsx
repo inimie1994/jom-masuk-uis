@@ -11,9 +11,10 @@ export interface PlayerData {
 
 interface RegistrationModalProps {
     onSubmit: (data: PlayerData) => void;
+    onClose: () => void;
 }
 
-export default function RegistrationModal({ onSubmit }: RegistrationModalProps) {
+export default function RegistrationModal({ onSubmit, onClose }: RegistrationModalProps) {
     const [formData, setFormData] = useState<PlayerData>({
         fullName: '',
         icNo: '',
@@ -47,6 +48,16 @@ export default function RegistrationModal({ onSubmit }: RegistrationModalProps) 
                 <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-purple-600/30 rounded-full blur-[60px] pointer-events-none" />
 
                 <div className="relative z-10">
+                    <button 
+                        onClick={onClose}
+                        className="absolute -top-2 -right-2 p-2 rounded-full bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white transition-all z-20 group"
+                        aria-label="Close"
+                    >
+                        <svg className="w-5 h-5 group-active:scale-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+
                     <h2 className="text-2xl font-black text-white mb-2 text-center tracking-tight">ENROLLMENT DESK</h2>
                     <p className="text-neutral-400 text-sm text-center mb-6">Please provide your details to enter CampusQuest.</p>
 
