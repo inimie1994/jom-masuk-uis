@@ -129,16 +129,16 @@ const PrintableWorkloadSheet = ({
                 `}
             </style>
 
-            <div className="flex flex-col items-center mb-6">
-                <img src={uisLogo} alt="Logo" className="h-24 w-auto mb-2" />
+            <div className="flex flex-col items-center mb-4">
+                <img src={uisLogo} alt="Logo" className="h-16 w-auto mb-1" />
                 <div className="text-center">
-                    <div className="text-sm font-bold uppercase">PUSAT MATRIKULASI</div>
-                    <div className="text-sm font-bold uppercase">BORANG LAPORAN PENGAJARAN {semesterSession}</div>
+                    <div className="text-[12px] font-bold uppercase">PUSAT MATRIKULASI</div>
+                    <div className="text-[12px] font-bold uppercase">BORANG LAPORAN PENGAJARAN {semesterSession}</div>
                 </div>
             </div>
 
             {/* Info Row */}
-            <div className="flex justify-between text-[11px] font-bold uppercase mb-0.5" style={{ borderBottom: '2px solid black' }}>
+            <div className="flex justify-between text-[11px] font-bold uppercase mb-0" style={{ borderBottom: '2px solid black' }}>
                 <div className="flex gap-1 pb-1">
                     <span>NAMA PENSYARAH:</span>
                     <span className="text-red-600 pl-1">{lecturer?.name || ''}</span>
@@ -154,16 +154,16 @@ const PrintableWorkloadSheet = ({
             </div>
 
             {/* Table */}
-            <table className="w-full border-collapse border border-black text-center text-[10px] print-table mb-1">
+            <table className="w-full border-collapse border border-black text-center text-[10px] print-table mb-0.5">
                 <thead>
-                    <tr className="bg-black text-white border-b border-black h-10 align-middle">
-                        <th className="w-24 border-r border-white font-bold uppercase py-1">KOD KURSUS</th>
-                        <th className="text-center border-r border-white font-bold uppercase py-1">NAMA KURSUS</th>
-                        <th className="w-48 border-r border-white font-bold uppercase py-1">HARI DAN MASA</th>
-                        <th className="w-20 border-r border-white leading-tight font-bold uppercase py-1 text-[9px]">BILANGAN<br />PELAJAR</th>
-                        <th className="w-16 border-r border-white leading-tight font-bold uppercase py-1 text-[9px]">JAM<br />KULIAH</th>
-                        <th className="w-16 border-r border-white leading-tight font-bold uppercase py-1 text-[9px]">JAM<br />TUTORIAL</th>
-                        <th className="w-24 leading-tight font-bold uppercase py-1 text-[9px]">JUMLAH JAM<br />PENGAJARAN</th>
+                    <tr className="bg-black text-white border-b border-black h-8 align-middle">
+                        <th className="w-24 border-r border-white font-bold uppercase py-0.5">KOD KURSUS</th>
+                        <th className="text-center border-r border-white font-bold uppercase py-0.5">NAMA KURSUS</th>
+                        <th className="w-48 border-r border-white font-bold uppercase py-0.5">HARI DAN MASA</th>
+                        <th className="w-20 border-r border-white leading-tight font-bold uppercase py-0.5 text-[9px]">BILANGAN<br />PELAJAR</th>
+                        <th className="w-16 border-r border-white leading-tight font-bold uppercase py-0.5 text-[9px]">JAM<br />KULIAH</th>
+                        <th className="w-16 border-r border-white leading-tight font-bold uppercase py-0.5 text-[9px]">JAM<br />TUTORIAL</th>
+                        <th className="w-24 leading-tight font-bold uppercase py-0.5 text-[9px]">JUMLAH JAM<br />PENGAJARAN</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -182,7 +182,7 @@ const PrintableWorkloadSheet = ({
                         }
 
                         return (
-                            <tr key={index} className="h-8">
+                            <tr key={index} className="h-6">
                                 {showSubject && (
                                     <td className="text-left font-medium" rowSpan={rowSpan}>
                                         {row.subjects?.code}
@@ -201,13 +201,13 @@ const PrintableWorkloadSheet = ({
                             </tr>
                         );
                     }) : (
-                        <tr className="h-32">
+                        <tr className="h-16">
                             <td colSpan={7}>&nbsp;</td>
                         </tr>
                     )}
                     {/* Empty row filler if needed to match height, but table auto-height is usually fine. */}
 
-                    <tr className="font-bold h-8">
+                    <tr className="font-bold h-6">
                         <td colSpan={4} className="text-right pr-2">JUMLAH</td>
                         <td className="text-center">{totalLectureHours}</td>
                         <td className="text-center">{totalTutorialHours}</td>
@@ -220,13 +220,13 @@ const PrintableWorkloadSheet = ({
 
             {/* Signatures */}
             {/* Signatures */}
-            <div className="flex flex-col text-[10px] mb-6">
+            <div className="flex flex-col text-[10px] mb-2">
                 {/* Left Box: Signature & Date */}
                 <div className="mb-0">
-                    <div className="border border-black border-b-0 w-[350px] h-24 p-1 relative">
+                    <div className="border border-black border-b-0 w-[300px] h-14 p-1 relative">
                         <div className="font-bold">TANDA TANGAN:</div>
                     </div>
-                    <div className="border border-black w-[350px] h-8 flex items-center px-1 bg-white">
+                    <div className="border border-black w-[300px] h-6 flex items-center px-1 bg-white">
                         <span className="font-bold mr-2">TARIKH:</span>
                         <span className="text-red-600 font-bold">{new Date().toLocaleDateString('en-GB').replace(/\//g, '.')}</span>
                     </div>
@@ -234,15 +234,15 @@ const PrintableWorkloadSheet = ({
 
                 {/* Approvals Section */}
                 <div className="w-full border border-black mt-0">
-                    <div className="bg-black text-white font-bold grid grid-cols-2 text-center items-center h-8">
-                        <div className="border-r border-white h-full flex items-center justify-center text-[9px] leading-tight px-1">
+                    <div className="bg-black text-white font-bold grid grid-cols-2 text-center items-center h-6">
+                        <div className="border-r border-white h-full flex items-center justify-center text-[8px] leading-tight px-1">
                             DIPERAKUKAN OLEH KETUA JABATAN / TIMBALAN DEKAN AKADEMIK
                         </div>
-                        <div className="h-full flex items-center justify-center text-[9px] leading-tight px-1">
+                        <div className="h-full flex items-center justify-center text-[8px] leading-tight px-1">
                             DISAHKAN OLEH TIMBALAN DEKAN AKADEMIK / DEKAN
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 h-24">
+                    <div className="grid grid-cols-2 h-16">
                         <div className="border-r border-black p-1 relative">
                             <div className="font-bold">TANDA TANGAN</div>
                         </div>

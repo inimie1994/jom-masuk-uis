@@ -211,11 +211,11 @@ const Students = () => {
     // Excel Functions
     const downloadTemplate = () => {
         const templateData = [
-            { Name: 'John Doe', 'Matric No': 'A23CS001', 'Student Group': '1SEC-1', Email: 'john@example.com' },
-            { Name: 'Jane Smith', 'Matric No': 'A23CS002', 'Student Group': '1SEC-1', Email: 'jane@example.com' }
+            { 'Matric No': 'A23CS001', Name: 'John Doe', 'Student Group': '1SEC-1', Email: 'john@example.com' },
+            { 'Matric No': 'A23CS002', Name: 'Jane Smith', 'Student Group': '1SEC-1', Email: 'jane@example.com' }
         ];
 
-        const ws = XLSX.utils.json_to_sheet(templateData);
+        const ws = XLSX.utils.json_to_sheet(templateData, { header: ['Matric No', 'Name', 'Student Group', 'Email'] });
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Students');
         XLSX.writeFile(wb, 'Student_List_Template.xlsx');

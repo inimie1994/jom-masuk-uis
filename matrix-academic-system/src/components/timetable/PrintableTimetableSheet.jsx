@@ -46,11 +46,8 @@ const PrintableTimetableSheet = ({
     let grandTotalPdp = 0;
     let grandTotalActivity = 0;
 
-    // Filter out placeholder activities
-    const filteredActivities = activities.filter(a => a.activity_type !== '**');
-
     // Process totals
-    [...timetable, ...filteredActivities.map(a => ({ ...a, isActivity: true }))].forEach(item => {
+    [...timetable, ...activities.map(a => ({ ...a, isActivity: true }))].forEach(item => {
         const hours = calculateHours(item.start_time, item.end_time);
         if (item.day && dailyTotals[item.day]) {
             if (item.isActivity) {

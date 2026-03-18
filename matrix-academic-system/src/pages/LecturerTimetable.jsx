@@ -42,6 +42,37 @@ const LecturerTimetable = () => {
     const [loading, setLoading] = useState(true);
     const [timetable, setTimetable] = useState([]);
     const [activities, setActivities] = useState([]); // New state for activities
+
+    // Helper functions for hours calculation
+    const calculateDailyHours = (day) => {
+        let hours = 0;
+        
+        // Sum class hours
+        const dailyClasses = timetable.filter(t => t.day === day);
+        dailyClasses.forEach(c => {
+            const startH = parseInt(c.start_time.split(':')[0]);
+            const endH = parseInt(c.end_time.split(':')[0]);
+            let duration = endH - startH;
+            if (duration < 1) duration = 1;
+            hours += duration;
+        });
+
+        // Sum activity hours
+        const dailyActivities = activities.filter(a => a.day === day);
+        dailyActivities.forEach(a => {
+            const startH = parseInt(a.start_time.split(':')[0]);
+            const endH = parseInt(a.end_time.split(':')[0]);
+            let duration = endH - startH;
+            if (duration < 1) duration = 1;
+            hours += duration;
+        });
+
+        return hours;
+    };
+
+    const calculateWeeklyHours = () => {
+        return DAYS.reduce((total, day) => total + calculateDailyHours(day), 0);
+    };
     const [subjects, setSubjects] = useState([]);
     const [groups, setGroups] = useState([]); // Available groups for selection
     const [lecturerDetails, setLecturerDetails] = useState(null);
@@ -580,26 +611,41 @@ const LecturerTimetable = () => {
 
             <div className="flex-1 overflow-auto bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 relative mt-6">
                 <div className="min-w-[1000px] p-4">
-                    <div className="grid grid-cols-[100px_repeat(10,1fr)] mb-2 border-b border-gray-200 dark:border-slate-700 pb-2">
+                    <div className="grid grid-cols-[100px_repeat(10,1fr)_80px] mb-2 border-b border-gray-200 dark:border-slate-700 pb-2">
                         <div className="font-bold text-gray-400 text-xs uppercase tracking-wider text-center pt-2">Day / Time</div>
                         {START_HOURS.map(hour => (
                             <div key={hour} className="text-center font-semibold text-gray-600 dark:text-gray-300 text-sm py-2">
                                 {hour.toString().padStart(2, '0')}:00
                             </div>
                         ))}
+                        <div className="font-bold text-gray-400 text-xs uppercase tracking-wider text-center pt-2">
+                            Total Hours
+                        </div>
                     </div>
 
                     <div className="divide-y divide-gray-100 dark:divide-slate-700">
                         {DAYS.map(day => (
-                            <div key={day} className="grid grid-cols-[100px_1fr] min-h-[6rem]">
+                            <div key={day} className="grid grid-cols-[100px_1fr_80px] min-h-[6rem]">
                                 <div className="flex flex-col justify-center items-center font-bold text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-slate-900 text-sm border-r border-gray-200 dark:border-slate-700 p-2 text-center uppercase tracking-tighter">
                                     {day.slice(0, 3)}
                                 </div>
-                                <div className="grid grid-cols-10">
+                                <div className="grid grid-cols-10 border-r border-gray-200 dark:border-slate-700">
                                     {renderDayRow(day)}
+                                </div>
+                                <div className="flex flex-col justify-center items-center font-bold text-primary dark:text-primary-foreground text-lg py-2 bg-gray-50/50 dark:bg-slate-900/50">
+                                    {calculateDailyHours(day)}h
                                 </div>
                             </div>
                         ))}
+                        
+                        <div className="grid grid-cols-[100px_1fr_80px] min-h-[4rem] bg-gray-50 dark:bg-slate-900 border-t-2 border-primary/20">
+                            <div className="flex justify-end items-center font-bold text-gray-700 dark:text-gray-200 text-sm p-4 col-span-2 pr-6">
+                                TOTAL WEEKLY HOURS
+                            </div>
+                            <div className="flex justify-center items-center font-black text-primary text-xl p-2 bg-primary/5 dark:bg-primary/10">
+                                {calculateWeeklyHours()}h
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
