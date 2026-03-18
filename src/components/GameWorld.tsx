@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { usePlayerMovement } from '@/hooks/usePlayerMovement';
 import { useCharacterAnimation, defaultAnimationMap, femaleAnimationMap } from '@/hooks/useCharacterAnimation';
 import FacultyModal from './FacultyModal';
@@ -20,9 +20,10 @@ type TileDefinition = {
 
 interface GameWorldProps {
     gender: 'male' | 'female';
+    isEditor?: boolean;
 }
 
-export default function GameWorld({ gender }: GameWorldProps) {
+export default function GameWorld({ gender, isEditor = false }: GameWorldProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
     const [zoomOption, setZoomOption] = useState<'close' | 'medium' | 'far'>('medium');
@@ -34,19 +35,61 @@ export default function GameWorld({ gender }: GameWorldProps) {
     const [tilesData, setTilesData] = useState<Record<number, TileDefinition>>({});
     const [isLoading, setIsLoading] = useState(true);
 
-    const [modalData, setModalData] = useState<{ isOpen: boolean; title: string; description: string; isQuest: boolean }>({
+    const [modalData, setModalData] = useState<{ 
+        isOpen: boolean; 
+        title: string; 
+        description: string; 
+        isQuest: boolean;
+        cta?: { enabled: boolean; text: string; link: string } 
+    }>({
         isOpen: false,
         title: "",
         description: "",
         isQuest: false
     });
 
-    // Admin State
-    const [isAdminMode, setIsAdminMode] = useState(false);
+
+    const [eventGrids, setEventGrids] = useState<any[]>([]);
+    const [npcs, setNpcs] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchEventGrids = async () => {
+            const { data } = await supabase
+                .from('event_grids')
+                .select('*')
+                .eq('is_active', true);
+            if (data) setEventGrids(data);
+        };
+
+        const fetchNPCs = async () => {
+            const { data } = await supabase
+                .from('npc_data')
+                .select('*');
+            if (data) setNpcs(data);
+        };
+
+        fetchEventGrids();
+        fetchNPCs();
+    }, []);
+
+    const [isAdminMode, setIsAdminMode] = useState(isEditor);
     const [gridOpacity, setGridOpacity] = useState(0.5);
     const [selectedBrush, setSelectedBrush] = useState<number>(1); // Default to wall
     const [isPainting, setIsPainting] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+
+    // Editor Camera & Tooling
+    const [toolMode, setToolMode] = useState<'pan' | 'paint'>(isEditor ? 'pan' : 'paint');
+    const [editorCamera, setEditorCamera] = useState({ x: 29, y: 35 }); // Match player start
+    const [isDragging, setIsDragging] = useState(false);
+    const [lastPointerPos, setLastPointerPos] = useState({ x: 0, y: 0 });
+
+    // Sync editor camera with player start once map is loaded if we're in editor
+    useEffect(() => {
+        if (isEditor && position) {
+            setEditorCamera({ x: position.x, y: position.y });
+        }
+    }, [isEditor, isLoading]);
 
     // Fetch Map on Mount
     useEffect(() => {
@@ -81,6 +124,7 @@ export default function GameWorld({ gender }: GameWorldProps) {
         fetchMap();
     }, []);
 
+
     const handleInteraction = async (x: number, y: number, tileDef: TileDefinition) => {
         // If the tile has specific metadata for an interaction, prefer that over random querying
         if (tileDef.metadata && tileDef.metadata.description) {
@@ -108,9 +152,25 @@ export default function GameWorld({ gender }: GameWorldProps) {
                     title: data.faculty_name || tileDef.label || "Notification",
                     description: data.content,
                     isQuest: data.quest_id ? true : false,
+                    cta: {
+                        enabled: data.cta_enabled,
+                        text: data.cta_text,
+                        link: data.cta_link
+                    }
                 });
             } else {
-                throw error || new Error('No data');
+                // Check if it's an event grid trigger tile (1001+)
+                const eventGrid = eventGrids.find(g => g.tile_type === tileDef.tile_id);
+                if (eventGrid) {
+                    setModalData({
+                        isOpen: true,
+                        title: `Event: ${eventGrid.name}`,
+                        description: `Welcome to the ${eventGrid.name} zone! You've unlocked a special reward: ${eventGrid.grid_config.rewards}.`,
+                        isQuest: false
+                    });
+                } else {
+                    throw error || new Error('No data');
+                }
             }
         } catch (err) {
             setModalData({
@@ -122,7 +182,63 @@ export default function GameWorld({ gender }: GameWorldProps) {
         }
     };
 
-    const { position, direction, isMoving, moveIfValid, interact } = usePlayerMovement({ x: 29, y: 35 }, gridData, tilesData, handleInteraction);
+    const computedTiles = useMemo(() => {
+        const base = { ...tilesData };
+        
+        // NPCs (101-999): Collidable & Trigger
+        npcs.forEach(npc => {
+            if (npc.tile_type) {
+                base[npc.tile_type] = {
+                    tile_id: npc.tile_type,
+                    label: npc.faculty_name,
+                    is_collidable: true,
+                    is_trigger: true,
+                    metadata: npc
+                };
+            }
+        });
+
+        // Event Grids (1001+): Not Collidable & Trigger
+        eventGrids.forEach(grid => {
+            if (grid.tile_type) {
+                base[grid.tile_type] = {
+                    tile_id: grid.tile_type,
+                    label: grid.name,
+                    is_collidable: false,
+                    is_trigger: true,
+                    metadata: grid
+                };
+            }
+        });
+
+        return base;
+    }, [tilesData, npcs, eventGrids]);
+
+    const { position, direction, isMoving, moveIfValid, interact } = usePlayerMovement({ x: 29, y: 35 }, gridData, computedTiles, handleInteraction);
+
+    const [activeEventGrid, setActiveEventGrid] = useState<string | null>(null);
+
+    // Tile-based trigger check for Event Grids
+    useEffect(() => {
+        if (!position || gridData.length === 0) return;
+        
+        const currentTileId = gridData[position.y]?.[position.x];
+        if (currentTileId === undefined) return;
+
+        // Find if this tile is an event grid trigger (ID > 1000)
+        const eventGrid = eventGrids.find(g => g.tile_type === currentTileId);
+        
+        if (eventGrid && eventGrid.id !== activeEventGrid) {
+            setActiveEventGrid(eventGrid.id);
+            console.log('Stepped on event trigger:', eventGrid.name);
+            setModalData({
+                isOpen: true,
+                title: `Event: ${eventGrid.name}`,
+                description: `Welcome to the ${eventGrid.name} zone! You've unlocked a special reward: ${eventGrid.grid_config.rewards}.`,
+                isQuest: false
+            });
+        }
+    }, [position, gridData, eventGrids, activeEventGrid]);
 
     const currentFrame = useCharacterAnimation(
         direction,
@@ -225,14 +341,19 @@ export default function GameWorld({ gender }: GameWorldProps) {
     const viewportCenterX = vw / 2;
     const viewportCenterY = vh / 2;
 
-    // Player position in pixels (center of tile)
-    const playerPxX = position.x * BASE_TILE_SIZE + BASE_TILE_SIZE / 2;
-    const playerPxY = position.y * BASE_TILE_SIZE + BASE_TILE_SIZE / 2;
+    // Determine camera focus position in pixels
+    // In Editor mode, we use the free camera. In Play mode, we lock to player.
+    const focusX = isEditor ? editorCamera.x : position.x;
+    const focusY = isEditor ? editorCamera.y : position.y;
 
-    // Calculate translation to center the player
-    // Math: Translate = Center - (PlayerPos * Scale)
-    const translateX = viewportCenterX - (playerPxX * scale);
-    const translateY = viewportCenterY - (playerPxY * scale);
+    // Focus position in pixels (center of tile)
+    const focusPxX = focusX * BASE_TILE_SIZE + BASE_TILE_SIZE / 2;
+    const focusPxY = focusY * BASE_TILE_SIZE + BASE_TILE_SIZE / 2;
+
+    // Calculate translation to center the focus point
+    // Math: Translate = Center - (FocusPos * Scale)
+    const translateX = viewportCenterX - (focusPxX * scale);
+    const translateY = viewportCenterY - (focusPxY * scale);
     // ---------------------------
 
     // Helper to map tile type to background position in tileset
@@ -249,13 +370,34 @@ export default function GameWorld({ gender }: GameWorldProps) {
             };
         }
 
+        // Check if this tileId is associated with an NPC (101-999)
+        const npc = npcs.find(n => n.tile_type === tileId);
+        if (npc) {
+            return {
+                ...base,
+                position: 'relative' as const,
+                backgroundColor: isAdminMode ? `rgba(0, 0, 255, ${gridOpacity / 2})` : 'transparent',
+                overflow: 'visible'
+            };
+        }
+
+        // Check if this tileId is an event grid trigger (1001+)
+        const eventGrid = eventGrids.find(g => g.tile_type === tileId);
+        if (eventGrid) {
+            return {
+                ...base,
+                backgroundColor: isAdminMode ? `rgba(168, 85, 247, ${gridOpacity})` : 'transparent',
+                border: isAdminMode ? '1px dashed rgba(168, 85, 247, 0.5)' : 'none'
+            };
+        }
+
         // Fallback colors for default definitions
         let color = 'transparent';
         switch (tileId) {
             case 0: color = 'transparent'; break; // Grass / Empty space
             case 1: color = `rgba(255, 0, 0, ${isAdminMode ? gridOpacity : 0})`; break; // Wall
             case 2: color = `rgba(255, 255, 0, ${isAdminMode ? gridOpacity : 0})`; break; // Path
-            case 3: color = `rgba(0, 0, 255, ${isAdminMode ? gridOpacity : 0})`; break; // Interaction
+            case 3: color = `rgba(0, 0, 255, ${isAdminMode ? gridOpacity : 0})`; break; // Legacy Interaction
         }
 
         return { ...base, backgroundColor: color };
@@ -263,10 +405,36 @@ export default function GameWorld({ gender }: GameWorldProps) {
 
     return (
         <div
-            className="w-full h-full relative bg-neutral-950 overflow-hidden select-none"
+            className={`w-full h-full relative bg-neutral-950 overflow-hidden select-none ${toolMode === 'pan' && isEditor ? 'cursor-grab active:cursor-grabbing' : ''}`}
             ref={containerRef}
-            onPointerUp={() => setIsPainting(false)}
-            onPointerLeave={() => setIsPainting(false)}
+            onPointerDown={(e) => {
+                if (isEditor && toolMode === 'pan') {
+                    setIsDragging(true);
+                    setLastPointerPos({ x: e.clientX, y: e.clientY });
+                }
+            }}
+            onPointerMove={(e) => {
+                if (isEditor && isDragging && toolMode === 'pan') {
+                    const dx = e.clientX - lastPointerPos.x;
+                    const dy = e.clientY - lastPointerPos.y;
+                    
+                    // Update editor camera based on drag delta (inverse movement)
+                    // Adjust by scale because when zoomed out, dragging 1px on screen moves more pixels in game world
+                    setEditorCamera(prev => ({
+                        x: prev.x - dx / (BASE_TILE_SIZE * scale),
+                        y: prev.y - dy / (BASE_TILE_SIZE * scale)
+                    }));
+                    setLastPointerPos({ x: e.clientX, y: e.clientY });
+                }
+            }}
+            onPointerUp={() => {
+                setIsPainting(false);
+                setIsDragging(false);
+            }}
+            onPointerLeave={() => {
+                setIsPainting(false);
+                setIsDragging(false);
+            }}
         >
             {/* Top Right Floating Controls Label & UI */}
             <div className="absolute top-4 right-4 z-[100] flex flex-col items-end gap-3 pointer-events-none">
@@ -278,15 +446,17 @@ export default function GameWorld({ gender }: GameWorldProps) {
 
                 {/* Control Column: Admin & Zoom */}
                 <div className="flex flex-col items-end gap-2 pointer-events-none">
-                    <button
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => { e.stopPropagation(); setIsAdminMode(!isAdminMode); }}
-                        className={`pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-2xl font-bold text-sm transition-all active:scale-95 shadow-2xl border ${isAdminMode ? 'bg-red-500 text-white border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)]' : 'bg-black/60 border-white/20 hover:bg-black/80 text-white/80'}`}
-                        title="Admin Editor Mode"
-                    >
-                        <div className={`w-2 h-2 rounded-full ${isAdminMode ? 'bg-white animate-pulse' : 'bg-red-500'}`} />
-                        Admin
-                    </button>
+                    {isEditor && (
+                        <button
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); setIsAdminMode(!isAdminMode); }}
+                            className={`pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-2xl font-bold text-sm transition-all active:scale-95 shadow-2xl border ${isAdminMode ? 'bg-red-500 text-white border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.4)]' : 'bg-black/60 border-white/20 hover:bg-black/80 text-white/80'}`}
+                            title="Admin Editor Mode"
+                        >
+                            <div className={`w-2 h-2 rounded-full ${isAdminMode ? 'bg-white animate-pulse' : 'bg-red-500'}`} />
+                            Admin
+                        </button>
+                    )}
 
                     {/* Camera Controls */}
                     <div className="pointer-events-auto flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-2xl p-1.5 border border-white/20 shadow-2xl overflow-hidden transition-all duration-300">
@@ -316,7 +486,7 @@ export default function GameWorld({ gender }: GameWorldProps) {
                 </div>
 
                 {/* Admin Panel Overlay */}
-                {isAdminMode && (
+                {(isEditor && isAdminMode) && (
                     <div className="pointer-events-auto bg-black/80 backdrop-blur-xl border border-white/20 p-5 rounded-2xl flex flex-col gap-5 shadow-[0_30px_60px_rgba(0,0,0,0.6)] min-w-[240px] text-white animate-in slide-in-from-top-4 fade-in duration-200">
                         <h3 className="font-black text-lg text-red-400 flex items-center gap-2">
                             <span className="w-1.5 h-4 bg-red-500 rounded-full" />
@@ -337,22 +507,80 @@ export default function GameWorld({ gender }: GameWorldProps) {
                         </div>
 
                         <div className="flex flex-col gap-2">
-                            <label className="text-xs font-bold text-neutral-400 tracking-wider flex justify-between">
-                                BRUSH
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button onClick={() => setSelectedBrush(0)} className={`p-2 rounded-xl text-xs font-bold border transition-colors ${selectedBrush === 0 ? 'bg-white text-black border-white' : 'bg-neutral-900 border-white/10 text-neutral-400 hover:bg-neutral-800'}`}>0: Eraser</button>
-                                <button onClick={() => setSelectedBrush(1)} className={`p-2 rounded-xl text-xs font-bold border transition-colors ${selectedBrush === 1 ? 'bg-red-500 text-white border-red-400 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'bg-neutral-900 border-white/10 text-neutral-400 hover:bg-red-900/40 hover:text-red-200'}`}>1: Wall</button>
-                                <button onClick={() => setSelectedBrush(3)} className={`p-2 rounded-xl text-xs font-bold border transition-colors col-span-2 ${selectedBrush === 3 ? 'bg-blue-500 text-white border-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'bg-neutral-900 border-white/10 text-neutral-400 hover:bg-blue-900/40 hover:text-blue-200'}`}>3: Trigger</button>
+                            <label className="text-xs font-bold text-neutral-400 tracking-wider">TOOL MODE</label>
+                            <div className="flex bg-neutral-900 p-1 rounded-xl border border-white/5">
+                                <button 
+                                    onClick={() => setToolMode('pan')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${toolMode === 'pan' ? 'bg-white text-black shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+                                >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0V12m-3 .5V12m3 .5V12m0 0V5a1.5 1.5 0 113 0v7m0 0V6a1.5 1.5 0 113 0v4.5m-9 1.5v-1a5 5 0 0110 0v2a5 5 0 01-10 0z" /></svg>
+                                    Pan
+                                </button>
+                                <button 
+                                    onClick={() => setToolMode('paint')}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${toolMode === 'paint' ? 'bg-red-500 text-white shadow-lg' : 'text-neutral-500 hover:text-white'}`}
+                                >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                    Paint
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                            <label className="text-xs font-bold text-neutral-400 tracking-wider">BRUSHES</label>
+                            
+                            <div className="space-y-4">
+                                {/* Basic Brushes */}
+                                <div className="space-y-2">
+                                    <span className="text-[10px] font-bold text-neutral-600 uppercase tracking-tighter">Basic Tiles</span>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button onClick={() => setSelectedBrush(0)} className={`p-2 rounded-xl text-[10px] font-bold border transition-colors ${selectedBrush === 0 ? 'bg-white text-black border-white' : 'bg-neutral-900 border-white/10 text-neutral-400 hover:bg-neutral-800'}`}>Eraser (0)</button>
+                                        <button onClick={() => setSelectedBrush(1)} className={`p-2 rounded-xl text-[10px] font-bold border transition-colors ${selectedBrush === 1 ? 'bg-red-500 text-white border-red-400' : 'bg-neutral-900 border-white/10 text-neutral-400 hover:bg-red-900/40'}`}>Wall (1)</button>
+                                    </div>
+                                </div>
+
+                                {/* NPC Brushes */}
+                                <div className="space-y-2">
+                                    <span className="text-[10px] font-bold text-neutral-600 uppercase tracking-tighter">NPCs</span>
+                                    <div className="grid grid-cols-1 gap-1">
+                                        {npcs.map(npc => (
+                                            <button 
+                                                key={npc.id}
+                                                onClick={() => setSelectedBrush(npc.tile_type)}
+                                                className={`p-2 rounded-xl text-left text-[10px] font-bold border transition-all flex items-center gap-2 ${selectedBrush === npc.tile_type ? 'bg-blue-600 text-white border-blue-400' : 'bg-neutral-900 border-white/10 text-neutral-400 hover:bg-blue-900/20'}`}
+                                            >
+                                                <img src={`/characters/npc/${npc.sprite_name || 'NPC1'}.png`} className="w-5 h-5 object-contain" alt="" />
+                                                <span className="truncate">{npc.faculty_name}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Event Trigger Brushes */}
+                                <div className="space-y-2">
+                                    <span className="text-[10px] font-bold text-neutral-600 uppercase tracking-tighter">Event Triggers</span>
+                                    <div className="grid grid-cols-1 gap-1">
+                                        {eventGrids.map(grid => (
+                                            <button 
+                                                key={grid.id}
+                                                onClick={() => setSelectedBrush(grid.tile_type)}
+                                                className={`p-2 rounded-xl text-left text-[10px] font-bold border transition-all flex items-center gap-2 ${selectedBrush === grid.tile_type ? 'bg-purple-600 text-white border-purple-400' : 'bg-neutral-900 border-white/10 text-neutral-400 hover:bg-purple-900/20'}`}
+                                            >
+                                                <div className="w-4 h-4 rounded bg-purple-500/50 border border-purple-400" />
+                                                <span className="truncate">{grid.name}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
                         <button
                             onClick={handleSaveMap}
                             disabled={isSaving}
-                            className="mt-2 w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 disabled:from-neutral-700 disabled:to-neutral-800 disabled:text-neutral-500 text-white font-bold py-3 rounded-xl transition-all shadow-[0_10px_20px_rgba(34,197,94,0.3)] hover:shadow-[0_15px_30px_rgba(34,197,94,0.4)] disabled:shadow-none active:scale-95"
+                            className="mt-2 w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 disabled:from-neutral-700 disabled:to-neutral-800 disabled:text-neutral-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95 text-xs"
                         >
-                            {isSaving ? 'Saving map data...' : '💾 Save Map To Database'}
+                            {isSaving ? 'Saving...' : '💾 Save Map To Database'}
                         </button>
                     </div>
                 )}
@@ -389,18 +617,45 @@ export default function GameWorld({ gender }: GameWorldProps) {
                     ${tilesData[tileId]?.is_trigger ? 'cursor-pointer hover:brightness-110' : ''}
                   `}
                                     onPointerDown={(e) => {
-                                        if (isAdminMode) {
+                                        if (isAdminMode && toolMode === 'paint') {
                                             e.preventDefault(); // prevent touch scrolling
                                             setIsPainting(true);
                                             handlePaint(x, y);
                                         }
                                     }}
                                     onPointerEnter={() => {
-                                        if (isAdminMode && isPainting) {
+                                        if (isAdminMode && isPainting && toolMode === 'paint') {
                                             handlePaint(x, y);
                                         }
                                     }}
                                 >
+                                    {/* Render NPC Sprite if this is an NPC tile */}
+                                    {(() => {
+                                        const npc = npcs.find(n => n.tile_type === tileId);
+                                        if (npc) {
+                                            const scaleFactor = npc.scale || 1.0;
+                                            return (
+                                                <div 
+                                                    className="absolute inset-0 flex items-end justify-center pointer-events-none"
+                                                    style={{ overflow: 'visible' }}
+                                                >
+                                                    <img 
+                                                        src={`/characters/npc/${npc.sprite_name || 'NPC1'}.png`}
+                                                        alt={npc.faculty_name}
+                                                        className="h-full w-auto object-contain transition-transform"
+                                                        style={{ 
+                                                            transform: `scale(${scaleFactor})`,
+                                                            transformOrigin: 'bottom center',
+                                                            maxWidth: 'none', // Allow it to exceed parent width
+                                                            filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))'
+                                                        }}
+                                                    />
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+
                                     {tilesData[tileId]?.is_trigger && (
                                         <div className="flex flex-col items-center">
                                             <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce shadow-[0_0_8px_white]" />
@@ -412,6 +667,22 @@ export default function GameWorld({ gender }: GameWorldProps) {
                         </div>
                     ))}
                 </div>
+
+                {/* Render Event Grids (Ghostly markers for editor) */}
+                {isAdminMode && eventGrids.map((grid) => (
+                    <div
+                        key={grid.id}
+                        className="absolute flex items-center justify-center pointer-events-none z-15 opacity-30"
+                        style={{
+                            width: BASE_TILE_SIZE * 3, // Fixed visualization radius
+                            height: BASE_TILE_SIZE * 3,
+                            left: (grid.x - 1) * BASE_TILE_SIZE,
+                            top: (grid.y - 1) * BASE_TILE_SIZE,
+                        }}
+                    >
+                        <div className="w-full h-full rounded-full bg-purple-500/10 border border-purple-500/20" />
+                    </div>
+                ))}
 
                 {/* Render Player Avatar */}
                 <div
@@ -440,7 +711,9 @@ export default function GameWorld({ gender }: GameWorldProps) {
                 title={modalData.title}
                 description={modalData.description}
                 isQuest={modalData.isQuest}
+                cta={modalData.cta}
             />
+
         </div>
     );
 }

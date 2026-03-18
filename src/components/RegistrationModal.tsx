@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
+import { supabase } from '@/lib/supabase';
+
 
 export interface PlayerData {
     fullName: string;
@@ -24,6 +26,8 @@ export default function RegistrationModal({ onSubmit, onClose }: RegistrationMod
 
     const [errors, setErrors] = useState<Partial<Record<keyof PlayerData, string>>>({});
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     const validate = () => {
         const newErrors: Partial<Record<keyof PlayerData, string>> = {};
         if (!formData.fullName.trim()) newErrors.fullName = "Full Name is required.";
@@ -33,16 +37,37 @@ export default function RegistrationModal({ onSubmit, onClose }: RegistrationMod
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (validate()) {
-            onSubmit(formData);
+            setIsSubmitting(true);
+            try {
+                // Save to Supabase
+                const { error } = await supabase
+                    .from('players')
+                    .insert([{
+                        full_name: formData.fullName,
+                        ic_no: formData.icNo,
+                        gender: formData.gender,
+                        spm_result: formData.spmResult
+                    }]);
+
+                if (error) throw error;
+                
+                onSubmit(formData);
+            } catch (error: any) {
+                console.error('Registration error:', error);
+                alert('Registration failed: ' + error.message);
+            } finally {
+                setIsSubmitting(false);
+            }
         }
     };
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
             <div className="w-full max-w-md bg-neutral-900 border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
+
                 {/* Decorative background glow */}
                 <div className="absolute -top-20 -left-20 w-40 h-40 bg-blue-600/30 rounded-full blur-[60px] pointer-events-none" />
                 <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-purple-600/30 rounded-full blur-[60px] pointer-events-none" />
@@ -121,9 +146,15 @@ export default function RegistrationModal({ onSubmit, onClose }: RegistrationMod
 
                         <button
                             type="submit"
-                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-[0_0_20px_rgba(37,99,235,0.4)] active:scale-[0.98] mt-4"
+                            disabled={isSubmitting}
+                            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-all shadow-[0_0_20px_rgba(37,99,235,0.4)] active:scale-[0.98] mt-4 flex items-center justify-center gap-2"
                         >
-                            ENTER CAMPUS
+                            {isSubmitting ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    REGISTERING...
+                                </>
+                            ) : "ENTER CAMPUS"}
                         </button>
                     </form>
                 </div>
