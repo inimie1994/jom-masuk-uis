@@ -330,7 +330,7 @@ const Attendance = () => {
             let query = supabase
                 .from('timetable')
                 .select('*, lecturers(name)')
-                .filter('group_names', 'cs', `{${selectedGroup}}`)
+                .contains('group_names', [selectedGroup])
                 .eq('subject_id', selectedSubject);
 
             if (['lecturer', 'hod', 'hop'].includes(user.role) && user.lecturer_id) {
@@ -350,7 +350,7 @@ const Attendance = () => {
             const { data: sessions, error: sessionsError } = await supabase
                 .from('attendance_sessions')
                 .select('id, date, start_time, end_time, class_type')
-                .filter('group_names', 'cs', `{${selectedGroup}}`)
+                .contains('group_names', [selectedGroup])
                 .eq('subject_id', selectedSubject)
                 .gte('date', startOfMonth)
                 .lte('date', endOfMonth);
@@ -437,7 +437,7 @@ const Attendance = () => {
             const { data: sessionData, error: sessionFindError } = await supabase
                 .from('attendance_sessions')
                 .select('id')
-                .filter('group_names', 'cs', `{${selectedGroup}}`)
+                .contains('group_names', [selectedGroup])
                 .eq('subject_id', selectedSubject)
                 .eq('date', column.date)
                 .eq('start_time', column.startTime)
@@ -579,7 +579,7 @@ const Attendance = () => {
                         const { data: sessions } = await supabase
                             .from('attendance_sessions')
                             .select('id, date, start_time')
-                            .filter('group_names', 'cs', `{${selectedGroup}}`)
+                            .contains('group_names', [selectedGroup])
                             .eq('subject_id', selectedSubject)
                             .gte('date', startOfMonth)
                             .lte('date', endOfMonth);
@@ -659,7 +659,7 @@ const Attendance = () => {
                     const { data: groupTimetable } = await supabase
                         .from('timetable')
                         .select('*, lecturers(name)')
-                        .filter('group_names', 'cs', `{${groupName}}`)
+                        .contains('group_names', [groupName])
                         .eq('subject_id', selectedSubject);
 
                     if (!groupTimetable || groupTimetable.length === 0) continue;
@@ -677,7 +677,7 @@ const Attendance = () => {
                     const { data: sessions } = await supabase
                         .from('attendance_sessions')
                         .select('id, date, start_time')
-                        .filter('group_names', 'cs', `{${groupName}}`)
+                        .contains('group_names', [groupName])
                         .eq('subject_id', selectedSubject)
                         .gte('date', startOfMonth)
                         .lte('date', endOfMonth);
@@ -722,15 +722,13 @@ const Attendance = () => {
     };
 
     const handleClearAll = async () => {
-        if (!window.confirm("Are you sure you want to clear ALL attendance data for this subject? This will delete all records and manually created sessions across ALL months. This action cannot be undone.")) return;
-
         setLoading(true);
         try {
             // 1. Find relevant sessions (Across ALL months for this Subject + Group)
             const { data: sessions, error: sessionsError } = await supabase
                 .from('attendance_sessions')
                 .select('id')
-                .filter('group_names', 'cs', `{${selectedGroup}}`)
+                .contains('group_names', [selectedGroup])
                 .eq('subject_id', selectedSubject);
 
             if (sessionsError) throw sessionsError;
@@ -771,7 +769,7 @@ const Attendance = () => {
     };
 
     const handleMarkAllOnDate = async (column) => {
-        if (!window.confirm(`Mark all students as Present for ${column.displayDate} (${column.startTime})?`)) return;
+        // Removed confirmation as per user request
 
         setLoading(true);
         try {
@@ -780,7 +778,7 @@ const Attendance = () => {
             const { data: sessionData } = await supabase
                 .from('attendance_sessions')
                 .select('id')
-                .filter('group_names', 'cs', `{${selectedGroup}}`)
+                .contains('group_names', [selectedGroup])
                 .eq('subject_id', selectedSubject)
                 .eq('date', column.date)
                 .eq('start_time', column.startTime)
@@ -846,7 +844,7 @@ const Attendance = () => {
     };
 
     const handleUntickAllOnDate = async (column) => {
-        if (!window.confirm(`Clear ALL attendance records for ${column.displayDate} (${column.startTime})?`)) return;
+        // Removed confirmation as per user request
 
         setLoading(true);
         try {
@@ -907,10 +905,6 @@ const Attendance = () => {
 
         // Scenerio 1: Standard Slot (Cancel it)
         if (!editingColumn.sessionId) {
-            if (!window.confirm("This is a standard timetable slot. Do you want to CANCEL this class for this specific date? It will be removed from the attendance list.")) {
-                return;
-            }
-
             setSaving(true);
             try {
                 // Find timetable entry details
@@ -947,10 +941,6 @@ const Attendance = () => {
         }
 
         // Scenario 2: Existing Session (Delete it)
-        if (!window.confirm("Are you sure you want to delete this session? This action cannot be undone.")) {
-            return;
-        }
-
         setSaving(true);
         try {
             const { error: deleteError } = await supabase
@@ -1392,11 +1382,9 @@ const Attendance = () => {
                                 dates={dateColumns}
                                 attendanceData={attendanceData}
                                 lecturerName={
-                                    ['lecturer', 'hod', 'hop'].includes(user.role)
-                                        ? user.name
-                                        : (timetable.length > 0 && timetable[0].lecturers
-                                            ? timetable[0].lecturers.name
-                                            : "__________________________")
+                                    (timetable.length > 0 && timetable[0].lecturers)
+                                        ? (timetable[0].lecturers.name)
+                                        : (['lecturer', 'hod', 'hop'].includes(user.role) ? user.name : "__________________________")
                                 }
                                 logoUrl={user?.faculty_logo}
                             />

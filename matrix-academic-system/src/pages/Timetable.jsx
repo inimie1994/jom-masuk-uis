@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
@@ -37,12 +38,14 @@ const getSubjectColor = (subjectId, allSubjects) => {
 };
 
 const Timetable = () => {
+    const location = useLocation();
+    const isInitialRender = useRef(true);
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
 
     // Filter State
-    const [viewMode, setViewMode] = useState('group'); // 'group', 'subject', 'lecturer'
-    const [selectedFilterId, setSelectedFilterId] = useState('');
+    const [viewMode, setViewMode] = useState(location.state?.viewMode || 'group'); // 'group', 'subject', 'lecturer'
+    const [selectedFilterId, setSelectedFilterId] = useState(location.state?.selectedFilterId || '');
 
     const [groups, setGroups] = useState([]);
     const [timetable, setTimetable] = useState([]);
@@ -86,6 +89,10 @@ const Timetable = () => {
 
     // Reset selection when view mode changes
     useEffect(() => {
+        if (isInitialRender.current) {
+            isInitialRender.current = false;
+            return;
+        }
         setSelectedFilterId('');
     }, [viewMode]);
 

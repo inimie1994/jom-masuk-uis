@@ -273,21 +273,48 @@ const Assessments = () => {
             }
 
             // 2. Fetch Lecturer Name specifically for this subject
-            let currentLecturer = user;
+            let currentLecturer = { ...user };
             const { data: timetableLecturers, error: lecturerError } = await supabase
                 .from('timetable')
                 .select(`
                     lecturer_id,
-                    lecturers (id, name, full_name)
+                    lecturers (id, name)
                 `)
                 .eq('subject_id', selectedSubject)
                 .limit(1);
 
             if (!lecturerError && timetableLecturers?.length > 0 && timetableLecturers[0].lecturers) {
-                currentLecturer = {
-                    ...user,
-                    ...timetableLecturers[0].lecturers
-                };
+                currentLecturer = { ...currentLecturer, ...timetableLecturers[0].lecturers };
+            } else {
+                // Fallback to workload table if timetable is empty
+                const { data: workloadLecturers } = await supabase
+                    .from('workload')
+                    .select('lecturer_id, lecturers (id, name)')
+                    .eq('subject_id', selectedSubject)
+                    .limit(1);
+
+                if (workloadLecturers?.[0]?.lecturers) {
+                    currentLecturer = { ...currentLecturer, ...workloadLecturers[0].lecturers };
+                }
+            }
+
+            // If name is still missing, try to fetch the current user's own formal lecturer record
+            if (!currentLecturer.name) {
+                if (['lecturer', 'hod', 'hop'].includes(user?.role) && user?.lecturer_id) {
+                    const { data: myLecturerData } = await supabase
+                        .from('lecturers')
+                        .select('id, name')
+                        .eq('id', user.lecturer_id)
+                        .single();
+                    if (myLecturerData) {
+                        currentLecturer = { ...currentLecturer, ...myLecturerData };
+                    }
+                }
+                
+                // Final fallback if name is still empty
+                if (!currentLecturer.name) {
+                    currentLecturer.name = user?.name || '-';
+                }
             }
 
             // 3. Get All Grades for this subject (all assessments)
@@ -375,28 +402,44 @@ const Assessments = () => {
             }
 
             // Fetch lecturer name - Prioritize assigned lecturer for the subject
-            let currentLecturer = user;
-            const { data: timetableLecturers } = await supabase
+            let currentLecturer = { ...user };
+            const { data: timetableLecturers, error: cloLecturerError } = await supabase
                 .from('timetable')
-                .select('lecturer_id, lecturers (id, name, full_name)')
+                .select('lecturer_id, lecturers (id, name)')
                 .eq('subject_id', selectedSubject)
                 .limit(1);
 
-            if (timetableLecturers?.[0]?.lecturers) {
-                currentLecturer = { ...user, ...timetableLecturers[0].lecturers };
+            if (!cloLecturerError && timetableLecturers?.length > 0 && timetableLecturers[0].lecturers) {
+                currentLecturer = { ...currentLecturer, ...timetableLecturers[0].lecturers };
             } else {
                 // Fallback to workload table if timetable is empty
                 const { data: workloadLecturers } = await supabase
                     .from('workload')
-                    .select('lecturer_id, lecturers (id, name, full_name)')
+                    .select('lecturer_id, lecturers (id, name)')
                     .eq('subject_id', selectedSubject)
                     .limit(1);
 
                 if (workloadLecturers?.[0]?.lecturers) {
-                    currentLecturer = { ...user, ...workloadLecturers[0].lecturers };
-                } else if (!['lecturer', 'hod', 'hop'].includes(user.role)) {
-                    // For pure admins or others, if no lecturer assigned, show fallback
-                    currentLecturer = { ...user, name: '-', full_name: '-' };
+                    currentLecturer = { ...currentLecturer, ...workloadLecturers[0].lecturers };
+                }
+            }
+
+            // If name is still missing, try to fetch the current user's own formal lecturer record
+            if (!currentLecturer.name) {
+                if (['lecturer', 'hod', 'hop'].includes(user?.role) && user?.lecturer_id) {
+                    const { data: myLecturerData } = await supabase
+                        .from('lecturers')
+                        .select('id, name')
+                        .eq('id', user.lecturer_id)
+                        .single();
+                    if (myLecturerData) {
+                        currentLecturer = { ...currentLecturer, ...myLecturerData };
+                    }
+                }
+                
+                // Final fallback if name is still empty
+                if (!currentLecturer.name) {
+                    currentLecturer.name = user?.name || '-';
                 }
             }
 

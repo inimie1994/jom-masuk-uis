@@ -163,7 +163,7 @@ const StudentMarksPrintTemplate = ({ subject, assessments, students, grades, lec
                                 <div className="grid grid-cols-[140px_10px_1fr]">
                                     <span>TENAGA PENGAJAR</span>
                                     <span>:</span>
-                                    <span>{lecturer?.full_name || lecturer?.name || 'N/A'}</span>
+                                    <span>{lecturer?.name || 'N/A'}</span>
                                 </div>
                                 <div className="grid grid-cols-[140px_10px_1fr]">
                                     <span>KOD/ KURSUS</span>

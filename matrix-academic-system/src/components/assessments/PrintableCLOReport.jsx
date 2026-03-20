@@ -107,7 +107,7 @@ const PrintableCLOReport = ({
         ? (allActiveCLOs.reduce((s, clo) => s + parseFloat(cloAchievements[clo] || 0), 0) / allActiveCLOs.length).toFixed(2)
         : '0.00';
 
-    const lecturerName = lecturer?.full_name || lecturer?.name || '-';
+    const lecturerName = lecturer?.name || '-';
     const subjectCode = subject?.code || '-';
     const subjectName = subject?.name || '-';
 

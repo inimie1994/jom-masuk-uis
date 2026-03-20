@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../auth/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import PageHeader from '../common/PageHeader';
 import Modal from '../common/Modal';
-import { Plus, Trash2, Clock, BookOpen, ChevronRight, Briefcase, Key, User, Lock, Pencil } from 'lucide-react';
+import { Plus, Trash2, Clock, BookOpen, ChevronRight, Briefcase, Key, User, Lock, Pencil, Calendar } from 'lucide-react';
 
 const HodHopLecturers = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [lecturers, setLecturers] = useState([]);
     const [subjects, setSubjects] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -520,13 +522,27 @@ const HodHopLecturers = () => {
                             ) : 'Select a lecturer to manage workload'}
                         </h3>
                         {selectedLecturer && (
-                            <button
-                                onClick={() => setIsWorkloadModalOpen(true)}
-                                className="inline-flex items-center px-4 py-2 border border-transparent text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm text-white bg-primary hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all"
-                            >
-                                <Plus size={16} className="mr-1.5" />
-                                Assign Subject
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => navigate('/timetable', { 
+                                        state: { 
+                                            viewMode: 'lecturer', 
+                                            selectedFilterId: selectedLecturer.id 
+                                        } 
+                                    })}
+                                    className="inline-flex items-center px-4 py-2 border border-gray-200 dark:border-slate-700 text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all"
+                                >
+                                    <Calendar size={16} className="mr-1.5" />
+                                    View Timetable
+                                </button>
+                                <button
+                                    onClick={() => setIsWorkloadModalOpen(true)}
+                                    className="inline-flex items-center px-4 py-2 border border-transparent text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm text-white bg-primary hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all"
+                                >
+                                    <Plus size={16} className="mr-1.5" />
+                                    Assign Subject
+                                </button>
+                            </div>
                         )}
                     </div>
 

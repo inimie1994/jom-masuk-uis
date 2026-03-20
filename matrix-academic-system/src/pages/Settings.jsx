@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
 import ThemeToggle from '../components/ThemeToggle';
-import { User, Building, Monitor, Save, Upload, Image as ImageIcon, CalendarDays, Plus, Trash2, DownloadCloud } from 'lucide-react';
+import { User, Building, Monitor, Save, Upload, Image as ImageIcon, CalendarDays, Plus, Trash2, DownloadCloud, Mail, Lock } from 'lucide-react';
 
 const Settings = () => {
     const { user } = useAuth();
@@ -13,6 +13,8 @@ const Settings = () => {
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null);
+    const [lecturerDetails, setLecturerDetails] = useState(null);
+    const [loadingProfile, setLoadingProfile] = useState(false);
 
     // Attendance Settings State
     const [semesterStart, setSemesterStart] = useState('');
@@ -24,11 +26,40 @@ const Settings = () => {
     const [loadingHolidays, setLoadingHolidays] = useState(false);
 
     useEffect(() => {
-        if (user?.faculty_id) {
-            if (activeTab === 'faculty') fetchFacultyDetails();
-            if (activeTab === 'attendance') fetchAttendanceSettings();
+        if (user?.id) {
+            if (activeTab === 'profile') fetchLecturerDetails();
         }
-    }, [user?.faculty_id, activeTab]);
+        if (user?.faculty_id) {
+            if (activeTab === 'faculty' && user?.role === 'admin') fetchFacultyDetails();
+            if (activeTab === 'attendance' && user?.role === 'admin') fetchAttendanceSettings();
+        }
+    }, [user?.id, user?.faculty_id, activeTab]);
+
+    const fetchLecturerDetails = async () => {
+        if (!user?.lecturer_id) return;
+        try {
+            setLoadingProfile(true);
+            const { data, error } = await supabase
+                .from('lecturers')
+                .select(`
+                    *,
+                    departments (
+                        id,
+                        code,
+                        name
+                    )
+                `)
+                .eq('id', user.lecturer_id)
+                .single();
+
+            if (error) throw error;
+            setLecturerDetails(data);
+        } catch (err) {
+            console.error('Error fetching lecturer details:', err);
+        } finally {
+            setLoadingProfile(false);
+        }
+    };
 
     const fetchAttendanceSettings = async () => {
         try {
@@ -353,31 +384,75 @@ const Settings = () => {
 
                         {activeTab === 'profile' && (
                             <div className="space-y-6">
-                                <h3 className="text-lg font-medium text-gray-900 dark:text-white border-b pb-2 dark:border-slate-700">Your Profile</h3>
-                                <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
-                                    <div className="sm:col-span-4">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email Address</label>
-                                        <div className="mt-1 flex rounded-md shadow-sm">
-                                            <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-gray-400 sm:text-sm">
-                                                @
-                                            </span>
-                                            <input
-                                                type="text"
-                                                disabled
-                                                value={user?.email || ''}
-                                                className="flex-1 pointer-events-none min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md border border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 sm:text-sm"
-                                            />
+                                <div className="flex justify-between items-center border-b pb-4 dark:border-slate-700">
+                                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Your Profile</h3>
+                                    {loadingProfile && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {/* Primary Info */}
+                                    <div className="space-y-5">
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-2">Display Name</label>
+                                            <div className="text-lg font-bold text-gray-900 dark:text-white bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-gray-100 dark:border-slate-800">
+                                                {lecturerDetails?.name || user?.name || 'N/A'}
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-2">Email Address</label>
+                                            <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-gray-100 dark:border-slate-800">
+                                                <Mail size={18} className="text-gray-400" />
+                                                <span className="font-medium">{user?.email || 'N/A'}</span>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-2">System Role</label>
+                                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800/50">
+                                                <Lock size={16} />
+                                                <span className="font-bold uppercase tracking-wide text-sm">{user?.role || 'User'}</span>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="sm:col-span-3">
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
-                                        <input
-                                            type="text"
-                                            disabled
-                                            value={user?.role?.toUpperCase() || 'USER'}
-                                            className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 sm:text-sm"
-                                        />
+                                    {/* Professional Info */}
+                                    <div className="space-y-5">
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-2">Staff ID / Username</label>
+                                            <div className="text-gray-700 dark:text-gray-300 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-gray-100 dark:border-slate-800 flex items-center gap-3">
+                                                <User size={18} className="text-gray-400" />
+                                                <span className="font-bold">{lecturerDetails?.username || user?.username || 'N/A'}</span>
+                                            </div>
+                                        </div>
+
+                                        {lecturerDetails?.departments && (
+                                            <div>
+                                                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-2">Department</label>
+                                                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-gray-100 dark:border-slate-800 flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center font-black text-indigo-600 dark:text-indigo-400 border border-indigo-50 dark:border-indigo-900/30">
+                                                        {lecturerDetails.departments.code}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-gray-900 dark:text-white leading-tight">
+                                                            {lecturerDetails.departments.name}
+                                                        </div>
+                                                        <div className="text-[10px] uppercase font-black tracking-widest text-gray-400 mt-1">
+                                                            Primary Affiliation
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {lecturerDetails?.program_code && (
+                                            <div>
+                                                <label className="block text-xs font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-2">Academic Program</label>
+                                                <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/50 rounded-xl inline-flex font-bold text-sm">
+                                                    {lecturerDetails.program_code}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
