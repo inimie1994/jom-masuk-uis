@@ -23,7 +23,12 @@ const Settings = () => {
     const [holidays, setHolidays] = useState([]);
     const [newHolidayName, setNewHolidayName] = useState('');
     const [newHolidayDate, setNewHolidayDate] = useState('');
+    const [newHolidayEndDate, setNewHolidayEndDate] = useState('');
     const [loadingHolidays, setLoadingHolidays] = useState(false);
+    const [editingHolidayId, setEditingHolidayId] = useState(null);
+    const [editHolidayName, setEditHolidayName] = useState('');
+    const [editHolidayDate, setEditHolidayDate] = useState('');
+    const [editHolidayEndDate, setEditHolidayEndDate] = useState('');
 
     useEffect(() => {
         if (user?.id) {
@@ -214,17 +219,57 @@ const Settings = () => {
                 .insert([{
                     faculty_id: user.faculty_id,
                     name: newHolidayName,
-                    date: newHolidayDate
+                    date: newHolidayDate,
+                    end_date: newHolidayEndDate || null
                 }]);
 
             if (error) throw error;
             setNewHolidayName('');
             setNewHolidayDate('');
+            setNewHolidayEndDate('');
             fetchHolidays();
             setMessage({ type: 'success', text: 'Holiday added successfully.' });
         } catch (err) {
             console.error('Error adding holiday:', err);
-            setMessage({ type: 'error', text: 'Failed to add holiday.' });
+            setMessage({ type: 'error', text: `Failed to add holiday: ${err.message || err.details || err}` });
+        }
+    };
+
+    const handleEditHoliday = (holiday) => {
+        setEditingHolidayId(holiday.id);
+        setEditHolidayName(holiday.name);
+        setEditHolidayDate(holiday.date);
+        setEditHolidayEndDate(holiday.end_date || '');
+    };
+
+    const handleCancelEdit = () => {
+        setEditingHolidayId(null);
+        setEditHolidayName('');
+        setEditHolidayDate('');
+        setEditHolidayEndDate('');
+    };
+
+    const handleUpdateHoliday = async (e) => {
+        e.preventDefault();
+        if (!editHolidayName || !editHolidayDate) return;
+
+        try {
+            const { error } = await supabase
+                .from('holidays')
+                .update({
+                    name: editHolidayName,
+                    date: editHolidayDate,
+                    end_date: editHolidayEndDate || null
+                })
+                .eq('id', editingHolidayId);
+
+            if (error) throw error;
+            setEditingHolidayId(null);
+            fetchHolidays();
+            setMessage({ type: 'success', text: 'Holiday updated successfully.' });
+        } catch (err) {
+            console.error('Error updating holiday:', err);
+            setMessage({ type: 'error', text: `Failed to update holiday: ${err.message || err.details || err}` });
         }
     };
 
@@ -616,8 +661,8 @@ const Settings = () => {
                                                     required
                                                 />
                                             </div>
-                                            <div className="w-full md:w-48">
-                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+                                            <div className="w-full md:w-40">
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
                                                 <input
                                                     type="date"
                                                     value={newHolidayDate}
@@ -626,12 +671,21 @@ const Settings = () => {
                                                     required
                                                 />
                                             </div>
+                                            <div className="w-full md:w-40">
+                                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date (Optional)</label>
+                                                <input
+                                                    type="date"
+                                                    value={newHolidayEndDate}
+                                                    onChange={(e) => setNewHolidayEndDate(e.target.value)}
+                                                    className="block w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-slate-800 dark:text-white"
+                                                />
+                                            </div>
                                             <button
                                                 type="submit"
-                                                className="w-full md:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                                className="w-full md:w-auto inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 h-10"
                                             >
                                                 <Plus size={16} className="mr-2" />
-                                                Add Holiday
+                                                Add
                                             </button>
                                         </form>
 
@@ -644,25 +698,76 @@ const Settings = () => {
                                             ) : (
                                                 <div className="space-y-2">
                                                     {holidays.map((holiday) => (
-                                                        <div key={holiday.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-md border border-gray-200 dark:border-slate-700 shadow-sm">
-                                                            <div className="flex items-center space-x-4">
-                                                                <div className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 p-2 rounded-full">
-                                                                    <CalendarDays size={18} />
-                                                                </div>
-                                                                <div>
-                                                                    <p className="font-medium text-gray-900 dark:text-white">{holiday.name}</p>
-                                                                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                                        {new Date(holiday.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                            <button
-                                                                onClick={() => handleDeleteHoliday(holiday.id)}
-                                                                className="text-red-500 hover:text-red-700 p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
-                                                                title="Delete Holiday"
-                                                            >
-                                                                <Trash2 size={18} />
-                                                            </button>
+                                                        <div key={holiday.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-md border border-gray-200 dark:border-slate-700 shadow-sm leading-none">
+                                                            {editingHolidayId === holiday.id ? (
+                                                                <form onSubmit={handleUpdateHoliday} className="flex-1 flex flex-col md:flex-row gap-3 items-end">
+                                                                    <div className="flex-1 w-full">
+                                                                        <input
+                                                                            type="text"
+                                                                            value={editHolidayName}
+                                                                            onChange={(e) => setEditHolidayName(e.target.value)}
+                                                                            className="block w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-slate-700 dark:text-white"
+                                                                            required
+                                                                        />
+                                                                    </div>
+                                                                    <div className="w-full md:w-36">
+                                                                        <input
+                                                                            type="date"
+                                                                            value={editHolidayDate}
+                                                                            onChange={(e) => setEditHolidayDate(e.target.value)}
+                                                                            className="block w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-slate-700 dark:text-white"
+                                                                            required
+                                                                        />
+                                                                    </div>
+                                                                    <div className="w-full md:w-36">
+                                                                        <input
+                                                                            type="date"
+                                                                            value={editHolidayEndDate}
+                                                                            onChange={(e) => setEditHolidayEndDate(e.target.value)}
+                                                                            className="block w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm dark:bg-slate-700 dark:text-white"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex gap-2 shrink-0">
+                                                                        <button type="submit" className="p-1.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md">
+                                                                            <Save size={18} />
+                                                                        </button>
+                                                                        <button type="button" onClick={handleCancelEdit} className="p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md">
+                                                                            <Plus size={18} className="rotate-45" />
+                                                                        </button>
+                                                                    </div>
+                                                                </form>
+                                                            ) : (
+                                                                <>
+                                                                    <div className="flex items-center space-x-4">
+                                                                        <div className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 p-2 rounded-full">
+                                                                            <CalendarDays size={18} />
+                                                                        </div>
+                                                                        <div>
+                                                                            <h5 className="text-sm font-bold text-gray-900 dark:text-white">{holiday.name}</h5>
+                                                                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">
+                                                                                {new Date(holiday.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                                                {holiday.end_date && ` - ${new Date(holiday.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex items-center space-x-1">
+                                                                        <button
+                                                                            onClick={() => handleEditHoliday(holiday)}
+                                                                            className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-md transition-colors"
+                                                                            title="Edit Holiday"
+                                                                        >
+                                                                            <Save size={16} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleDeleteHoliday(holiday.id)}
+                                                                            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
+                                                                            title="Delete Holiday"
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>

@@ -611,14 +611,24 @@ const LecturerReports = ({ adminViewLecturerId = null }) => {
         };
 
         // Pre-build a Set of holiday date strings for O(1) lookup
-        const holidayDateSet = new Set(
-            holidayData.map(h => {
-                // h.date is stored as YYYY-MM-DD string - use it directly
-                // but parse it safely via UTC to keep the date string accurate
-                const parts = String(h.date).split('T')[0]; // strip any time component
-                return parts;
-            })
-        );
+        const holidayDateSet = new Set();
+        holidayData.forEach(h => {
+            if (!h.date) return;
+            const startStr = h.date.split('T')[0];
+            const endStr = (h.end_date || h.date).split('T')[0];
+            
+            const [sY, sM, sD] = startStr.split('-').map(Number);
+            const [eY, eM, eD] = endStr.split('-').map(Number);
+            
+            let current = new Date(Date.UTC(sY, sM - 1, sD));
+            const end = new Date(Date.UTC(eY, eM - 1, eD));
+            
+            while (current <= end) {
+                const hDateStr = current.toISOString().split('T')[0];
+                holidayDateSet.add(hDateStr);
+                current.setUTCDate(current.getUTCDate() + 1);
+            }
+        });
 
         const getSessionForWeek = (weekNum, type) => {
             if (!semesterDetails?.semester_start_date) return [];
@@ -660,7 +670,6 @@ const LecturerReports = ({ adminViewLecturerId = null }) => {
             const holidayDatesForWeek = [];
 
             // Strategy A: Use timetable rules to pinpoint the exact class day
-            // Broaden the filter: include rules for this type, OR rules with no class_type (treat as Lecture)
             const rules = timetableRules.filter(r =>
                 r.class_type === type ||
                 (type === 'Lecture' && !r.class_type) ||
@@ -694,15 +703,28 @@ const LecturerReports = ({ adminViewLecturerId = null }) => {
                 // Check if ANY holiday falls within this week (Lecture column only to avoid duplicates).
                 if (type === 'Lecture') {
                     holidayData.forEach(h => {
-                        const hDateStr = String(h.date).split('T')[0]; // raw YYYY-MM-DD
-                        if (hDateStr >= weekStartStr && hDateStr <= weekEndStr) {
-                            const [, mm, dd] = hDateStr.split('-');
-                            holidayDatesForWeek.push({
-                                date: `${parseInt(dd)}/${parseInt(mm)}`,
-                                time: 'CUTI',
-                                isHoliday: true,
-                                fullDate: hDateStr
-                            });
+                        if (!h.date) return;
+                        const startStr = h.date.split('T')[0];
+                        const endStr = (h.end_date || h.date).split('T')[0];
+            
+                        const [sY, sM, sD] = startStr.split('-').map(Number);
+                        const [eY, eM, eD] = endStr.split('-').map(Number);
+                        
+                        let current = new Date(Date.UTC(sY, sM - 1, sD));
+                        const end = new Date(Date.UTC(eY, eM - 1, eD));
+
+                        while (current <= end) {
+                            const hDateStr = current.toISOString().split('T')[0];
+                            if (hDateStr >= weekStartStr && hDateStr <= weekEndStr) {
+                                const [, mm, dd] = hDateStr.split('-');
+                                holidayDatesForWeek.push({
+                                    date: `${parseInt(dd)}/${parseInt(mm)}`,
+                                    time: 'CUTI',
+                                    isHoliday: true,
+                                    fullDate: hDateStr
+                                });
+                            }
+                            current.setUTCDate(current.getUTCDate() + 1);
                         }
                     });
                 }
@@ -898,7 +920,7 @@ const LecturerReports = ({ adminViewLecturerId = null }) => {
                     </div>
                     <div className="flex bg-white">
                         <div className="flex-1 border-r border-black p-1">
-                            <div>Tenaga Pengajar: {user?.name || user?.email}</div>
+                            <div>Tenaga Pengajar: {lecturerName || user?.name || user?.email}</div>
                             <div className="mt-4">Tarikh :</div>
                         </div>
                         <div className="flex-1 border-r border-black p-1">

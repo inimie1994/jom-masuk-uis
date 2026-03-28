@@ -182,7 +182,21 @@ const Attendance = () => {
         // Holiday Map for O(1) lookup
         const holidayMap = {};
         holidays.forEach(h => {
-            holidayMap[h.date] = h.name;
+            if (!h.date) return;
+            const startStr = h.date.split('T')[0];
+            const endStr = (h.end_date || h.date).split('T')[0];
+            
+            const [sY, sM, sD] = startStr.split('-').map(Number);
+            const [eY, eM, eD] = endStr.split('-').map(Number);
+            
+            let current = new Date(Date.UTC(sY, sM - 1, sD));
+            const end = new Date(Date.UTC(eY, eM - 1, eD));
+            
+            while (current <= end) {
+                const dateStr = current.toISOString().split('T')[0];
+                holidayMap[dateStr] = h.name;
+                current.setUTCDate(current.getUTCDate() + 1);
+            }
         });
 
         const normalizeDate = (dateStr) => {
@@ -320,7 +334,7 @@ const Attendance = () => {
 
                 const { data: holidayData } = await supabase
                     .from('holidays')
-                    .select('name, date')
+                    .select('name, date, end_date')
                     .eq('faculty_id', user.faculty_id);
 
                 if (holidayData) holidays = holidayData;
@@ -556,7 +570,7 @@ const Attendance = () => {
                 // 2. Refresh Holidays
                 const { data: holidays } = await supabase
                     .from('holidays')
-                    .select('name, date')
+                    .select('name, date, end_date')
                     .eq('faculty_id', user.faculty_id);
 
                 // 3. Iterate Months
@@ -640,7 +654,7 @@ const Attendance = () => {
                 }
                 const { data: holidays } = await supabase
                     .from('holidays')
-                    .select('name, date')
+                    .select('name, date, end_date')
                     .eq('faculty_id', user.faculty_id);
 
                 const semesterSettings = start && end ? { start: start.toISOString(), end: end.toISOString() } : {};
