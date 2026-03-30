@@ -10,6 +10,16 @@ export default function Home() {
   const [showIntro, setShowIntro] = useState(true);
 
   useEffect(() => {
+    // Check for saved player data
+    const savedPlayer = localStorage.getItem('campusQuestPlayer');
+    if (savedPlayer) {
+      try {
+        setPlayerData(JSON.parse(savedPlayer));
+      } catch (e) {
+        console.error("Error parsing saved player data", e);
+      }
+    }
+
     const checkMobile = () => {
       if (window.innerWidth < 768) {
         setIsDetailsExpanded(false);
@@ -24,7 +34,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen w-screen bg-[#050505] text-white selection:bg-blue-500/30 font-sans overflow-hidden fixed inset-0">
-      {showIntro && <IntroPage onStart={() => setShowIntro(false)} />}
+      {showIntro && <IntroPage onStart={() => setShowIntro(false)} hasSavedData={!!playerData} />}
       {!showIntro && !playerData && <RegistrationModal onSubmit={setPlayerData} onClose={() => setShowIntro(true)} />}
 
       {/* FULLSCREEN GAME MAP */}

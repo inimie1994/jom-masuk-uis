@@ -8,7 +8,7 @@ export interface PlayerData {
     fullName: string;
     icNo: string;
     gender: 'male' | 'female';
-    spmResult: string;
+    phoneNumber: string;
 }
 
 interface RegistrationModalProps {
@@ -21,7 +21,7 @@ export default function RegistrationModal({ onSubmit, onClose }: RegistrationMod
         fullName: '',
         icNo: '',
         gender: 'male',
-        spmResult: '',
+        phoneNumber: '',
     });
 
     const [errors, setErrors] = useState<Partial<Record<keyof PlayerData, string>>>({});
@@ -32,7 +32,7 @@ export default function RegistrationModal({ onSubmit, onClose }: RegistrationMod
         const newErrors: Partial<Record<keyof PlayerData, string>> = {};
         if (!formData.fullName.trim()) newErrors.fullName = "Full Name is required.";
         if (!formData.icNo.trim()) newErrors.icNo = "IC Number is required.";
-        if (!formData.spmResult.trim()) newErrors.spmResult = "SPM Result is required.";
+        if (!formData.phoneNumber.trim()) newErrors.phoneNumber = "Phone Number is required.";
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -49,10 +49,13 @@ export default function RegistrationModal({ onSubmit, onClose }: RegistrationMod
                         full_name: formData.fullName,
                         ic_no: formData.icNo,
                         gender: formData.gender,
-                        spm_result: formData.spmResult
+                        phone_number: formData.phoneNumber
                     }]);
 
                 if (error) throw error;
+                
+                // Save to localStorage for persistence
+                localStorage.setItem('campusQuestPlayer', JSON.stringify(formData));
                 
                 onSubmit(formData);
             } catch (error: any) {
@@ -132,16 +135,16 @@ export default function RegistrationModal({ onSubmit, onClose }: RegistrationMod
                         </div>
 
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider ml-1">SPM Result</label>
+                            <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider ml-1">Telefon No.</label>
                             <input
-                                type="text"
-                                value={formData.spmResult}
-                                onChange={(e) => setFormData({ ...formData, spmResult: e.target.value })}
+                                type="tel"
+                                value={formData.phoneNumber}
+                                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                                 className="w-full bg-black/50 border border-white/10 focus:border-blue-500 rounded-xl px-4 py-3 text-white placeholder-neutral-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-                                placeholder="E.g., 5A 2B 1C"
+                                placeholder="E.g., 012-3456789"
                             />
-                            <p className="text-[10px] text-neutral-500 ml-1">Needed for your custom campus experience.</p>
-                            {errors.spmResult && <p className="text-red-400 text-xs mt-1 ml-1">{errors.spmResult}</p>}
+                            <p className="text-[10px] text-neutral-500 ml-1">We'll use this to contact you about your enrollment.</p>
+                            {errors.phoneNumber && <p className="text-red-400 text-xs mt-1 ml-1">{errors.phoneNumber}</p>}
                         </div>
 
                         <button

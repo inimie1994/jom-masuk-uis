@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react';
 
 interface IntroPageProps {
   onStart: () => void;
+  hasSavedData?: boolean;
 }
 
-export default function IntroPage({ onStart }: IntroPageProps) {
+export default function IntroPage({ onStart, hasSavedData }: IntroPageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -77,7 +78,7 @@ export default function IntroPage({ onStart }: IntroPageProps) {
           <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity" />
           
           <span className="relative z-10 text-lg font-bold tracking-widest text-white group-hover:text-blue-100 transition-colors">
-            START YOUR ADVENTURE
+            {hasSavedData ? 'CONTINUE ADVENTURE' : 'START YOUR ADVENTURE'}
           </span>
 
           {/* Animating Border Accent */}

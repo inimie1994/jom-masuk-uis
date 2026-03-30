@@ -51,8 +51,8 @@ export default function AdminLayout({
     );
   }
 
-  // Login page gets its own empty layout
-  if (pathname === '/admin/login') {
+  // Login or Fullscreen Editor pages get their own empty layout
+  if (pathname === '/admin/login' || pathname === '/admin/editor/fullscreen') {
     return <>{children}</>;
   }
 

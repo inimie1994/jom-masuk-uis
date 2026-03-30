@@ -1,6 +1,8 @@
 import React from 'react';
 import { supabase } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 async function getStats() {
   const { count: playerCount } = await supabase
     .from('players')

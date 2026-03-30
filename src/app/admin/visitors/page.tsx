@@ -1,12 +1,14 @@
 import React from 'react';
 import { supabase } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 interface Player {
   id: string;
   full_name: string;
   ic_no: string;
   gender: string;
-  spm_result: string | null;
+  phone_number: string | null;
   created_at: string;
 }
 
@@ -48,7 +50,7 @@ export default async function VisitorsPage() {
                 <th className="px-6 py-4 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Full Name</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">IC Number</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Gender</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">SPM Result</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Telefon No.</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -80,8 +82,8 @@ export default async function VisitorsPage() {
                         {visitor.gender}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-xs text-neutral-400">
-                      {visitor.spm_result || 'N/A'}
+                    <td className="px-6 py-4 text-xs text-neutral-300 font-medium">
+                      {visitor.phone_number || 'N/A'}
                     </td>
                   </tr>
                 ))
