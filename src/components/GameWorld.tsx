@@ -27,9 +27,10 @@ interface GameWorldProps {
     onMapUpdate?: (name: string) => void;
     onBackgroundImageChange?: (url: string) => void;
     onLoadMap?: (mapId: number) => void;
+    playerIcNo?: string;
 }
 
-export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUpdate, onBackgroundImageChange, onLoadMap }: GameWorldProps) {
+export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUpdate, onBackgroundImageChange, onLoadMap, playerIcNo }: GameWorldProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
     const [zoomOption, setZoomOption] = useState<'close' | 'medium' | 'far'>('medium');
@@ -162,6 +163,28 @@ export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUp
         fetchMap();
     }, [mapId]);
 
+    const saveInteraction = async (type: 'npc_dialog' | 'event_trigger', idRef: string | number) => {
+        if (!playerIcNo) return;
+        
+        try {
+            console.log(`Recording interaction: ${type} for ${idRef}`);
+            const { error } = await supabase
+                .from('player_progress')
+                .upsert({
+                    player_ic_no: playerIcNo,
+                    interaction_type: type,
+                    id_reference: idRef.toString(),
+                    last_interacted_at: new Date().toISOString()
+                }, {
+                    onConflict: 'player_ic_no,interaction_type,id_reference'
+                });
+
+            if (error) throw error;
+        } catch (err) {
+            console.error('Error saving interaction:', err);
+        }
+    };
+
 
     const handleInteraction = async (x: number, y: number, tileDef: TileDefinition) => {
         // If the tile has specific metadata for an interaction, prefer that over random querying
@@ -178,6 +201,10 @@ export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUp
         // 1. Check for RPG Dialog (Highest priority)
         if (tileDef.metadata?.dialog_sequences) {
             setActiveDialog(tileDef.metadata.dialog_sequences);
+            // If it's an NPC or has an ID, save it
+            if (tileDef.metadata.id) {
+                saveInteraction('npc_dialog', tileDef.metadata.id);
+            }
             return;
         }
 
@@ -215,8 +242,10 @@ export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUp
 
                     if (eventGrid.dialog_sequences) {
                         setActiveDialog(eventGrid.dialog_sequences);
+                        saveInteraction('event_trigger', eventGrid.id);
                     } else if (eventGrid.content_pages) {
                         setActiveContentPage(eventGrid.content_pages);
+                        saveInteraction('event_trigger', eventGrid.id);
                     } else {
                         setModalData({
                             isOpen: true,
@@ -224,6 +253,7 @@ export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUp
                             description: `Welcome to the ${eventGrid.name} zone! You've unlocked a special reward: ${eventGrid.grid_config.rewards}.`,
                             isQuest: false
                         });
+                        saveInteraction('event_trigger', eventGrid.id);
                     }
                 } else {
                     throw error || new Error('No data');
@@ -300,6 +330,7 @@ export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUp
                 
                 if (npc.dialog_sequences) {
                     setActiveDialog(npc.dialog_sequences);
+                    saveInteraction('npc_dialog', npc.id);
                 } else if (npc.content) {
                     // Fallback to simple modal if no complex dialog sequence
                     setModalData({

@@ -46,22 +46,23 @@ export default function MobileControls({ onMove, onInteract }: MobileControlsPro
     return (
         <div className="absolute inset-0 pointer-events-none z-50 md:hidden">
             {/* Interact Button (Bottom Left) */}
-            <div className="absolute bottom-6 left-6 pointer-events-auto">
+            <div className="absolute bottom-10 left-10 pointer-events-auto">
                 <button
                     onClick={onInteract}
-                    className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex flex-col items-center justify-center text-white/90 active:bg-blue-600/50 transition-colors shadow-lg active:scale-95 flex-shrink-0"
+                    className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex flex-col items-center justify-center text-white/90 active:bg-blue-600/50 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] active:scale-90 flex-shrink-0 group"
                 >
-                    <svg className="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="absolute inset-0 rounded-full bg-white/5 opacity-0 group-active:opacity-100 transition-opacity" />
+                    <svg className="w-8 h-8 mb-1 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
                     </svg>
-                    <span className="text-[10px] font-bold tracking-widest uppercase">Interact</span>
+                    <span className="text-[10px] font-black tracking-[0.2em] uppercase relative z-10">Interact</span>
                 </button>
             </div>
 
             {/* Virtual Joypad (Bottom Right) */}
-            <div className="absolute bottom-6 right-6 pointer-events-auto">
+            <div className="absolute bottom-10 right-10 pointer-events-auto">
                 {/* 3x3 Grid for Cross Shape */}
-                <div className="grid grid-cols-3 grid-rows-3 w-[150px] h-[150px] gap-0 opacity-80 backdrop-blur-sm drop-shadow-2xl">
+                <div className="grid grid-cols-3 grid-rows-3 w-[150px] h-[150px] gap-0 opacity-90 backdrop-blur-xl drop-shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
                     <div />
                     <button
                         onPointerDown={(e) => { e.preventDefault(); startMoving('UP'); }}

@@ -94,6 +94,10 @@ export default function AdminLayout({
             <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
             Map Editor
           </Link>
+          <Link href="/admin/info-panel" className={`px-4 py-3 rounded-xl transition-colors flex items-center gap-3 text-sm font-medium ${pathname === '/admin/info-panel' ? 'bg-white/10 text-white' : 'text-neutral-300 hover:text-white hover:bg-white/5'}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+            Info Panel
+          </Link>
         </nav>
 
         <div className="mt-auto flex flex-col gap-4">
