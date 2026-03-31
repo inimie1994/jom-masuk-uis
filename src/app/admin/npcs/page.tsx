@@ -11,13 +11,16 @@ export default function NPCManagerPage() {
     const [formData, setFormData] = useState({
         faculty_name: '',
         content: '',
-        tile_type: 0, // Will be calculated on submit
+        tile_type: 0,
         cta_enabled: false,
         cta_text: 'Visit Now',
         cta_link: '',
         sprite_name: 'NPC1',
-        scale: 1.0
+        scale: 1.0,
+        dialog_sequence_id: ''
     });
+
+    const [dialogs, setDialogs] = useState<any[]>([]);
 
     useEffect(() => {
         fetchNPCs();
@@ -27,6 +30,11 @@ export default function NPCManagerPage() {
         setIsLoading(true);
         const { data, error } = await supabase.from('npc_data').select('*').order('created_at', { ascending: false });
         if (!error) setNpcs(data || []);
+        
+        // Fetch dialogs too
+        const { data: dialogData } = await supabase.from('dialog_sequences').select('id, title');
+        if (dialogData) setDialogs(dialogData);
+        
         setIsLoading(false);
     };
 
@@ -45,7 +53,8 @@ export default function NPCManagerPage() {
                         cta_text: formData.cta_text,
                         cta_link: formData.cta_link,
                         sprite_name: formData.sprite_name,
-                        scale: formData.scale
+                        scale: formData.scale,
+                        dialog_sequence_id: formData.dialog_sequence_id || null
                     })
                     .eq('id', isEditing.id);
                 if (error) throw error;
@@ -59,6 +68,7 @@ export default function NPCManagerPage() {
                     .from('npc_data')
                     .insert([{
                         ...formData,
+                        dialog_sequence_id: formData.dialog_sequence_id || null,
                         tile_type: Math.max(101, maxType + 1)
                     }]);
                 if (error) throw error;
@@ -72,7 +82,8 @@ export default function NPCManagerPage() {
                 cta_text: 'Visit Now',
                 cta_link: '',
                 sprite_name: 'NPC1',
-                scale: 1.0
+                scale: 1.0,
+                dialog_sequence_id: ''
             });
             setIsEditing(null);
             fetchNPCs();
@@ -93,7 +104,8 @@ export default function NPCManagerPage() {
             cta_text: npc.cta_text || 'Visit Now',
             cta_link: npc.cta_link || '',
             sprite_name: npc.sprite_name || 'NPC1',
-            scale: npc.scale || 1.0
+            scale: npc.scale || 1.0,
+            dialog_sequence_id: npc.dialog_sequence_id || ''
         });
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -143,6 +155,21 @@ export default function NPCManagerPage() {
                                 placeholder="Enter the dialogue message..."
                                 className="w-full bg-black/50 border border-white/10 focus:border-blue-500 rounded-xl px-4 py-3 text-white transition-all outline-none resize-none"
                             />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-neutral-400 uppercase tracking-widest ml-1">Optional: RPG Dialog Sequence</label>
+                            <select 
+                                value={formData.dialog_sequence_id}
+                                onChange={e => setFormData({...formData, dialog_sequence_id: e.target.value})}
+                                className="w-full bg-black/50 border border-white/10 focus:border-blue-500 rounded-xl px-4 py-3 text-white transition-all outline-none"
+                            >
+                                <option value="">None (Use standard modal)</option>
+                                {dialogs.map(d => (
+                                    <option key={d.id} value={d.id}>{d.title}</option>
+                                ))}
+                            </select>
+                            <p className="text-[10px] text-neutral-500 italic px-1">If selected, this will replace the standard dialogue content.</p>
                         </div>
                     </div>
 
@@ -254,7 +281,7 @@ export default function NPCManagerPage() {
                             {isEditing && (
                                 <button 
                                     type="button"
-                                    onClick={() => { setIsEditing(null); setFormData({ faculty_name: '', content: '', tile_type: 0, cta_enabled: false, cta_text: 'Visit Now', cta_link: '', sprite_name: 'NPC1', scale: 1.0 }); }}
+                                    onClick={() => { setIsEditing(null); setFormData({ faculty_name: '', content: '', tile_type: 0, cta_enabled: false, cta_text: 'Visit Now', cta_link: '', sprite_name: 'NPC1', scale: 1.0, dialog_sequence_id: '' }); }}
                                     className="px-6 py-4 bg-neutral-800 hover:bg-neutral-700 text-white rounded-2xl font-bold border border-white/5"
                                 >
                                     Cancel

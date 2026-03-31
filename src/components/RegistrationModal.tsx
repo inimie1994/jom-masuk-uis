@@ -53,10 +53,10 @@ export default function RegistrationModal({ onSubmit, onClose }: RegistrationMod
                     }]);
 
                 if (error) throw error;
-                
+
                 // Save to localStorage for persistence
                 localStorage.setItem('campusQuestPlayer', JSON.stringify(formData));
-                
+
                 onSubmit(formData);
             } catch (error: any) {
                 console.error('Registration error:', error);
@@ -76,7 +76,7 @@ export default function RegistrationModal({ onSubmit, onClose }: RegistrationMod
                 <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-purple-600/30 rounded-full blur-[60px] pointer-events-none" />
 
                 <div className="relative z-10">
-                    <button 
+                    <button
                         onClick={onClose}
                         className="absolute -top-2 -right-2 p-2 rounded-full bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white transition-all z-20 group"
                         aria-label="Close"

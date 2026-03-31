@@ -4,6 +4,9 @@ import { supabase } from '@/lib/supabase';
 
 export default function EventGridManagerPage() {
     const [grids, setGrids] = useState<any[]>([]);
+    const [pages, setPages] = useState<any[]>([]);
+    const [dialogs, setDialogs] = useState<any[]>([]);
+    const [maps, setMaps] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditing, setIsEditing] = useState<any | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -12,10 +15,13 @@ export default function EventGridManagerPage() {
         name: '',
         x: 0,
         y: 0,
+        content_page_id: '' as string | null,
+        dialog_sequence_id: '' as string | null,
         grid_config: {
             type: 'standard',
             radius: 5,
-            rewards: 'Prospectus'
+            rewards: 'Prospectus',
+            target_map_id: null as number | null
         },
         is_active: true,
         tile_type: 0 // Will be calculated on submit
@@ -24,6 +30,7 @@ export default function EventGridManagerPage() {
 
     useEffect(() => {
         fetchGrids();
+        fetchPages();
     }, []);
 
     const fetchGrids = async () => {
@@ -33,21 +40,39 @@ export default function EventGridManagerPage() {
         setIsLoading(false);
     };
 
+    const fetchPages = async () => {
+        const { data, error } = await supabase.from('content_pages').select('id, title').order('title');
+        if (!error) setPages(data || []);
+
+        const { data: dialogData } = await supabase.from('dialog_sequences').select('id, title').order('title');
+        if (dialogData) setDialogs(dialogData);
+
+        // Fetch maps
+        fetch('/api/maps')
+            .then(res => res.json())
+            .then(data => setMaps(data.maps || []))
+            .catch(err => console.error('Error fetching maps:', err));
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
 
         try {
+            const submitData = {
+                name: formData.name,
+                x: formData.x,
+                y: formData.y,
+                content_page_id: formData.content_page_id || null,
+                dialog_sequence_id: formData.dialog_sequence_id || null,
+                grid_config: formData.grid_config,
+                is_active: formData.is_active
+            };
+
             if (isEditing) {
                 const { error } = await supabase
                     .from('event_grids')
-                    .update({
-                        name: formData.name,
-                        x: formData.x,
-                        y: formData.y,
-                        grid_config: formData.grid_config,
-                        is_active: formData.is_active
-                    })
+                    .update(submitData)
                     .eq('id', isEditing.id);
                 if (error) throw error;
             } else {
@@ -59,7 +84,7 @@ export default function EventGridManagerPage() {
                 const { error } = await supabase
                     .from('event_grids')
                     .insert([{
-                        ...formData,
+                        ...submitData,
                         tile_type: Math.max(1001, maxType + 1)
                     }]);
                 if (error) throw error;
@@ -69,7 +94,9 @@ export default function EventGridManagerPage() {
                 name: '',
                 x: 0,
                 y: 0,
-                grid_config: { type: 'standard', radius: 5, rewards: 'Prospectus' },
+                content_page_id: null,
+                dialog_sequence_id: null,
+                grid_config: { type: 'standard', radius: 5, rewards: 'Prospectus', target_map_id: null },
                 is_active: true,
                 tile_type: 0
             });
@@ -134,18 +161,42 @@ export default function EventGridManagerPage() {
                                 />
                             </div>
                         </div>
-
                         <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-neutral-400 uppercase tracking-widest ml-1">Reward Type</label>
+                            <label className="text-xs font-bold text-neutral-400 uppercase tracking-widest ml-1">Linked Content Page (Optional)</label>
                             <select 
-                                value={formData.grid_config.rewards}
-                                onChange={e => setFormData({...formData, grid_config: {...formData.grid_config, rewards: e.target.value}})}
+                                value={formData.content_page_id || ''}
+                                onChange={e => setFormData({...formData, content_page_id: e.target.value || null})}
                                 className="w-full bg-black/50 border border-white/10 focus:border-purple-500 rounded-xl px-4 py-3 text-white transition-all outline-none"
                             >
-                                <option value="Prospectus">Digital Prospectus</option>
-                                <option value="Voucher">Starbucks Voucher</option>
-                                <option value="Scholarship">Scholarship Guide</option>
+                                <option value="">None (Generic Notification)</option>
+                                {pages.map(page => (
+                                    <option key={page.id} value={page.id}>{page.title}</option>
+                                ))}
                             </select>
+                            <p className="text-[10px] text-neutral-500 ml-1">If selected, this page will open when the grid is triggered.</p>
+                        </div>
+
+                        <div className="space-y-1.5 text-blue-400">
+                            <label className="text-xs font-bold text-neutral-400 uppercase tracking-widest ml-1">LINKED MAP (LOAD MAP)</label>
+                            <select 
+                                value={formData.grid_config.target_map_id || ''}
+                                onChange={e => setFormData({
+                                    ...formData, 
+                                    grid_config: {
+                                        ...formData.grid_config,
+                                        target_map_id: e.target.value ? parseInt(e.target.value) : null
+                                    }
+                                })}
+                                className="w-full bg-blue-600/10 border border-blue-500/30 focus:border-blue-500 rounded-xl px-4 py-3 text-white transition-all outline-none font-bold"
+                            >
+                                <option value="" className="bg-neutral-900">None (Regular Trigger)</option>
+                                {maps.map(m => (
+                                    <option key={m.map_id} value={m.map_id} className="bg-neutral-900">
+                                        Teleport to: {m.name} (ID: {m.map_id})
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="text-[10px] text-blue-400/60 ml-1 font-medium">Use this to create doorways or teleporters between maps.</p>
                         </div>
                     </div>
 
@@ -219,10 +270,13 @@ export default function EventGridManagerPage() {
                                                 name: grid.name, 
                                                 x: grid.x, 
                                                 y: grid.y, 
+                                                content_page_id: grid.content_page_id || null,
+                                                dialog_sequence_id: grid.dialog_sequence_id || null,
                                                 grid_config: {
                                                     type: grid.grid_config.type || 'standard',
                                                     radius: grid.grid_config.radius || 5,
-                                                    rewards: grid.grid_config.rewards || 'Prospectus'
+                                                    rewards: grid.grid_config.rewards || 'Prospectus',
+                                                    target_map_id: grid.grid_config.target_map_id || null
                                                 }, 
                                                 is_active: grid.is_active,
                                                 tile_type: grid.tile_type || 0

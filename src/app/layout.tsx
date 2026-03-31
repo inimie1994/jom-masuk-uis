@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "UniQuest PWA",
+  title: "CampusQuest PWA",
   description: "Interactive Recruitment RPG",
   manifest: "/manifest.json",
 };

@@ -82,6 +82,14 @@ export default function AdminLayout({
             <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
             Event Grids
           </Link>
+          <Link href="/admin/content-pages" className={`px-4 py-3 rounded-xl transition-colors flex items-center gap-3 text-sm font-medium ${pathname === '/admin/content-pages' ? 'bg-white/10 text-white' : 'text-neutral-300 hover:text-white hover:bg-white/5'}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
+            Content Pages
+          </Link>
+          <Link href="/admin/dialogs" className={`px-4 py-3 rounded-xl transition-colors flex items-center gap-3 text-sm font-medium ${pathname === '/admin/dialogs' ? 'bg-white/10 text-white' : 'text-neutral-300 hover:text-white hover:bg-white/5'}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+            Dialogs
+          </Link>
           <Link href="/admin/editor" className={`px-4 py-3 rounded-xl transition-colors flex items-center gap-3 text-sm font-medium ${pathname === '/admin/editor' ? 'bg-white/10 text-white' : 'text-neutral-300 hover:text-white hover:bg-white/5'}`}>
             <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
             Map Editor

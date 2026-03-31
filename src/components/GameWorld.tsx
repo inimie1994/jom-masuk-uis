@@ -5,6 +5,8 @@ import { usePlayerMovement } from '@/hooks/usePlayerMovement';
 import { useCharacterAnimation, defaultAnimationMap, femaleAnimationMap } from '@/hooks/useCharacterAnimation';
 import FacultyModal from './FacultyModal';
 import MobileControls from './MobileControls';
+import { ContentPageModal } from './ContentPageModal';
+import DialogViewer from './DialogViewer';
 import { supabase } from '@/lib/supabase';
 
 const BASE_TILE_SIZE = 48;
@@ -21,9 +23,13 @@ type TileDefinition = {
 interface GameWorldProps {
     gender: 'male' | 'female';
     isEditor?: boolean;
+    mapId?: number;
+    onMapUpdate?: (name: string) => void;
+    onBackgroundImageChange?: (url: string) => void;
+    onLoadMap?: (mapId: number) => void;
 }
 
-export default function GameWorld({ gender, isEditor = false }: GameWorldProps) {
+export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUpdate, onBackgroundImageChange, onLoadMap }: GameWorldProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
     const [zoomOption, setZoomOption] = useState<'close' | 'medium' | 'far'>('medium');
@@ -33,6 +39,7 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
     const [mapName, setMapName] = useState<string>("Loading...");
     const [gridData, setGridData] = useState<number[][]>([]);
     const [tilesData, setTilesData] = useState<Record<number, TileDefinition>>({});
+    const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     const [modalData, setModalData] = useState<{ 
@@ -48,6 +55,9 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
         isQuest: false
     });
 
+    const [activeContentPage, setActiveContentPage] = useState<any | null>(null);
+    const [activeDialog, setActiveDialog] = useState<any | null>(null);
+
 
     const [eventGrids, setEventGrids] = useState<any[]>([]);
     const [npcs, setNpcs] = useState<any[]>([]);
@@ -56,7 +66,7 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
         const fetchEventGrids = async () => {
             const { data } = await supabase
                 .from('event_grids')
-                .select('*')
+                .select('*, content_pages(*), dialog_sequences(*)')
                 .eq('is_active', true);
             if (data) setEventGrids(data);
         };
@@ -64,7 +74,7 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
         const fetchNPCs = async () => {
             const { data } = await supabase
                 .from('npc_data')
-                .select('*');
+                .select('*, dialog_sequences(*)');
             if (data) setNpcs(data);
         };
 
@@ -77,6 +87,7 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
     const [selectedBrush, setSelectedBrush] = useState<number>(1); // Default to wall
     const [isPainting, setIsPainting] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
     // Editor Camera & Tooling
     const [toolMode, setToolMode] = useState<'pan' | 'paint'>(isEditor ? 'pan' : 'paint');
@@ -84,25 +95,52 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
     const [isDragging, setIsDragging] = useState(false);
     const [lastPointerPos, setLastPointerPos] = useState({ x: 0, y: 0 });
 
-    // Sync editor camera with player start once map is loaded if we're in editor
-    useEffect(() => {
-        if (isEditor && position) {
-            setEditorCamera({ x: position.x, y: position.y });
-        }
-    }, [isEditor, isLoading]);
+
+    const [initialSpawnPoint, setInitialSpawnPoint] = useState({ x: 29, y: 35 });
+
+    // ... (modal states etc)
 
     // Fetch Map on Mount
     useEffect(() => {
         const fetchMap = async () => {
             try {
-                // Hardcoding map ID 1 for now
-                const res = await fetch('/api/map/1');
+                const res = await fetch(`/api/map/${mapId}`, { cache: 'no-store' });
                 if (!res.ok) throw new Error('Network response was not ok');
 
                 const data = await res.json();
                 setMapName(data.name);
                 setGridData(data.grid);
                 setTilesData(data.tiles);
+                setNpcs(data.npcs || []);
+                setEventGrids(data.eventGrids || []);
+                setBackgroundImage(data.background_image || null);
+                if (onBackgroundImageChange && data.background_image) onBackgroundImageChange(data.background_image);
+
+                // Scan for spawn point (Tile ID 4)
+                let spawnX = -1;
+                let spawnY = -1;
+                let found = false;
+                data.grid.forEach((row: number[], y: number) => {
+                    row.forEach((cell: number, x: number) => {
+                        if (cell === 4) {
+                            spawnX = x;
+                            spawnY = y;
+                            found = true;
+                        }
+                    });
+                });
+
+                if (found) {
+                    console.log(`Spawn point found at: ${spawnX}, ${spawnY}`);
+                    setInitialSpawnPoint({ x: spawnX, y: spawnY });
+                    setEditorCamera({ x: spawnX, y: spawnY });
+                } else {
+                    console.log('No spawn point (tile 4) found, using default 29, 35');
+                    // Fallback to legacy default if no spawn point defined in map
+                    setInitialSpawnPoint({ x: 29, y: 35 });
+                    setEditorCamera({ x: 29, y: 35 });
+                }
+
             } catch (error) {
                 console.error("Failed to fetch map data:", error);
                 // Fallback map if database fails
@@ -122,7 +160,7 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
         };
 
         fetchMap();
-    }, []);
+    }, [mapId]);
 
 
     const handleInteraction = async (x: number, y: number, tileDef: TileDefinition) => {
@@ -134,6 +172,12 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
                 description: tileDef.metadata.description,
                 isQuest: false,
             });
+            return;
+        }
+
+        // 1. Check for RPG Dialog (Highest priority)
+        if (tileDef.metadata?.dialog_sequences) {
+            setActiveDialog(tileDef.metadata.dialog_sequences);
             return;
         }
 
@@ -162,12 +206,25 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
                 // Check if it's an event grid trigger tile (1001+)
                 const eventGrid = eventGrids.find(g => g.tile_type === tileDef.tile_id);
                 if (eventGrid) {
-                    setModalData({
-                        isOpen: true,
-                        title: `Event: ${eventGrid.name}`,
-                        description: `Welcome to the ${eventGrid.name} zone! You've unlocked a special reward: ${eventGrid.grid_config.rewards}.`,
-                        isQuest: false
-                    });
+                    // Check for Load Map trigger first
+                    if (eventGrid.grid_config?.target_map_id && onLoadMap) {
+                        console.log('Interaction trigger: Loading map', eventGrid.grid_config.target_map_id);
+                        onLoadMap(eventGrid.grid_config.target_map_id);
+                        return;
+                    }
+
+                    if (eventGrid.dialog_sequences) {
+                        setActiveDialog(eventGrid.dialog_sequences);
+                    } else if (eventGrid.content_pages) {
+                        setActiveContentPage(eventGrid.content_pages);
+                    } else {
+                        setModalData({
+                            isOpen: true,
+                            title: `Event: ${eventGrid.name}`,
+                            description: `Welcome to the ${eventGrid.name} zone! You've unlocked a special reward: ${eventGrid.grid_config.rewards}.`,
+                            isQuest: false
+                        });
+                    }
                 } else {
                     throw error || new Error('No data');
                 }
@@ -185,14 +242,14 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
     const computedTiles = useMemo(() => {
         const base = { ...tilesData };
         
-        // NPCs (101-999): Collidable & Trigger
+        // NPCs (101-999): Collidable & NOT Trigger in their own cell (auto-trigger when stepping below)
         npcs.forEach(npc => {
             if (npc.tile_type) {
                 base[npc.tile_type] = {
                     tile_id: npc.tile_type,
                     label: npc.faculty_name,
                     is_collidable: true,
-                    is_trigger: true,
+                    is_trigger: false, // Changed from true - we trigger from below
                     metadata: npc
                 };
             }
@@ -214,9 +271,59 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
         return base;
     }, [tilesData, npcs, eventGrids]);
 
-    const { position, direction, isMoving, moveIfValid, interact } = usePlayerMovement({ x: 29, y: 35 }, gridData, computedTiles, handleInteraction);
+    const { position, direction, isMoving, moveIfValid, interact } = usePlayerMovement(initialSpawnPoint, gridData, computedTiles, handleInteraction);
+ 
+    // Sync editor camera with player start once map is loaded if we're in editor
+    useEffect(() => {
+        if (isEditor && position) {
+            setEditorCamera({ x: position.x, y: position.y });
+        }
+    }, [isEditor, isLoading, position.x, position.y]);
 
     const [activeEventGrid, setActiveEventGrid] = useState<string | null>(null);
+
+    // NPC Auto-trigger from below
+    useEffect(() => {
+        if (!position || gridData.length === 0) return;
+
+        // Check the tile immediately ABOVE the player
+        const tileAboveId = gridData[position.y - 1]?.[position.x];
+        if (tileAboveId === undefined) return;
+
+        const npc = npcs.find(n => n.tile_type === tileAboveId);
+        
+        if (npc) {
+            const npcId = `npc-${npc.id}`;
+            if (npcId !== activeEventGrid) {
+                setActiveEventGrid(npcId);
+                console.log('Auto-triggered NPC dialogue from below:', npc.faculty_name);
+                
+                if (npc.dialog_sequences) {
+                    setActiveDialog(npc.dialog_sequences);
+                } else if (npc.content) {
+                    // Fallback to simple modal if no complex dialog sequence
+                    setModalData({
+                        isOpen: true,
+                        title: npc.faculty_name || "Notification",
+                        description: npc.content,
+                        isQuest: npc.quest_id ? true : false,
+                        cta: {
+                            enabled: npc.cta_enabled,
+                            text: npc.cta_text,
+                            link: npc.cta_link
+                        }
+                    });
+                }
+            }
+        } else {
+            // Reset activeEventGrid if not on a trigger tile or below an NPC
+            const currentTileId = gridData[position.y]?.[position.x];
+            const eventGrid = eventGrids.find(g => g.tile_type === currentTileId);
+            if (!eventGrid) {
+                setActiveEventGrid(null);
+            }
+        }
+    }, [position, gridData, npcs, activeEventGrid]);
 
     // Tile-based trigger check for Event Grids
     useEffect(() => {
@@ -231,12 +338,26 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
         if (eventGrid && eventGrid.id !== activeEventGrid) {
             setActiveEventGrid(eventGrid.id);
             console.log('Stepped on event trigger:', eventGrid.name);
-            setModalData({
-                isOpen: true,
-                title: `Event: ${eventGrid.name}`,
-                description: `Welcome to the ${eventGrid.name} zone! You've unlocked a special reward: ${eventGrid.grid_config.rewards}.`,
-                isQuest: false
-            });
+            
+            // Check for Load Map trigger
+            if (eventGrid.grid_config?.target_map_id && onLoadMap) {
+                console.log('Stepped trigger: Loading map', eventGrid.grid_config.target_map_id);
+                onLoadMap(eventGrid.grid_config.target_map_id);
+                return;
+            }
+
+            if (eventGrid.dialog_sequences) {
+                setActiveDialog(eventGrid.dialog_sequences);
+            } else if (eventGrid.content_pages) {
+                setActiveContentPage(eventGrid.content_pages);
+            } else {
+                setModalData({
+                    isOpen: true,
+                    title: `Event: ${eventGrid.name}`,
+                    description: `Welcome to the ${eventGrid.name} zone! You've unlocked a special reward: ${eventGrid.grid_config.rewards}.`,
+                    isQuest: false
+                });
+            }
         }
     }, [position, gridData, eventGrids, activeEventGrid]);
 
@@ -286,16 +407,23 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
     const handleSaveMap = async () => {
         setIsSaving(true);
         try {
-            const res = await fetch('/api/map/1', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ grid_data: gridData }),
-            });
-            if (!res.ok) throw new Error('Failed to save');
+            const { error } = await supabase
+                .from('campus_maps')
+                .update({ 
+                    name: mapName,
+                    grid_data: gridData,
+                    npcs_data: npcs,
+                    event_grids_data: eventGrids,
+                    background_image: backgroundImage
+                })
+                .eq('map_id', mapId);
+
+            if (error) throw error;
+            if (onMapUpdate) onMapUpdate(mapName);
             alert('Map saved successfully!');
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            alert('Error saving map');
+            alert('Error saving map: ' + error.message);
         } finally {
             setIsSaving(false);
         }
@@ -305,9 +433,26 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
         if (!isAdminMode) return;
         setGridData(prev => {
             const newGrid = [...prev];
-            newGrid[y] = [...newGrid[y]];
+            
+            // If painting a spawn point (4), remove all other spawn points first
+            if (selectedBrush === 4) {
+                for (let ry = 0; ry < newGrid.length; ry++) {
+                    newGrid[ry] = [...newGrid[ry]];
+                    for (let rx = 0; rx < newGrid[ry].length; rx++) {
+                        if (newGrid[ry][rx] === 4) {
+                            newGrid[ry][rx] = 0; // Replace with grass
+                        }
+                    }
+                }
+            } else {
+                newGrid[y] = [...newGrid[y]];
+            }
+
             if (newGrid[y][x] !== selectedBrush) {
                 newGrid[y][x] = selectedBrush;
+                if (selectedBrush === 4) {
+                    setInitialSpawnPoint({ x, y });
+                }
             }
             return newGrid;
         });
@@ -398,6 +543,7 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
             case 1: color = `rgba(255, 0, 0, ${isAdminMode ? gridOpacity : 0})`; break; // Wall
             case 2: color = `rgba(255, 255, 0, ${isAdminMode ? gridOpacity : 0})`; break; // Path
             case 3: color = `rgba(0, 0, 255, ${isAdminMode ? gridOpacity : 0})`; break; // Legacy Interaction
+            case 4: color = `rgba(34, 197, 94, ${isAdminMode ? gridOpacity : 0})`; break; // Spawn Point (Green)
         }
 
         return { ...base, backgroundColor: color };
@@ -440,8 +586,21 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
             <div className="absolute top-4 right-4 z-[100] flex flex-col items-end gap-3 pointer-events-none">
 
                 {/* Game / Map Title */}
-                <div className="font-bold text-white/50 text-[10px] tracking-[0.2em] uppercase bg-black/40 px-3 py-1 rounded-full backdrop-blur-md border border-white/10">
-                    {mapName}
+                <div className="group relative pointer-events-auto">
+                    {isAdminMode ? (
+                        <input
+                            type="text"
+                            value={mapName}
+                            onChange={(e) => setMapName(e.target.value)}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            className="font-bold text-white text-[10px] tracking-[0.2em] uppercase bg-blue-600/40 px-3 py-1 rounded-full backdrop-blur-md border border-blue-400/30 focus:outline-none focus:bg-blue-600/60 transition-all min-w-[120px] text-center shadow-[0_0_15px_rgba(37,99,235,0.2)]"
+                            placeholder="Enter Map Name..."
+                        />
+                    ) : (
+                        <div className="font-bold text-white/50 text-[10px] tracking-[0.2em] uppercase bg-black/40 px-3 py-1 rounded-full backdrop-blur-md border border-white/10">
+                            {mapName}
+                        </div>
+                    )}
                 </div>
 
                 {/* Control Column: Admin & Zoom */}
@@ -493,6 +652,21 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
                             Admin Space
                         </h3>
 
+                        <button
+                            onClick={handleSaveMap}
+                            disabled={isSaving}
+                            className="w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 disabled:from-neutral-700 disabled:to-neutral-800 disabled:text-neutral-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95 text-xs flex items-center justify-center gap-2 mb-2"
+                        >
+                            {isSaving ? 'Saving...' : '💾 Save Map To Database'}
+                        </button>
+
+                        <button
+                            onClick={() => setIsImagePickerOpen(true)}
+                            className="w-full bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-white font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95 text-xs flex items-center justify-center gap-2 mb-4"
+                        >
+                            🖼️ Change Background Image
+                        </button>
+
                         <div className="flex flex-col gap-2">
                             <label className="text-xs font-bold text-neutral-400 tracking-wider flex justify-between">
                                 <span>GRID OPACITY</span>
@@ -536,6 +710,7 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
                                     <div className="grid grid-cols-2 gap-2">
                                         <button onClick={() => setSelectedBrush(0)} className={`p-2 rounded-xl text-[10px] font-bold border transition-colors ${selectedBrush === 0 ? 'bg-white text-black border-white' : 'bg-neutral-900 border-white/10 text-neutral-400 hover:bg-neutral-800'}`}>Eraser (0)</button>
                                         <button onClick={() => setSelectedBrush(1)} className={`p-2 rounded-xl text-[10px] font-bold border transition-colors ${selectedBrush === 1 ? 'bg-red-500 text-white border-red-400' : 'bg-neutral-900 border-white/10 text-neutral-400 hover:bg-red-900/40'}`}>Wall (1)</button>
+                                        <button onClick={() => setSelectedBrush(4)} className={`p-2 rounded-xl text-[10px] font-bold border transition-colors ${selectedBrush === 4 ? 'bg-green-600 text-white border-green-400 shadow-[0_0_10px_rgba(34,197,94,0.3)]' : 'bg-neutral-900 border-white/10 text-neutral-400 hover:bg-green-900/40'}`}>Spawn (4)</button>
                                     </div>
                                 </div>
 
@@ -575,13 +750,6 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
                             </div>
                         </div>
 
-                        <button
-                            onClick={handleSaveMap}
-                            disabled={isSaving}
-                            className="mt-2 w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 disabled:from-neutral-700 disabled:to-neutral-800 disabled:text-neutral-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95 text-xs"
-                        >
-                            {isSaving ? 'Saving...' : '💾 Save Map To Database'}
-                        </button>
                     </div>
                 )}
             </div>
@@ -597,7 +765,7 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
                 <div
                     className="absolute top-0 left-0 w-full h-full pointer-events-none z-0"
                     style={{
-                        backgroundImage: `url('/map/game%20map.png')`,
+                        backgroundImage: `url('${backgroundImage || '/map/game%20map.png'}')`,
                         backgroundSize: '100% 100%',
                         backgroundRepeat: 'no-repeat'
                     }}
@@ -714,6 +882,111 @@ export default function GameWorld({ gender, isEditor = false }: GameWorldProps) 
                 cta={modalData.cta}
             />
 
+            {activeContentPage && (
+                <ContentPageModal 
+                    page={activeContentPage} 
+                    onClose={() => setActiveContentPage(null)} 
+                />
+            )}
+
+            {activeDialog && (
+                <DialogViewer 
+                    isOpen={true}
+                    sequence={activeDialog}
+                    onClose={() => setActiveDialog(null)}
+                    onEvent={(eventName) => {
+                        console.log(`Action triggered from dialog: ${eventName}`);
+                        // Handle specific game events here
+                        if (eventName.startsWith('OPEN_')) {
+                            setModalData({
+                                isOpen: true,
+                                title: "New Quest Available!",
+                                description: `You have unlocked a new challenge. Check your quest log for details.`,
+                                isQuest: true,
+                                cta: { enabled: true, text: "Accept Quest", link: "/quests" }
+                            });
+                        }
+                    }}
+                />
+            )}
+            {/* Map Image Picker Modal */}
+            {isImagePickerOpen && (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+                    <div 
+                        className="bg-neutral-900 border border-white/10 rounded-[40px] w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300"
+                        onPointerDown={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-8 border-b border-white/5 flex justify-between items-center bg-gradient-to-r from-blue-600/10 to-transparent">
+                            <div>
+                                <h3 className="text-2xl font-black text-white flex items-center gap-3">
+                                    <span className="w-2 h-8 bg-blue-500 rounded-full" />
+                                    Select Map Background
+                                </h3>
+                                <p className="text-neutral-400 text-sm mt-1">Choose a large view for your campus exploration.</p>
+                            </div>
+                            <button 
+                                onClick={() => setIsImagePickerOpen(false)}
+                                className="w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 text-white transition-all flex items-center justify-center group"
+                            >
+                                <svg className="w-6 h-6 transition-transform group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                            <MapImageGrid 
+                                onSelect={(url) => {
+                                    setBackgroundImage(url);
+                                    if (onBackgroundImageChange) onBackgroundImageChange(url);
+                                    setIsImagePickerOpen(false);
+                                }}
+                                selectedUrl={backgroundImage}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function MapImageGrid({ onSelect, selectedUrl }: { onSelect: (url: string) => void, selectedUrl: string | null }) {
+    const [images, setImages] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetch('/api/map-images')
+            .then(res => res.json())
+            .then(data => {
+                setImages(data.images || []);
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error(err);
+                setLoading(false);
+            });
+    }, []);
+
+    if (loading) return <div className="flex justify-center p-20 text-blue-500 animate-pulse font-black text-xl tracking-widest">LOADING MAPS...</div>;
+
+    return (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            {images.map((img) => (
+                <button
+                    key={img.value}
+                    onClick={() => onSelect(img.value)}
+                    className={`group relative aspect-video rounded-3xl overflow-hidden border-2 transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 ${selectedUrl === img.value ? 'border-blue-500 shadow-[0_20px_40px_rgba(37,99,235,0.3)] ring-4 ring-blue-500/20' : 'border-white/5 grayscale-[0.5] hover:grayscale-0 hover:border-white/20 hover:shadow-2xl'}`}
+                >
+                    <img src={img.value} className="w-full h-full object-cover" alt={img.label} />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+                        <span className="text-white font-black text-xs uppercase tracking-widest">{img.label}</span>
+                    </div>
+                    {selectedUrl === img.value && (
+                        <div className="absolute top-3 right-3 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white shadow-lg animate-in zoom-in-0 duration-300">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                        </div>
+                    )}
+                </button>
+            ))}
         </div>
     );
 }

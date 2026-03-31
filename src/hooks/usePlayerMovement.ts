@@ -116,5 +116,9 @@ export const usePlayerMovement = (
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [moveIfValid]);
 
+    useEffect(() => {
+        setPosition(initialPosition);
+    }, [initialPosition.x, initialPosition.y]);
+
     return { position, direction, isMoving, moveIfValid, interact };
 };

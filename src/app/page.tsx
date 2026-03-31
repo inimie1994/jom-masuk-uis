@@ -8,6 +8,7 @@ export default function Home() {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(true);
   const [playerData, setPlayerData] = useState<PlayerData | null>(null);
   const [showIntro, setShowIntro] = useState(true);
+  const [currentMapId, setCurrentMapId] = useState(1);
 
   useEffect(() => {
     // Check for saved player data
@@ -39,7 +40,17 @@ export default function Home() {
 
       {/* FULLSCREEN GAME MAP */}
       <div className="absolute inset-0 z-0">
-        {playerData && <GameWorld gender={playerData.gender} />}
+        {playerData && (
+          <GameWorld 
+            key={currentMapId}
+            mapId={currentMapId}
+            gender={playerData.gender} 
+            onLoadMap={(id) => {
+              console.log('Transitioning to map:', id);
+              setCurrentMapId(id);
+            }}
+          />
+        )}
       </div>
 
       {/* TOP LEFT FLOATING UI: Player Details & Status */}

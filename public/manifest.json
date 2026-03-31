@@ -1,6 +1,6 @@
 {
-    "name": "UniQuest PWA",
-    "short_name": "UniQuest",
+    "name": "CampusQuest PWA",
+    "short_name": "CampusQuest",
     "description": "Interactive Recruitment RPG",
     "start_url": "/",
     "display": "standalone",
