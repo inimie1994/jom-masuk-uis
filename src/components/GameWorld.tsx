@@ -59,29 +59,17 @@ export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUp
     const [activeContentPage, setActiveContentPage] = useState<any | null>(null);
     const [activeDialog, setActiveDialog] = useState<any | null>(null);
 
-
     const [eventGrids, setEventGrids] = useState<any[]>([]);
     const [npcs, setNpcs] = useState<any[]>([]);
+    const [availableImages, setAvailableImages] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetchEventGrids = async () => {
-            const { data } = await supabase
-                .from('event_grids')
-                .select('*, content_pages(*), dialog_sequences(*)')
-                .eq('is_active', true);
-            if (data) setEventGrids(data);
-        };
-
-        const fetchNPCs = async () => {
-            const { data } = await supabase
-                .from('npc_data')
-                .select('*, dialog_sequences(*)');
-            if (data) setNpcs(data);
-        };
-
-        fetchEventGrids();
-        fetchNPCs();
+        fetch('/api/map-images')
+            .then(res => res.json())
+            .then(data => setAvailableImages(data.images || []))
+            .catch(err => console.error('Error fetching map images:', err));
     }, []);
+
 
     const [isAdminMode, setIsAdminMode] = useState(isEditor);
     const [gridOpacity, setGridOpacity] = useState(0.5);
@@ -109,11 +97,29 @@ export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUp
                 if (!res.ok) throw new Error('Network response was not ok');
 
                 const data = await res.json();
+                
+                // Fetch LIVE definitions for events and NPCs to ensure we have latest transition links
+                const [{ data: liveEvents }, { data: liveNPCs }] = await Promise.all([
+                    supabase.from('event_grids').select('*, content_pages(*), dialog_sequences(*)').eq('is_active', true),
+                    supabase.from('npc_data').select('*, dialog_sequences(*)')
+                ]);
+
+                // Merge Map Position with LIVE Config
+                const mergedEvents = (data.eventGrids || []).map((mapGrid: any) => {
+                    const live = liveEvents?.find((e: any) => e.tile_type === mapGrid.tile_type);
+                    return live ? { ...live, x: mapGrid.x, y: mapGrid.y } : mapGrid;
+                });
+
+                const mergedNPCs = (data.npcs || []).map((mapNPC: any) => {
+                    const live = liveNPCs?.find((n: any) => n.tile_type === mapNPC.tile_type);
+                    return live ? { ...live, x: mapNPC.x, y: mapNPC.y } : mapNPC;
+                });
+
                 setMapName(data.name);
                 setGridData(data.grid);
                 setTilesData(data.tiles);
-                setNpcs(data.npcs || []);
-                setEventGrids(data.eventGrids || []);
+                setNpcs(mergedNPCs);
+                setEventGrids(mergedEvents);
                 setBackgroundImage(data.background_image || null);
                 if (onBackgroundImageChange && data.background_image) onBackgroundImageChange(data.background_image);
 
@@ -484,6 +490,13 @@ export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUp
                 if (selectedBrush === 4) {
                     setInitialSpawnPoint({ x, y });
                 }
+
+                // Sync NPC/Event positions if a specialized brush was used
+                if (selectedBrush >= 101 && selectedBrush <= 999) {
+                    setNpcs(prevNpcs => prevNpcs.map(n => n.tile_type === selectedBrush ? { ...n, x, y } : n));
+                } else if (selectedBrush >= 1001) {
+                    setEventGrids(prevGrids => prevGrids.map(g => g.tile_type === selectedBrush ? { ...g, x, y } : g));
+                }
             }
             return newGrid;
         });
@@ -691,12 +704,21 @@ export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUp
                             {isSaving ? 'Saving...' : '💾 Save Map To Database'}
                         </button>
 
-                        <button
-                            onClick={() => setIsImagePickerOpen(true)}
-                            className="w-full bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-white font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95 text-xs flex items-center justify-center gap-2 mb-4"
-                        >
-                            🖼️ Change Background Image
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setIsImagePickerOpen(true)}
+                                className="flex-1 bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-white font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95 text-xs flex items-center justify-center gap-2"
+                            >
+                                🖼️ Change
+                            </button>
+                            <button
+                                onClick={() => setBackgroundImage(null)}
+                                className="px-4 bg-red-900/20 hover:bg-red-900/30 border border-red-500/30 text-red-400 font-bold py-3 rounded-xl transition-all shadow-lg active:scale-95 text-xs flex items-center justify-center"
+                                title="Remove background image"
+                            >
+                                ✖
+                            </button>
+                        </div>
 
                         <div className="flex flex-col gap-2">
                             <label className="text-xs font-bold text-neutral-400 tracking-wider flex justify-between">
@@ -955,7 +977,7 @@ export default function GameWorld({ gender, isEditor = false, mapId = 1, onMapUp
                                 </h3>
                                 <p className="text-neutral-400 text-sm mt-1">Choose a large view for your campus exploration.</p>
                             </div>
-                            <button 
+                                                            <button 
                                 onClick={() => setIsImagePickerOpen(false)}
                                 className="w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 text-white transition-all flex items-center justify-center group"
                             >

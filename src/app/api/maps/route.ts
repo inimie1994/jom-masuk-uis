@@ -25,7 +25,7 @@ export async function POST(request: Request) {
         const { name } = await request.json();
         
         // Default 10x10 grass grid
-        const defaultGrid = Array(10).fill(Array(10).fill(0));
+        const defaultGrid = Array(10).fill(0).map(() => Array(10).fill(0));
 
         const { data, error } = await supabase
             .from('campus_maps')
