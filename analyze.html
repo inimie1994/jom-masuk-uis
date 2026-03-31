@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Grid Analyzer</title>
+</head>
+<body>
+    <img id="gridImg" src="C:/Users/Huawei/Documents/App Development/CampusQuest PWA/assets/animated male character/map/grid map.png" style="display:none;" />
+    <canvas id="canvas"></canvas>
+    <div id="output">Analyzing...</div>
+    <script>
+        window.onload = function() {
+            const img = document.getElementById('gridImg');
+            const canvas = document.getElementById('canvas');
+            const output = document.getElementById('output');
+            
+            if (!img.complete) {
+                img.onload = analyze;
+            } else {
+                analyze();
+            }
+
+            function analyze() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                const w = canvas.width;
+                const h = canvas.height;
+                
+                // We'll scan the first row and first column to find repeating patterns or grid lines.
+                // Assuming grid lines are a specific color (e.g. black or white).
+                
+                // Let's just create an array of horizontal and vertical line positions.
+                let xLines = [];
+                let yLines = [];
+                
+                for(let x = 0; x < w; x++) {
+                    const idx = (0 * w + x) * 4;
+                    // Check if pixel is a line (e.g., darker or different from background)
+                }
+                
+                // Let's print out the first 50 pixels to see what we're dealing with.
+                let topRow = [];
+                for(let x=0; x<50; x++) {
+                    const idx = x*4;
+                    topRow.push(`(${data[idx]},${data[idx+1]},${data[idx+2]})`);
+                }
+                
+                output.innerText = "Top row pixels: " + topRow.join(' ');
+                
+                // Try to find the tile size by looking for repeating color blocks.
+                let tileWidth = 0;
+                let tileHeight = 0;
+                
+                // Just let the subagent read the output, we'll try something simpler first: 
+                // We don't know the background color. 
+            }
+        };
+    </script>
+</body>
+</html>
