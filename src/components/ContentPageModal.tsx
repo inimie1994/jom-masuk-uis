@@ -1,6 +1,7 @@
 "use client";
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SPMResultsForm } from './SPMResultsForm';
+import { supabase } from '@/lib/supabase';
 
 interface ContentPage {
     id: string;
@@ -18,6 +19,16 @@ interface ContentPageModalProps {
 }
 
 export const ContentPageModal: React.FC<ContentPageModalProps> = ({ page, onClose }) => {
+    const [courses, setCourses] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchCourses = async () => {
+            const { data } = await supabase.from('courses').select('*').eq('content_page_id', page.id).order('created_at', { ascending: true });
+            if (data) setCourses(data);
+        };
+        fetchCourses();
+    }, [page.id]);
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 md:p-8 animate-in fade-in duration-300">
             {/* Backdrop */}
@@ -61,6 +72,28 @@ export const ContentPageModal: React.FC<ContentPageModalProps> = ({ page, onClos
 
                     {page.has_spm_form && (
                         <SPMResultsForm />
+                    )}
+
+                    {courses.length > 0 && (
+                        <div className="mt-10 pt-8 border-t border-white/10 space-y-4">
+                            <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                                <span className="w-1.5 h-5 bg-blue-500 rounded-full" />
+                                Available Courses
+                            </h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {courses.map(course => (
+                                    <div key={course.id} className="p-4 rounded-2xl bg-black/40 border border-white/5 hover:bg-white/5 hover:border-white/10 transition-all cursor-pointer group flex items-center justify-between">
+                                        <div>
+                                            <div className="font-bold text-sm text-neutral-200 group-hover:text-white transition-colors">{course.title}</div>
+                                            {course.code && <div className="text-[10px] text-blue-400 font-mono mt-1 font-bold tracking-widest uppercase">{course.code}</div>}
+                                        </div>
+                                        <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     )}
                 </div>
 
