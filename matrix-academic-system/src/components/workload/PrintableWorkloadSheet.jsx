@@ -4,116 +4,112 @@ import uisLogo from '../../assets/LOGO-RASMI-UIS cropped.png';
 
 const PrintableWorkloadSheet = ({
     lecturer,
-    timetable,
+    timetable = [],
     activities = [],
-    studentCounts,
+    studentCounts = {},
     semesterSession = "",
     className
 }) => {
-    // Helper to calculate hours
-    const calculateHours = (start, end) => {
-        if (!start || !end) return 0;
-        const startH = parseInt(start.split(':')[0]);
-        const endH = parseInt(end.split(':')[0]);
-        if (isNaN(startH) || isNaN(endH)) return 0;
-        return Math.max(0, endH - startH);
+    // 1. Setup Time Slots (8.00 to 5.00 + Malam)
+    const timeSlots = [
+        { label: '8.00', start: 8 },
+        { label: '9.00', start: 9 },
+        { label: '10.00', start: 10 },
+        { label: '11.00', start: 11 },
+        { label: '12.00', start: 12 },
+        { label: '1.00', start: 13 },
+        { label: '2.00', start: 14 },
+        { label: '3.00', start: 15 },
+        { label: '4.00', start: 16 },
+        { label: '5.00', start: 17 },
+        { label: 'Malam', start: 18 } // Simplified for evening classes
+    ];
+
+    const days = [
+        { key: 'Monday', label: 'ISNIN' },
+        { key: 'Tuesday', label: 'SELASA' },
+        { key: 'Wednesday', label: 'RABU' },
+        { key: 'Thursday', label: 'KHAMIS' },
+        { key: 'Friday', label: 'JUMAAT' },
+        { key: 'Saturday', label: 'SABTU' },
+        { key: 'Sunday', label: 'AHAD' }
+    ];
+
+    // Helper to get hour from HH:mm:ss
+    const getHour = (timeStr) => {
+        if (!timeStr) return 0;
+        const h = parseInt(timeStr.split(':')[0]);
+        // Handle 12-hour format or 24-hour format if needed, 
+        // but assuming 24h based on earlier code
+        return h;
     };
 
-    // Helper to format time
-    const formatTime = (timeStr) => {
-        if (!timeStr || typeof timeStr !== 'string') return '';
-        const parts = timeStr.split(':');
-        if (parts.length < 2) return timeStr;
-        const [hour, minute] = parts;
-        const h = parseInt(hour);
-        if (isNaN(h)) return timeStr;
-        const ampm = h >= 12 ? 'PETANG' : 'PAGI';
-        const displayH = h > 12 ? h - 12 : (h === 0 ? 12 : h);
-        return `${displayH}${minute === '00' ? '' : '.' + minute} ${ampm}`;
-    };
+    // 2. Prepare Data Grid
+    const gridData = useMemo(() => {
+        const grid = {};
+        days.forEach(day => {
+            grid[day.key] = {
+                slots: new Array(timeSlots.length).fill(null),
+                pdpHours: 0,
+                activityHours: 0
+            };
+        });
 
-    // Process timetable data
-    // Group by Subject ID to potentially merge rows or just list them
-    // The template shows listing courses. If a course has multiple slots, they are listed.
-    // We will list each timetable entry.
-    const sortedTimetable = [...timetable].sort((a, b) => {
-        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        if (a.subjects?.code !== b.subjects?.code) {
-            return (a.subjects?.code || '').localeCompare(b.subjects?.code || '');
-        }
-        if (days.indexOf(a.day) !== days.indexOf(b.day)) return days.indexOf(a.day) - days.indexOf(b.day);
-        return (a.start_time || '').localeCompare(b.start_time || '');
-    });
+        // Combine timetable and activities
+        // Note: activities might be objects like { day, start_time, end_time, name }
+        const allEvents = [
+            ...timetable.map(t => ({ ...t, type: 'pdp' })),
+            ...activities.map(a => ({ ...a, type: 'activity' }))
+        ];
 
-    // Calculate totals
-    let totalStudents = 0;
-    let totalLectureHours = 0;
-    let totalTutorialHours = 0;
-    let totalTeachingHours = 0;
+        allEvents.forEach(event => {
+            const dayKey = event.day;
+            if (!grid[dayKey]) return;
 
-    // Calculate daily totals for summary table
-    const dailyTotals = {
-        Mon: { pdp: 0, activity: 0 },
-        Tue: { pdp: 0, activity: 0 },
-        Wed: { pdp: 0, activity: 0 },
-        Thu: { pdp: 0, activity: 0 },
-        Fri: { pdp: 0, activity: 0 },
-        Sat: { pdp: 0, activity: 0 },
-        Sun: { pdp: 0, activity: 0 }
-    };
+            const startH = getHour(event.start_time);
+            const endH = getHour(event.end_time);
+            const duration = Math.max(1, endH - startH);
 
-    const dayMap = {
-        'Monday': 'Mon', 'Tuesday': 'Tue', 'Wednesday': 'Wed', 'Thursday': 'Thu', 'Friday': 'Fri', 'Saturday': 'Sat', 'Sunday': 'Sun'
-    };
+            if (event.type === 'pdp') grid[dayKey].pdpHours += duration;
+            else grid[dayKey].activityHours += duration;
 
-    const rows = sortedTimetable.map(item => {
-        const hours = calculateHours(item.start_time, item.end_time);
+            // Find slot index
+            const slotIndex = timeSlots.findIndex(s => s.start === startH);
+            if (slotIndex !== -1) {
+                // If there's already something here (overlap), we might need to handle it.
+                // For now, first one wins or overwrite.
+                grid[dayKey].slots[slotIndex] = {
+                    ...event,
+                    colSpan: duration
+                };
+                // Mark subsequent slots as occupied
+                for (let i = 1; i < duration; i++) {
+                    if (slotIndex + i < timeSlots.length) {
+                        grid[dayKey].slots[slotIndex + i] = 'skip';
+                    }
+                }
+            }
+        });
 
-        // Student count for this slot
-        // sum of counts for all groups in this slot
-        const groups = Array.isArray(item.group_names) ? item.group_names : (item.group_names ? [item.group_names] : []);
-        const studentCount = groups.reduce((sum, group) => sum + (studentCounts[group] || 0), 0);
+        return grid;
+    }, [timetable, activities]);
 
-        const isLecture = item.class_type === 'Lecture';
-        const isActivity = item.isActivity;
+    // Unique Courses for Header
+    const uniqueCourses = useMemo(() => {
+        const subjects = timetable.map(t => t.subjects).filter(Boolean);
+        const map = new Map();
+        subjects.forEach(s => map.set(s.code, s));
+        return Array.from(map.values());
+    }, [timetable]);
 
-        const lectureHours = isLecture ? hours : 0;
-        const tutorialHours = (!isLecture && !isActivity) ? hours : 0;
-        // For activities, we don't count them as Lecture or Tutorial hours for now, 
-        // or we could add a column. But usually 'Teaching Hours' refers to classes.
-        // If we want to include them in the total, we can.
-        // Let's assume they contribute to "Total Teaching Hours" only if requested, 
-        // but usually non-teaching activities are separate. 
-        // However, the request says "workload report", so maybe they should be just listed.
-        // Let's keep them out of "Lecture" and "Tutorial" columns but valid in the "Hours" column?
-        // Or maybe just show dash?
-        const displayHours = isActivity ? hours : hours; // Show hours for everything in the total column?
-
-        totalStudents += studentCount; // Note: This might double count if same students attend multiple classes. 
-        // But based on the template "BILANGAN PELAJAR" column sum, it seems to sum per row.
-        totalLectureHours += lectureHours;
-        totalTutorialHours += tutorialHours;
-        totalTeachingHours += displayHours;
-
-        // Add to daily totals
-        // (Removed logic)
-
-        return {
-            ...item,
-            hours: displayHours,
-            studentCount: isActivity ? '-' : studentCount,
-            lectureHours: isActivity ? '-' : lectureHours,
-            tutorialHours: isActivity ? '-' : tutorialHours,
-            dayTime: `${item.day ? item.day.toUpperCase() : ''} / ${formatTime(item.start_time)} - ${formatTime(item.end_time).replace(' ', '')}`
-        };
-    });
+    const totalPdp = Object.values(gridData).reduce((sum, d) => sum + d.pdpHours, 0);
+    const totalActivity = Object.values(gridData).reduce((sum, d) => sum + d.activityHours, 0);
 
     return (
-        <div className={`printable-workload-sheet hidden print:block print:w-full bg-white text-black font-sans ${className || ''}`}>
+        <div className={`printable-workload-sheet hidden print:block print:w-full bg-white text-black font-sans p-4 ${className || ''}`}>
             <style type="text/css" media="print">
                 {`
-                    @page { size: landscape; margin: 10mm; }
-                    
+                    @page { size: landscape; margin: 8mm; }
                     @media print {
                         body > * { visibility: hidden !important; }
                         .printable-workload-sheet, .printable-workload-sheet * { visibility: visible !important; }
@@ -123,142 +119,177 @@ const PrintableWorkloadSheet = ({
                             top: 0 !important;
                             width: 100% !important;
                         }
-                       html, body, #root { height: auto !important; overflow: visible !important; }
                     }
-                    .print-table th, .print-table td { border: 1px solid black !important; padding: 4px; vertical-align: top; }
+                    .grid-table th, .grid-table td { border: 1px solid black !important; vertical-align: middle; height: 35px; }
+                    .grid-table tr.empty-row td { height: 22px !important; }
+                    .grid-table th { background: #f8fafc; font-weight: bold; text-transform: uppercase; font-size: 8px; padding: 2px; }
                 `}
             </style>
 
-            <div className="flex flex-col items-center mb-4">
-                <img src={uisLogo} alt="Logo" className="h-16 w-auto mb-1" />
-                <div className="text-center">
-                    <div className="text-[12px] font-bold uppercase">PUSAT MATRIKULASI</div>
-                    <div className="text-[12px] font-bold uppercase">BORANG LAPORAN PENGAJARAN {semesterSession}</div>
+            {/* Header Section */}
+            <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center">
+                    <img src={uisLogo} alt="UIS Logo" className="h-[70px] w-auto mr-4" />
+                    <div className="border-l-[1.5px] border-black pl-3 h-[60px] flex flex-col justify-center">
+                        <h1 className="text-sm font-bold tracking-tight leading-tight uppercase">PUSAT MATRIKULASI</h1>
+                        <h2 className="text-sm font-bold leading-tight uppercase">JADUAL KULIAH PENSYARAH</h2>
+                        <h2 className="text-sm font-bold leading-tight uppercase">{semesterSession || "SESI II TAHUN AKADEMIK 2025/2026"}</h2>
+                    </div>
                 </div>
             </div>
 
-            {/* Info Row */}
-            <div className="flex justify-between text-[11px] font-bold uppercase mb-0" style={{ borderBottom: '2px solid black' }}>
-                <div className="flex gap-1 pb-1">
-                    <span>NAMA PENSYARAH:</span>
-                    <span className="text-red-600 pl-1">{lecturer?.name || ''}</span>
+            {/* Info Tri-Column */}
+            <div className="grid grid-cols-[1fr_auto_auto] gap-12 text-[8px] items-start mb-4">
+                {/* Column 1: Lecturer Info */}
+                <div className="space-y-0.5">
+                    <div className="grid grid-cols-[90px_10px_1fr]">
+                        <span>NAMA PENSYARAH</span><span>:</span><span className="uppercase">{lecturer?.name || ''}</span>
+                    </div>
+                    <div className="grid grid-cols-[90px_10px_1fr]">
+                        <span>JABATAN</span><span>:</span><span className="uppercase">{lecturer?.departments?.name || ''}</span>
+                    </div>
+                    <div className="grid grid-cols-[90px_10px_1fr]">
+                        <span>KURSUS</span><span>:</span>
+                        <div className="flex flex-col uppercase">
+                            {uniqueCourses.length > 0 ? uniqueCourses.map((c, idx) => (
+                                <div key={c.id}>{c.code} - {c.name}</div>
+                            )) : <span>-</span>}
+                        </div>
+                    </div>
                 </div>
-                <div className="flex gap-1 pb-1">
-                    <span>JABATAN:</span>
-                    <span className="text-red-600 pl-1">{lecturer?.departments?.name || 'JABATAN PENGAJIAN ISLAM'}</span>
+
+                {/* Column 2: Contact Info */}
+                <div className="space-y-1">
+                    <div className="grid grid-cols-[14px_10px_1fr] items-center">
+                        <div className="flex justify-center text-[10px]">☏</div>
+                        <span>:</span><span>03-89117000 ext:</span>
+                    </div>
+                    <div className="grid grid-cols-[14px_10px_1fr] items-center">
+                        <div className="flex justify-center text-[10px]">📱</div>
+                        <span>:</span><span>{lecturer?.phone_number || '018-2324150'}</span>
+                    </div>
+                    <div className="grid grid-cols-[14px_10px_1fr] items-center">
+                        <div className="flex justify-center text-[10px]">✉</div>
+                        <span>:</span><span className="text-blue-700 underline lowercase">{lecturer?.email || 'email@uis.edu.my'}</span>
+                    </div>
                 </div>
-                <div className="flex gap-1 pb-1">
-                    <span>MOD:</span>
-                    <span className="text-red-600 pl-1">C</span>
+
+                {/* Column 3: Total Hours */}
+                <div className="space-y-1 pr-16 border-none">
+                    <div className="grid grid-cols-[90px_10px_1fr]">
+                        <span>JAM PENGAJARAN</span><span>:</span><span>{totalPdp} JAM</span>
+                    </div>
+                    <div className="grid grid-cols-[90px_10px_1fr]">
+                        <span></span><span>:</span><span></span>
+                    </div>
                 </div>
             </div>
 
-            {/* Table */}
-            <table className="w-full border-collapse border border-black text-center text-[10px] print-table mb-0.5">
+            {/* Timetable Grid */}
+            <table className="w-full border-collapse grid-table text-center text-[7px] leading-tight mb-2">
                 <thead>
-                    <tr className="bg-black text-white border-b border-black h-8 align-middle">
-                        <th className="w-24 border-r border-white font-bold uppercase py-0.5">KOD KURSUS</th>
-                        <th className="text-center border-r border-white font-bold uppercase py-0.5">NAMA KURSUS</th>
-                        <th className="w-48 border-r border-white font-bold uppercase py-0.5">HARI DAN MASA</th>
-                        <th className="w-20 border-r border-white leading-tight font-bold uppercase py-0.5 text-[9px]">BILANGAN<br />PELAJAR</th>
-                        <th className="w-16 border-r border-white leading-tight font-bold uppercase py-0.5 text-[9px]">JAM<br />KULIAH</th>
-                        <th className="w-16 border-r border-white leading-tight font-bold uppercase py-0.5 text-[9px]">JAM<br />TUTORIAL</th>
-                        <th className="w-24 leading-tight font-bold uppercase py-0.5 text-[9px]">JUMLAH JAM<br />PENGAJARAN</th>
+                    <tr>
+                        <th className="w-16">HARI/ WAKTU</th>
+                        {timeSlots.map(s => <th key={s.label} className="w-16">{s.label}</th>)}
+                        <th className="w-10">PdP (jam)</th>
+                        <th className="w-10 italic">Lain-lain Aktiviti (jam)</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {rows.length > 0 ? rows.map((row, index) => {
-                        const showSubject = index === 0 || rows[index - 1].subjects?.code !== row.subjects?.code;
-                        // Calculate rowSpan for this subject if it's the first occurrence
-                        let rowSpan = 1;
-                        if (showSubject) {
-                            for (let i = index + 1; i < rows.length; i++) {
-                                if (rows[i].subjects?.code === row.subjects?.code) {
-                                    rowSpan++;
-                                } else {
-                                    break;
-                                }
-                            }
-                        }
-
+                    {days.map(day => {
+                        const isEmpty = gridData[day.key].pdpHours === 0 && gridData[day.key].activityHours === 0;
                         return (
-                            <tr key={index} className="h-6">
-                                {showSubject && (
-                                    <td className="text-left font-medium" rowSpan={rowSpan}>
-                                        {row.subjects?.code}
+                            <tr key={day.key} className={isEmpty ? 'empty-row' : ''}>
+                                <td className="font-bold bg-slate-50 text-[8px]">{day.label}</td>
+                            {gridData[day.key].slots.map((slot, i) => {
+                                if (slot === 'skip') return null;
+                                if (!slot) return <td key={i}></td>;
+                                
+                                return (
+                                    <td key={i} colSpan={slot.colSpan} className="p-1 font-medium bg-white border border-black">
+                                        {slot.type === 'pdp' ? (
+                                            <div className="flex flex-col justify-center h-full">
+                                                <div className="text-[7.5px]">{slot.subjects?.code}</div>
+                                                <div className="font-bold text-[7.5px]">{slot.class_type?.toUpperCase()}</div>
+                                                <div className="text-[6.5px]">[{slot.room || ''}] [{Array.isArray(slot.group_names) ? slot.group_names.join(', ') : slot.group_names}]</div>
+                                            </div>
+                                        ) : (
+                                            <div className="uppercase font-bold text-[7.5px]">{slot.name || slot.type_name || 'AKTIVITI'}</div>
+                                        )}
                                     </td>
-                                )}
-                                {showSubject && (
-                                    <td className="text-left font-medium uppercase" rowSpan={rowSpan}>
-                                        {row.subjects?.name}
-                                    </td>
-                                )}
-                                <td className="text-left uppercase font-medium pl-2">{row.dayTime}</td>
-                                <td className="text-center">{row.studentCount}</td>
-                                <td className="text-center">{row.lectureHours}</td>
-                                <td className="text-center">{row.tutorialHours}</td>
-                                <td className="text-center">{row.hours}</td>
-                            </tr>
-                        );
-                    }) : (
-                        <tr className="h-16">
-                            <td colSpan={7}>&nbsp;</td>
+                                );
+                            })}
+                            <td className="font-bold text-[9px]">{gridData[day.key].pdpHours || '0'}</td>
+                            <td className="font-bold text-[9px]">{gridData[day.key].activityHours || '0'}</td>
                         </tr>
-                    )}
-                    {/* Empty row filler if needed to match height, but table auto-height is usually fine. */}
-
-                    <tr className="font-bold h-6">
-                        <td colSpan={4} className="text-right pr-2">JUMLAH</td>
-                        <td className="text-center">{totalLectureHours}</td>
-                        <td className="text-center">{totalTutorialHours}</td>
-                        <td className="text-center">{totalTeachingHours}</td>
+                    );
+                })}
+                    <tr className="font-bold text-[9px]">
+                        <td colSpan={12} className="text-right border-none h-8 pr-2">Jumlah Jam</td>
+                        <td className="border border-black">{totalPdp}</td>
+                        <td className="border border-black">{totalActivity}</td>
                     </tr>
-                </tbody>
+                    <tr className="font-bold text-[9px]">
+                        <td colSpan={12} className="text-right border-none h-8 pr-2">Jumlah Jam Keseluruhan</td>
+                        <td colSpan={2} className="border border-black text-center">{totalPdp + totalActivity}</td>
+                    </tr>
+</tbody>
             </table>
 
-            {/* Total Hours Summary Table (Removed) */}
-
             {/* Signatures */}
-            {/* Signatures */}
-            <div className="flex flex-col text-[10px] mb-2">
-                {/* Left Box: Signature & Date */}
-                <div className="mb-0">
-                    <div className="border border-black border-b-0 w-[300px] h-14 p-1 relative">
-                        <div className="font-bold">TANDA TANGAN:</div>
-                    </div>
-                    <div className="border border-black w-[300px] h-6 flex items-center px-1 bg-white">
-                        <span className="font-bold mr-2">TARIKH:</span>
-                        <span className="text-red-600 font-bold">{new Date().toLocaleDateString('en-GB').replace(/\//g, '.')}</span>
+            <div className="flex justify-between items-start mt-8 text-[8px]">
+                {/* Left: Disediakan Oleh */}
+                <div className="w-[300px]">
+                    <p className="font-bold mb-6">DISEDIAKAN OLEH:</p>
+                    <div className="space-y-1">
+                        <div className="grid grid-cols-[90px_10px_1fr]">
+                            <span className="font-bold">NAMA</span>
+                            <span>:</span>
+                            <span className="uppercase">{lecturer?.name || ''}</span>
+                        </div>
+                        <div className="grid grid-cols-[90px_10px_1fr]">
+                            <span className="font-bold">JAWATAN</span>
+                            <span>:</span>
+                            <span className="uppercase">
+                                {lecturer?.role?.toUpperCase() === 'HOD' ? 'Ketua Jabatan' : 
+                                 lecturer?.role?.toUpperCase() === 'HOP' ? 'Ketua Program' : 
+                                 lecturer?.role?.toUpperCase() === 'LECTURER' ? 'Pensyarah' : 
+                                 lecturer?.role || ''}
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-[90px_10px_1fr]">
+                            <span className="font-bold">TARIKH</span>
+                            <span>:</span>
+                            <span>{new Date().toLocaleDateString('en-GB').replace(/\//g, '.')}</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Approvals Section */}
-                <div className="w-full border border-black mt-0">
-                    <div className="bg-black text-white font-bold grid grid-cols-2 text-center items-center h-6">
-                        <div className="border-r border-white h-full flex items-center justify-center text-[8px] leading-tight px-1">
-                            DIPERAKUKAN OLEH KETUA JABATAN / TIMBALAN DEKAN AKADEMIK
+                {/* Right: Disahkan Oleh */}
+                <div className="w-[300px]">
+                    <p className="font-bold mb-6">DISAHKAN OLEH:</p>
+                    <div className="space-y-1">
+                        <div className="grid grid-cols-[90px_10px_1fr]">
+                            <span className="font-bold">NAMA</span>
+                            <span>:</span>
+                            <span></span>
                         </div>
-                        <div className="h-full flex items-center justify-center text-[8px] leading-tight px-1">
-                            DISAHKAN OLEH TIMBALAN DEKAN AKADEMIK / DEKAN
+                        <div className="grid grid-cols-[90px_10px_1fr]">
+                            <span className="font-bold">JAWATAN</span>
+                            <span>:</span>
+                            <span></span>
                         </div>
-                    </div>
-                    <div className="grid grid-cols-2 h-16">
-                        <div className="border-r border-black p-1 relative">
-                            <div className="font-bold">TANDA TANGAN</div>
-                        </div>
-                        <div className="p-1 relative">
-                            <div className="font-bold">TANDA TANGAN</div>
+                        <div className="grid grid-cols-[90px_10px_1fr]">
+                            <span className="font-bold">TARIKH</span>
+                            <span>:</span>
+                            <span></span>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <div className="text-[10px] font-medium">
-                *Borang ini perlu diserahkan kepada Ketua Jabatan/ Timbalan Dekan Akademik pada minggu ke-3 pada setiap semester.
-            </div>
-
         </div>
     );
 };
 
 export default PrintableWorkloadSheet;
+

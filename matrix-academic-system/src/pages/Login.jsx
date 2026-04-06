@@ -29,16 +29,29 @@ const Login = () => {
         setError(null);
 
         try {
-            const internalEmail = username.includes('@') ? username : `${username.trim()}@matrix-system.com`;
-            const { error: signInError } = await signIn({
-                email: internalEmail,
+            const isEmail = username.includes('@');
+            let loginEmail = isEmail ? username : `${username.trim()}@uis.edu.my`;
+
+            console.log('Login: Attempting sign in for', loginEmail);
+            let { error: signInError } = await signIn({
+                email: loginEmail,
                 password
             });
 
-            if (signInError) throw signInError;
-        } catch (error) {
-            console.error('Error logging in:', error);
-            setError(error.message || 'Invalid username or password');
+            // If it failed and it was an auto-generated email, try the old domain fallback
+            if (signInError && !isEmail) {
+                const oldEmail = `${username.trim()}@matrix-system.com`;
+                console.log('Login: New domain failed, retrying with old domain...', oldEmail);
+                const retry = await signIn({ email: oldEmail, password });
+                if (retry.error) throw retry.error;
+            } else if (signInError) {
+                throw signInError;
+            }
+
+            navigate('/dashboard');
+        } catch (err) {
+            console.error('Error logging in:', err);
+            setError(err.message || 'Invalid username or password');
             setLoading(false);
         }
     };

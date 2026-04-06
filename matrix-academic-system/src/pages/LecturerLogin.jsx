@@ -36,18 +36,19 @@ const LecturerLogin = () => {
         setAuthSuccess(false);
 
         try {
-            const internalEmail = `${username.trim()}@matrix-system.com`;
-            console.log('LecturerLogin: Attempting sign in for', internalEmail);
-            const { data, error } = await signIn({ email: internalEmail, password });
+            const newEmail = `${username.trim()}@uis.edu.my`;
+            console.log('LecturerLogin: Attempting sign in for', newEmail);
+            let { data, error: signInError } = await signIn({ email: newEmail, password });
 
-            if (error) {
-                console.error('LecturerLogin: Sign in error', error);
-                throw error;
+            if (signInError) {
+                const oldEmail = `${username.trim()}@matrix-system.com`;
+                console.log('LecturerLogin: New domain failed, retrying with old domain...', oldEmail);
+                const retry = await signIn({ email: oldEmail, password });
+                if (retry.error) throw retry.error;
             }
 
             console.log('LecturerLogin: Sign in successful, waiting for profile...');
             setAuthSuccess(true);
-            // We don't set loading(false) here, we wait for useEffect
         } catch (err) {
             console.error('Login error:', err);
             setError(err.message || 'Invalid email or password.');

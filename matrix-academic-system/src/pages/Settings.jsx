@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthContext';
 import { supabase } from '../lib/supabaseClient';
 import PageHeader from '../components/common/PageHeader';
 import ThemeToggle from '../components/ThemeToggle';
-import { User, Building, Monitor, Save, Upload, Image as ImageIcon, CalendarDays, Plus, Trash2, DownloadCloud, Mail, Lock } from 'lucide-react';
+import { User, Building, Monitor, Save, Upload, Image as ImageIcon, CalendarDays, Plus, Trash2, DownloadCloud, Mail, Lock, Pencil, Phone, X } from 'lucide-react';
 
 const Settings = () => {
     const { user } = useAuth();
@@ -15,6 +15,10 @@ const Settings = () => {
     const [message, setMessage] = useState(null);
     const [lecturerDetails, setLecturerDetails] = useState(null);
     const [loadingProfile, setLoadingProfile] = useState(false);
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+    const [editEmail, setEditEmail] = useState('');
+    const [editPhone, setEditPhone] = useState('');
+    const [savingProfile, setSavingProfile] = useState(false);
 
     // Attendance Settings State
     const [semesterStart, setSemesterStart] = useState('');
@@ -59,6 +63,8 @@ const Settings = () => {
 
             if (error) throw error;
             setLecturerDetails(data);
+            setEditEmail(user?.email || '');
+            setEditPhone(data?.phone_number || '');
         } catch (err) {
             console.error('Error fetching lecturer details:', err);
         } finally {
@@ -385,6 +391,55 @@ const Settings = () => {
         }
     };
 
+    const handleSaveProfile = async () => {
+        setSavingProfile(true);
+        setMessage(null);
+        // Use lecturerDetails.id as the reliable key (user.lecturer_id may be null for HOD/HOP)
+        const lecturerId = lecturerDetails?.id || user?.lecturer_id;
+        
+        if (!lecturerId) {
+            setMessage({ type: 'error', text: 'Could not identify lecturer record. Please refresh and try again.' });
+            setSavingProfile(false);
+            return;
+        }
+        try {
+            const { data, error: lecturerError } = await supabase
+                .from('lecturers')
+                .update({ phone_number: editPhone || null })
+                .eq('id', lecturerId)
+                .select(); 
+            
+            if (lecturerError) throw lecturerError;
+
+            if (!data || data.length === 0) {
+                throw new Error('No records were updated. This might be due to database permissions (RLS policies).');
+            }
+
+            // Update email if changed (Supabase sends confirmation email)
+            let emailMessage = '';
+            if (editEmail && editEmail !== user?.email) {
+                const { error: authError } = await supabase.auth.updateUser({ email: editEmail });
+                if (authError) throw authError;
+                
+                if (user?.role === 'superadmin' || user?.role === 'admin') {
+                    emailMessage = ' A confirmation link has been sent. TIP: Since old auto-generated emails do not exist, please disable "Secure email change" in Supabase Dashboard > Authentication > Email to allow single-link confirmation.';
+                } else {
+                    emailMessage = ' A confirmation link has been sent to BOTH your old and new email addresses. You must click BOTH links to finalize the change.';
+                }
+            }
+
+            // Refresh lecturer details
+            await fetchLecturerDetails();
+            setIsEditingProfile(false);
+            setMessage({ type: 'success', text: `Profile details updated successfully.${emailMessage}` });
+        } catch (err) {
+            console.error('Error saving profile:', err);
+            setMessage({ type: 'error', text: err.message || 'Failed to save profile details.' });
+        } finally {
+            setSavingProfile(false);
+        }
+    };
+
     const tabs = [
         { id: 'profile', label: 'Profile', icon: User },
         ...(user?.role === 'admin' ? [
@@ -431,7 +486,36 @@ const Settings = () => {
                             <div className="space-y-6">
                                 <div className="flex justify-between items-center border-b pb-4 dark:border-slate-700">
                                     <h3 className="text-xl font-bold text-gray-900 dark:text-white">Your Profile</h3>
-                                    {loadingProfile && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>}
+                                    <div className="flex items-center gap-2">
+                                        {loadingProfile && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>}
+                                        {!isEditingProfile ? (
+                                            <button
+                                                onClick={() => setIsEditingProfile(true)}
+                                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+                                            >
+                                                <Pencil size={14} />
+                                                Edit Details
+                                            </button>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => { setIsEditingProfile(false); setEditEmail(user?.email || ''); setEditPhone(lecturerDetails?.phone_number || ''); }}
+                                                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+                                                >
+                                                    <X size={14} />
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={handleSaveProfile}
+                                                    disabled={savingProfile}
+                                                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                                                >
+                                                    <Save size={14} />
+                                                    {savingProfile ? 'Saving...' : 'Save Details'}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -446,10 +530,60 @@ const Settings = () => {
 
                                         <div>
                                             <label className="block text-xs font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-2">Email Address</label>
-                                            <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-gray-100 dark:border-slate-800">
-                                                <Mail size={18} className="text-gray-400" />
-                                                <span className="font-medium">{user?.email || 'N/A'}</span>
-                                            </div>
+                                            {isEditingProfile ? (
+                                                <div className="flex flex-col gap-1.5">
+                                                    <div className="flex items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-xl border-2 border-indigo-300 dark:border-indigo-700">
+                                                        <Mail size={18} className="text-indigo-400 shrink-0" />
+                                                        <input
+                                                            type="email"
+                                                            value={editEmail}
+                                                            onChange={(e) => setEditEmail(e.target.value)}
+                                                            className="flex-1 bg-transparent text-gray-900 dark:text-white font-medium focus:outline-none"
+                                                            placeholder="your@email.com"
+                                                        />
+                                                    </div>
+                                                    <p className="text-[10px] text-amber-600 dark:text-amber-400 italic pl-1">Changing email requires confirmation from the new address.</p>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-gray-100 dark:border-slate-800">
+                                                    <Mail size={18} className="text-gray-400 shrink-0" />
+                                                    <div className="flex flex-col">
+                                                        <span className="font-medium">{user?.email || 'N/A'}</span>
+                                                        {user?.new_email && user.new_email !== user.email && (
+                                                            <div className="flex items-center gap-1.5 mt-1">
+                                                                <span className="relative flex h-2 w-2">
+                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                                                </span>
+                                                                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">
+                                                                    Pending confirmation to: <span className="underline italic">{user.new_email}</span>
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-widest text-gray-400 dark:text-slate-500 mb-2">Phone Number</label>
+                                            {isEditingProfile ? (
+                                                <div className="flex items-center gap-3 bg-white dark:bg-slate-800 p-3 rounded-xl border-2 border-indigo-300 dark:border-indigo-700">
+                                                    <Phone size={18} className="text-indigo-400 shrink-0" />
+                                                    <input
+                                                        type="tel"
+                                                        value={editPhone}
+                                                        onChange={(e) => setEditPhone(e.target.value)}
+                                                        className="flex-1 bg-transparent text-gray-900 dark:text-white font-medium focus:outline-none"
+                                                        placeholder="e.g. +60 12-345 6789"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-gray-100 dark:border-slate-800">
+                                                    <Phone size={18} className="text-gray-400" />
+                                                    <span className="font-medium">{lecturerDetails?.phone_number || <span className="text-gray-400 italic">Not set</span>}</span>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div>

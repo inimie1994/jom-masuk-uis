@@ -126,13 +126,12 @@ export const AuthProvider = ({ children }) => {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             console.log('AuthContext: onAuthStateChange event:', event);
-            fetchProfile(session);
-
-            // Handle audit logging for SIGNED_IN event
-            if (event === 'SIGNED_IN' && session?.user) {
-                // We'll delay the audit log until we're sure the profile is loaded via fetchProfile
-                // or just log with what we have if it's simpler.
+            
+            if (event === 'USER_UPDATED' && session?.user) {
+                console.log('AuthContext: User profile updated (could be email confirmation success)');
             }
+
+            fetchProfile(session);
         });
 
         return () => {

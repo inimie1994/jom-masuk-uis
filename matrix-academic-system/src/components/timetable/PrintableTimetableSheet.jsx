@@ -1,105 +1,105 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import uisLogo from '../../assets/LOGO-RASMI-UIS cropped.png';
 
 const PrintableTimetableSheet = ({
     lecturer,
     timetable = [],
     activities = [],
-    semesterSession = "", // Updated default
+    studentCounts = {},
+    semesterSession = "",
     className
 }) => {
-    // Helper to calculate hours
-    const calculateHours = (start, end) => {
-        if (!start || !end) return 0;
-        const startH = parseInt(start.split(':')[0]);
-        const endH = parseInt(end.split(':')[0]);
-        if (isNaN(startH) || isNaN(endH)) return 0;
-        return Math.max(0, endH - startH);
+    // 1. Setup Time Slots (8.00 to 5.00 + Malam)
+    const timeSlots = [
+        { label: '8.00', start: 8 },
+        { label: '9.00', start: 9 },
+        { label: '10.00', start: 10 },
+        { label: '11.00', start: 11 },
+        { label: '12.00', start: 12 },
+        { label: '1.00', start: 13 },
+        { label: '2.00', start: 14 },
+        { label: '3.00', start: 15 },
+        { label: '4.00', start: 16 },
+        { label: '5.00', start: 17 },
+        { label: 'Malam', start: 18 } // Simplified for evening classes
+    ];
+
+    const days = [
+        { key: 'Monday', label: 'ISNIN' },
+        { key: 'Tuesday', label: 'SELASA' },
+        { key: 'Wednesday', label: 'RABU' },
+        { key: 'Thursday', label: 'KHAMIS' },
+        { key: 'Friday', label: 'JUMAAT' },
+        { key: 'Saturday', label: 'SABTU' },
+        { key: 'Sunday', label: 'AHAD' }
+    ];
+
+    // Helper to get hour from HH:mm:ss
+    const getHour = (timeStr) => {
+        if (!timeStr) return 0;
+        const h = parseInt(timeStr.split(':')[0]);
+        return h;
     };
 
-    const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const DAY_MAP = {
-        'Monday': 'Isnin',
-        'Tuesday': 'Selasa',
-        'Wednesday': 'Rabu',
-        'Thursday': 'Khamis',
-        'Friday': 'Jumaat',
-        'Saturday': 'Sabtu',
-        'Sunday': 'Ahad'
-    };
-
-    // Time slots 8.00 - 18.00 (10 slots)
-    // 8-9, 9-10, 10-11, 11-12, 12-13, 13-14 (REHAT), 14-15, 15-16, 16-17, 17-18
-    const TIME_SLOTS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
-
-    // Calculate daily totals map
-    const dailyTotals = {
-        Monday: { pdp: 0, activity: 0 },
-        Tuesday: { pdp: 0, activity: 0 },
-        Wednesday: { pdp: 0, activity: 0 },
-        Thursday: { pdp: 0, activity: 0 },
-        Friday: { pdp: 0, activity: 0 },
-        Saturday: { pdp: 0, activity: 0 },
-        Sunday: { pdp: 0, activity: 0 }
-    };
-
-    let grandTotalPdp = 0;
-    let grandTotalActivity = 0;
-
-    // Process totals
-    [...timetable, ...activities.map(a => ({ ...a, isActivity: true }))].forEach(item => {
-        const hours = calculateHours(item.start_time, item.end_time);
-        if (item.day && dailyTotals[item.day]) {
-            if (item.isActivity) {
-                dailyTotals[item.day].activity += hours;
-                grandTotalActivity += hours;
-            } else {
-                dailyTotals[item.day].pdp += hours;
-                grandTotalPdp += hours;
-            }
-        }
-    });
-
-    const getCellContent = (day, hour) => {
-        const timeStr = `${hour.toString().padStart(2, '0')}:00:00`;
-        // Check for Class
-        const classItem = timetable.find(t => t.day === day && t.start_time === timeStr);
-        if (classItem) {
-            const duration = calculateHours(classItem.start_time, classItem.end_time);
-            return {
-                type: 'class',
-                data: classItem,
-                duration
+    // 2. Prepare Data Grid
+    const gridData = useMemo(() => {
+        const grid = {};
+        days.forEach(day => {
+            grid[day.key] = {
+                slots: new Array(timeSlots.length).fill(null),
+                pdpHours: 0,
+                activityHours: 0
             };
-        }
-        // Check for Activity
-        const activityItem = activities.find(a => a.day === day && a.start_time === timeStr);
-        if (activityItem) {
-            const duration = calculateHours(activityItem.start_time, activityItem.end_time);
-            return {
-                type: 'activity',
-                data: activityItem,
-                duration
-            };
-        }
-
-        // Check if occupied by previous
-        const occupied = [...timetable, ...activities].some(t => {
-            const startH = parseInt(t.start_time.split(':')[0]);
-            const endH = parseInt(t.end_time.split(':')[0]);
-            return t.day === day && hour > startH && hour < endH;
         });
 
-        if (occupied) return { type: 'occupied' };
+        const allEvents = [
+            ...timetable.map(t => ({ ...t, type: 'pdp' })),
+            ...activities.map(a => ({ ...a, type: 'activity' }))
+        ];
 
-        return { type: 'empty' };
-    };
+        allEvents.forEach(event => {
+            const dayKey = event.day;
+            if (!grid[dayKey]) return;
+
+            const startH = getHour(event.start_time);
+            const endH = getHour(event.end_time);
+            const duration = Math.max(1, endH - startH);
+
+            if (event.type === 'pdp') grid[dayKey].pdpHours += duration;
+            else grid[dayKey].activityHours += duration;
+
+            const slotIndex = timeSlots.findIndex(s => s.start === startH);
+            if (slotIndex !== -1) {
+                grid[dayKey].slots[slotIndex] = {
+                    ...event,
+                    colSpan: duration
+                };
+                for (let i = 1; i < duration; i++) {
+                    if (slotIndex + i < timeSlots.length) {
+                        grid[dayKey].slots[slotIndex + i] = 'skip';
+                    }
+                }
+            }
+        });
+
+        return grid;
+    }, [timetable, activities]);
+
+    const uniqueCourses = useMemo(() => {
+        const subjects = timetable.map(t => t.subjects).filter(Boolean);
+        const map = new Map();
+        subjects.forEach(s => map.set(s.code, s));
+        return Array.from(map.values());
+    }, [timetable]);
+
+    const totalPdp = Object.values(gridData).reduce((sum, d) => sum + d.pdpHours, 0);
+    const totalActivity = Object.values(gridData).reduce((sum, d) => sum + d.activityHours, 0);
 
     return (
-        <div className={`printable-timetable-sheet hidden print:block print:w-full bg-white text-black font-sans text-[10px] ${className || ''}`}>
+        <div className={`printable-timetable-sheet hidden print:block print:w-full bg-white text-black font-sans p-4 ${className || ''}`}>
             <style type="text/css" media="print">
                 {`
-                    @page { size: landscape; margin: 10mm; }
+                    @page { size: landscape; margin: 8mm; }
                     @media print {
                         body > * { visibility: hidden !important; }
                         .printable-timetable-sheet, .printable-timetable-sheet * { visibility: visible !important; }
@@ -108,166 +108,165 @@ const PrintableTimetableSheet = ({
                             left: 0 !important;
                             top: 0 !important;
                             width: 100% !important;
-                            zoom: 0.85 !important;
                         }
-                        .print-cell { border: 1px solid black !important; text-align: center; vertical-align: middle; padding: 2px; }
-                        .bg-peach { background-color: #ffdab9 !important; -webkit-print-color-adjust: exact; }
-                        .bg-blue-light { background-color: #dae8fc !important; -webkit-print-color-adjust: exact; }
-                        .bg-gray-light { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; }
-                        .section-header { font-weight: bold; }
                     }
+                    .grid-table th, .grid-table td { border: 1px solid black !important; vertical-align: middle; height: 35px; }
+                    .grid-table tr.empty-row td { height: 22px !important; }
+                    .grid-table th { background: #f8fafc; font-weight: bold; text-transform: uppercase; font-size: 8px; padding: 2px; }
                 `}
             </style>
 
-            {/* Header Info */}
-            <div className="mb-4 font-bold uppercase text-xs">
-                <div className="flex mb-1">
-                    <span className="w-40">Nama Pensyarah :</span>
-                    <span className="underline">{lecturer?.name || ''}</span>
-                </div>
-                <div className="flex">
-                    <span className="w-40">Jabatan / Fakulti :</span>
-                    <span className="underline">
-                        {lecturer?.departments?.name || 'JABATAN PENGAJIAN ISLAM'} / {lecturer?.departments?.faculties?.name || 'PUSAT MATRIKULASI'}
-                    </span>
+            <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center">
+                    <img src={uisLogo} alt="UIS Logo" className="h-[70px] w-auto mr-4" />
+                    <div className="border-l-[1.5px] border-black pl-3 h-[60px] flex flex-col justify-center">
+                        <h1 className="text-sm font-bold tracking-tight leading-tight uppercase">PUSAT MATRIKULASI</h1>
+                        <h2 className="text-sm font-bold leading-tight uppercase">JADUAL KULIAH PENSYARAH</h2>
+                        <h2 className="text-sm font-bold leading-tight uppercase">{semesterSession || "SESI II TAHUN AKADEMIK 2025/2026"}</h2>
+                    </div>
                 </div>
             </div>
 
-            {/* Title */}
-            <div className="text-center font-bold uppercase text-sm mb-2">
-                JUMLAH JAM KESELURUHAN SEMINGGU – {semesterSession}
+            <div className="grid grid-cols-[1fr_auto_auto] gap-12 text-[8px] items-start mb-4">
+                <div className="space-y-0.5">
+                    <div className="grid grid-cols-[90px_10px_1fr]">
+                        <span>NAMA PENSYARAH</span><span>:</span><span className="uppercase">{lecturer?.name || ''}</span>
+                    </div>
+                    <div className="grid grid-cols-[90px_10px_1fr]">
+                        <span>JABATAN</span><span>:</span><span className="uppercase">{lecturer?.departments?.name || ''}</span>
+                    </div>
+                    <div className="grid grid-cols-[90px_10px_1fr]">
+                        <span>KURSUS</span><span>:</span>
+                        <div className="flex flex-col uppercase">
+                            {uniqueCourses.length > 0 ? uniqueCourses.map((c, idx) => (
+                                <div key={idx}>{c.code} - {c.name}</div>
+                            )) : <span>-</span>}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-1">
+                    <div className="grid grid-cols-[14px_10px_1fr] items-center">
+                        <div className="flex justify-center text-[10px]">☏</div>
+                        <span>:</span><span>03-89117000 ext:</span>
+                    </div>
+                    <div className="grid grid-cols-[14px_10px_1fr] items-center">
+                        <div className="flex justify-center text-[10px]">📱</div>
+                        <span>:</span><span>{lecturer?.phone_number || ''}</span>
+                    </div>
+                    <div className="grid grid-cols-[14px_10px_1fr] items-center">
+                        <div className="flex justify-center text-[10px]">✉</div>
+                        <span>:</span><span className="text-blue-700 underline lowercase">{lecturer?.email || ''}</span>
+                    </div>
+                </div>
+
+                <div className="space-y-1 pr-16 border-none">
+                    <div className="grid grid-cols-[90px_10px_1fr]">
+                        <span>JAM PENGAJARAN</span><span>:</span><span>{totalPdp} JAM</span>
+                    </div>
+                </div>
             </div>
 
-            {/* Main Table */}
-            <table className="w-full border-collapse border border-black text-center">
+            <table className="w-full border-collapse grid-table text-center text-[7px] leading-tight mb-2">
                 <thead>
-                    <tr className="h-10">
-                        <th rowSpan={2} className="print-cell w-20">Hari</th>
-                        {TIME_SLOTS.map(hour => (
-                            hour !== 13 ? (
-                                <th key={hour} rowSpan={2} className="print-cell w-24">
-                                    {hour}.00 –<br />{(hour + 1)}.00
-                                </th>
-                            ) : (
-                                <th key={hour} rowSpan={2} className="print-cell w-8" style={{ writingMode: 'vertical-lr' }}>
-                                    REHAT
-                                </th>
-                            )
-                        ))}
-                        <th className="print-cell w-16 text-[9px]">PdP<br />(jam)</th>
-                        <th className="print-cell w-20 text-[9px]">Lain-Lain<br />Aktiviti<br />(jam)</th>
-                    </tr>
-                    <tr className="h-6">
-                        <th className="print-cell bg-blue-light"></th>
-                        <th className="print-cell bg-peach"></th>
+                    <tr>
+                        <th className="w-16">HARI/ WAKTU</th>
+                        {timeSlots.map(s => <th key={s.label} className="w-16">{s.label}</th>)}
+                        <th className="w-10">PdP (jam)</th>
+                        <th className="w-10 italic">Lain-lain Aktiviti (jam)</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {DAYS.map((day, dayIndex) => {
-                        // Skip rendering Sunday if empty? No, render all 7 days usually. E.g. Isnin-Ahad.
-                        // Actually let's assume Monday-Sunday row rendering.
-
-                        const isWeekend = day === 'Saturday' || day === 'Sunday';
-
+                    {days.map(day => {
+                        const isEmpty = gridData[day.key].pdpHours === 0 && gridData[day.key].activityHours === 0;
                         return (
-                            <tr key={day} className={isWeekend ? "h-10" : "h-16"}>
-                                <td className="print-cell font-bold">{DAY_MAP[day]}</td>
-
-                                {TIME_SLOTS.map((hour) => {
-                                    if (hour === 13) {
-                                        // REHAT Column - RowSpan 7 on first day
-                                        if (dayIndex === 0) {
-                                            return (
-                                                <td key={hour} rowSpan={DAYS.length} className="print-cell font-bold" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-                                                    REHAT
-                                                </td>
-                                            );
-                                        } else {
-                                            return null;
-                                        }
-                                    }
-
-                                    const content = getCellContent(day, hour);
-
-                                    if (content.type === 'occupied') return null;
-
-                                    if (content.type === 'class') {
-                                        // Colors: Classes usually blue-ish
-                                        return (
-                                            <td key={hour} colSpan={content.duration} className="print-cell bg-blue-light">
-                                                <div className="font-bold">{content.data.subjects?.code}</div>
-                                                <div className="uppercase">{content.data.class_type}</div>
-                                                <div>{content.data.room}</div>
-                                                {/* Group Names */}
-                                                <div className="text-[9px]">
-                                                    {Array.isArray(content.data.group_names)
-                                                        ? content.data.group_names.join(', ')
-                                                        : content.data.group_names}
-                                                </div>
-                                            </td>
-                                        );
-                                    }
-
-                                    if (content.type === 'activity') {
-                                        // Colors: Activities usually peach/orange
-                                        return (
-                                            <td key={hour} colSpan={content.duration} className="print-cell bg-peach">
-                                                <div className="font-bold uppercase">{content.data.activity_type}</div>
-                                                <div className="italic">{content.data.description}</div>
-                                            </td>
-                                        );
-                                    }
-
-                                    return <td key={hour} className="print-cell"></td>;
-                                })}
-
-                                {/* Totals Columns */}
-                                <td className="print-cell bg-blue-light font-bold text-sm">
-                                    {dailyTotals[day].pdp || 0}
-                                </td>
-                                <td className="print-cell bg-peach font-bold text-sm">
-                                    {dailyTotals[day].activity || 0}
-                                </td>
-                            </tr>
-                        );
-                    })}
-
-                    {/* Grand Total Row */}
-                    <tr className="h-10 bg-gray-light">
-                        <td colSpan={11} className="print-cell text-right pr-4 font-bold">
-                            Jumlah Jam
-                        </td>
-                        <td className="print-cell font-bold text-sm bg-blue-light">{grandTotalPdp}</td>
-                        <td className="print-cell font-bold text-sm bg-peach">{grandTotalActivity}</td>
+                            <tr key={day.key} className={isEmpty ? 'empty-row' : ''}>
+                                <td className="font-bold bg-slate-50 text-[8px]">{day.label}</td>
+                            {gridData[day.key].slots.map((slot, i) => {
+                                if (slot === 'skip') return null;
+                                if (!slot) return <td key={i}></td>;
+                                
+                                return (
+                                    <td key={i} colSpan={slot.colSpan} className="p-1 font-medium bg-white border border-black">
+                                        {slot.type === 'pdp' || slot.subjects ? (
+                                            <div className="flex flex-col justify-center h-full">
+                                                <div className="text-[7.5px]">{slot.subjects?.code}</div>
+                                                <div className="font-bold text-[7.5px]">{slot.class_type?.toUpperCase()}</div>
+                                                <div className="text-[6.5px]">[{slot.room || ''}] [{Array.isArray(slot.group_names) ? slot.group_names.join(', ') : slot.group_names}]</div>
+                                            </div>
+                                        ) : (
+                                            <div className="uppercase font-bold text-[7.5px]">{slot.activity_type || 'AKTIVITI'}</div>
+                                        )}
+                                    </td>
+                                );
+                            })}
+                            <td className="font-bold text-[9px]">{gridData[day.key].pdpHours || '0'}</td>
+                            <td className="font-bold text-[9px]">{gridData[day.key].activityHours || '0'}</td>
+                        </tr>
+                    );
+                })}
+                    <tr className="font-bold text-[9px]">
+                        <td colSpan={12} className="text-right border-none h-8 pr-2">Jumlah Jam</td>
+                        <td className="border border-black">{totalPdp}</td>
+                        <td className="border border-black">{totalActivity}</td>
                     </tr>
-                    <tr className="h-10 text-white bg-gray-600 print:bg-gray-600 border-t-2 border-black">
-                        <td colSpan={11} className="print-cell text-right pr-4 font-bold text-white uppercase tracking-wider">
-                            Jumlah Jam Keseluruhan Seminggu
-                        </td>
-                        <td colSpan={2} className="print-cell font-bold text-sm text-white text-center">
-                            {grandTotalPdp + grandTotalActivity}
-                        </td>
+                    <tr className="font-bold text-[9px]">
+                        <td colSpan={12} className="text-right border-none h-8 pr-2">Jumlah Jam Keseluruhan</td>
+                        <td colSpan={2} className="border border-black text-center">{totalPdp + totalActivity}</td>
                     </tr>
-
                 </tbody>
             </table>
 
-            {/* Footer Signatures */}
-            <div className="flex justify-between mt-12 px-4 uppercase text-xs">
-                <div className="text-center">
-                    <div className="mb-16">Disediakan oleh:</div>
-                    <div className="border-t border-black w-48 border-dotted"></div>
+            <div className="flex justify-between items-start mt-8 text-[8px]">
+                {/* Left: Disediakan Oleh */}
+                <div className="w-[300px]">
+                    <p className="font-bold mb-6">DISEDIAKAN OLEH:</p>
+                    <div className="space-y-1">
+                        <div className="grid grid-cols-[90px_10px_1fr]">
+                            <span className="font-bold">NAMA</span>
+                            <span>:</span>
+                            <span className="uppercase">{lecturer?.name || ''}</span>
+                        </div>
+                        <div className="grid grid-cols-[90px_10px_1fr]">
+                            <span className="font-bold">JAWATAN</span>
+                            <span>:</span>
+                            <span className="uppercase">
+                                {lecturer?.role?.toUpperCase() === 'HOD' ? 'Ketua Jabatan' : 
+                                 lecturer?.role?.toUpperCase() === 'HOP' ? 'Ketua Program' : 
+                                 lecturer?.role?.toUpperCase() === 'LECTURER' ? 'Pensyarah' : 
+                                 lecturer?.role || ''}
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-[90px_10px_1fr]">
+                            <span className="font-bold">TARIKH</span>
+                            <span>:</span>
+                            <span>{new Date().toLocaleDateString('en-GB').replace(/\//g, '.')}</span>
+                        </div>
+                    </div>
                 </div>
-                <div className="text-center">
-                    <div className="mb-16">Disemak oleh:</div>
-                    <div className="border-t border-black w-48 border-dotted"></div>
-                </div>
-                <div className="text-center">
-                    <div className="mb-16">Diluluskan oleh:</div>
-                    <div className="border-t border-black w-48 border-dotted"></div>
+
+                {/* Right: Disahkan Oleh */}
+                <div className="w-[300px]">
+                    <p className="font-bold mb-6">DISAHKAN OLEH:</p>
+                    <div className="space-y-1">
+                        <div className="grid grid-cols-[90px_10px_1fr]">
+                            <span className="font-bold">NAMA</span>
+                            <span>:</span>
+                            <span></span>
+                        </div>
+                        <div className="grid grid-cols-[90px_10px_1fr]">
+                            <span className="font-bold">JAWATAN</span>
+                            <span>:</span>
+                            <span></span>
+                        </div>
+                        <div className="grid grid-cols-[90px_10px_1fr]">
+                            <span className="font-bold">TARIKH</span>
+                            <span>:</span>
+                            <span></span>
+                        </div>
+                    </div>
                 </div>
             </div>
-
         </div>
     );
 };
